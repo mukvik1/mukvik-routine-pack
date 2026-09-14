@@ -121,3 +121,85 @@ dialog{border:0;padding:0;background:#0b0b0b;color:#fff;width:min(92vw,460px);bo
 @media(max-width:520px){
   .hero-product{height:420px}
 }
+
+
+/* v4: turn poster artwork into a box-focused product hero */
+@media (min-width:901px){
+  .hero{grid-template-columns:.9fr 1.1fr;overflow:hidden}
+  .hero-product{
+    height:585px;
+    width:100%;
+    justify-self:stretch;
+    align-self:center;
+    overflow:hidden;
+    padding:0;
+    background:
+      radial-gradient(circle at 78% 40%,rgba(20,92,255,.22),transparent 24%),
+      linear-gradient(115deg,#0a0b0f 0%,#050608 60%,#10131a 100%);
+    clip-path:polygon(3% 2%,97% 0,100% 6%,98% 17%,100% 29%,98% 44%,100% 57%,98% 70%,100% 84%,97% 100%,5% 98%,0 91%,2% 78%,0 65%,2% 51%,0 38%,2% 24%,0 10%);
+    box-shadow:0 18px 38px rgba(0,0,0,.36);
+  }
+  .hero-product img{
+    position:absolute;
+    width:650px;
+    height:auto;
+    max-width:none;
+    left:50%;
+    top:-205px;
+    transform:translateX(-50%);
+    object-fit:initial;
+    filter:contrast(1.12) saturate(.94);
+  }
+  .hero-product:before{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:2;
+    background:
+      linear-gradient(90deg,rgba(7,7,8,.92) 0%,transparent 14%,transparent 84%,rgba(7,7,8,.9) 100%),
+      linear-gradient(0deg,rgba(7,7,8,.82) 0%,transparent 12%,transparent 90%,rgba(7,7,8,.55) 100%);
+    clip-path:none;
+    width:auto;height:auto;right:0;top:0;opacity:1;
+    pointer-events:none;
+  }
+  .hero-product:after{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:3;
+    background-image:
+      radial-gradient(circle at 18% 18%,rgba(255,255,255,.09),transparent 22%),
+      radial-gradient(circle at 78% 72%,rgba(255,255,255,.06),transparent 30%);
+    mix-blend-mode:screen;
+    pointer-events:none;
+    left:0;bottom:0;width:auto;height:auto;opacity:1;clip-path:none;
+  }
+  .scribble-a{right:10%;top:48%;z-index:7}
+  .scribble-b{right:1.5%;bottom:7%;z-index:7}
+  .scribble-c{right:34%;bottom:11%;z-index:7}
+}
+@media(max-width:900px){
+  .hero-product{
+    height:460px;
+    overflow:hidden;
+    background:
+      radial-gradient(circle at 72% 38%,rgba(20,92,255,.2),transparent 25%),
+      #08090d;
+    clip-path:polygon(2% 0,98% 1%,100% 8%,98% 18%,100% 30%,98% 44%,100% 58%,98% 73%,100% 88%,97% 100%,3% 99%,0 90%,2% 76%,0 61%,2% 47%,0 33%,2% 19%,0 8%);
+  }
+  .hero-product img{
+    position:absolute;
+    width:530px;
+    max-width:none;
+    height:auto;
+    left:50%;
+    top:-165px;
+    transform:translateX(-50%);
+    object-fit:initial;
+    filter:contrast(1.1);
+  }
+}
+@media(max-width:520px){
+  .hero-product{height:420px}
+  .hero-product img{width:485px;top:-145px}
+}
