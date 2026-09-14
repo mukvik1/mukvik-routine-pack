@@ -60,3 +60,64 @@ dialog{border:0;padding:0;background:#0b0b0b;color:#fff;width:min(92vw,460px);bo
 @media(max-width:520px){
   .hero h1{font-size:15.2vw}.hero-product{height:390px}.pack-strip{grid-template-columns:repeat(4,108px)}.tracklist li{font-size:11px}
 }
+
+/* v3 reference-match refinements */
+@media (min-width:901px){
+  .site-header{height:88px;padding-top:8px;padding-bottom:8px}
+  .logo-wrap{width:205px;height:70px}
+  .hero{min-height:630px;grid-template-columns:.86fr 1.14fr;padding:42px 54px 34px}
+  .hero-copy{padding-left:8px}
+  .hero h1{font-size:clamp(70px,7.15vw,118px);margin-bottom:18px}
+  .subtitle{margin-top:2px}
+  .hero-product{height:585px;justify-content:flex-end;padding-right:54px}
+  .hero-product img{width:min(100%,720px);height:100%;object-fit:contain;transform:scale(1.12);transform-origin:center}
+  .scribble-a{right:13%;top:49%}
+  .scribble-b{right:1.5%;bottom:7%}
+  .scribble-c{right:35%;bottom:13%}
+  .pack-strip{margin-top:0}
+  .pack-card{min-height:118px}
+  .tracklist{padding-top:18px}
+}
+.hero:before{
+  content:"";
+  position:absolute;
+  left:0;right:0;top:0;bottom:0;
+  pointer-events:none;
+  background:
+    linear-gradient(165deg,transparent 0 80%,rgba(0,0,0,.06) 80.5% 82%,transparent 82.5%),
+    linear-gradient(15deg,rgba(0,0,0,.05),transparent 18%),
+    radial-gradient(ellipse at 88% 18%,rgba(0,0,0,.08),transparent 30%);
+  mix-blend-mode:multiply;
+}
+.hero .hero-product:before{
+  content:"";
+  position:absolute;
+  right:-44px;
+  top:24px;
+  width:120px;
+  height:250px;
+  background:#080808;
+  clip-path:polygon(28% 0,100% 10%,88% 28%,100% 44%,84% 62%,100% 80%,70% 100%,0 88%,15% 68%,0 50%,18% 32%,0 16%);
+  opacity:.96;
+  z-index:-1;
+}
+.hero .hero-product:after{
+  content:"";
+  position:absolute;
+  left:-34px;
+  bottom:15px;
+  width:160px;
+  height:90px;
+  background:#0a0a0a;
+  clip-path:polygon(0 26%,18% 8%,36% 34%,54% 2%,70% 31%,85% 12%,100% 38%,100% 100%,0 100%);
+  opacity:.95;
+  z-index:-1;
+}
+@media(max-width:900px){
+  .hero{padding-top:18px}
+  .hero-product{height:455px;margin-top:2px}
+  .hero-product img{transform:scale(1.08)}
+}
+@media(max-width:520px){
+  .hero-product{height:420px}
+}
