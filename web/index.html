@@ -3,99 +3,55 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="theme-color" content="#050505" />
   <title>MUKVIK — Routine Pack Volume 1</title>
   <meta name="description" content="DJ Tools for Real DJs. Routine Pack Volume 1 by MUKVIK. Includes MP3 + Videos." />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=3" />
 </head>
 <body>
-  <div class="noise" aria-hidden="true"></div>
-
-  <header class="site-header">
-    <a href="#top" class="logo-wrap" aria-label="Mukvik home">
-      <img src="./assets/mukvik-logo.png" alt="MUKVIK" class="logo-img" />
-    </a>
-    <nav class="desktop-nav" aria-label="Primary">
-      <a class="active" href="#top">HOME</a>
-      <a href="#packs">PACKS</a>
-      <a href="#tracklist">DEMOS</a>
-      <a href="#footer">ABOUT</a>
-    </nav>
-    <div class="header-actions">
-      <button class="cart-button" data-buy aria-label="Open cart">🛒</button>
-      <button class="menu-button" aria-label="Open menu"><span></span><span></span><span></span></button>
-    </div>
-  </header>
-
-  <main id="top">
-    <section class="hero paper-panel">
-      <span class="tear tear-tl"></span>
-      <span class="tear tear-br"></span>
+<div class="noise"></div>
+<header class="site-header">
+  <a href="#top" class="logo-wrap"><img src="./assets/mukvik-logo.png" alt="MUKVIK"></a>
+  <nav><a class="active" href="#top">HOME</a><a href="#packs">PACKS</a><a href="#tracklist">DEMOS</a><a href="#footer">ABOUT</a></nav>
+  <button class="cart-button" data-buy aria-label="Cart">🛒</button>
+</header>
+<main id="top">
+  <section class="hero">
+    <div class="paper">
       <div class="hero-copy">
         <h1>DJ TOOLS<br>FOR <mark>REAL</mark> DJS.</h1>
-        <p class="subtitle">ROUTINE PACK VOLUME 1</p>
-        <p class="price">$49</p>
+        <p class="subtitle">ROUTINE PACK VOLUME 1</p><p class="price">$49</p>
         <button class="cta" data-buy>GET THE PACK <span>→</span></button>
-        <div class="includes" aria-label="Includes MP3 and videos">
-          <span class="media-icon">▶</span>
-          <span class="media-icon">♫</span>
-          <span>INCLUDES MP3 + VIDEOS</span>
-        </div>
+        <div class="includes"><i>▶</i><i>♫</i><b>INCLUDES MP3 + VIDEOS</b></div>
       </div>
-
-      <div class="hero-product" aria-label="Routine Pack Volume 1">
-        <img class="routine-box-art" src="./assets/routine-box.webp" alt="MUKVIK Routine Pack Volume 1" />
-      </div>
-
-      <div class="scribble scribble-a">REAL<br>DJS<br>ONLY.</div>
-      <div class="scribble scribble-b">TRANSITIONS<br>BUILD<br>BETTER<br>SETS.</div>
-      <div class="scribble scribble-c">MUSIC<br>PEOPLE<br>CULTURE<br>ALWAYS.</div>
-    </section>
-
-    <section id="packs" class="pack-strip">
-      <article class="pack-card active-pack">
-        <div class="pack-thumb"><img src="./assets/routine-box.webp" alt="" /></div>
-        <div><strong>VOLUME 1</strong><span>ROUTINE PACK</span></div>
-      </article>
-      <article class="pack-card locked"><span class="lock">🔒</span><div><strong>VOLUME 2</strong><span>COMING SOON</span></div></article>
-      <article class="pack-card locked"><span class="lock">🔒</span><div><strong>VOLUME 3</strong><span>COMING SOON</span></div></article>
-      <article class="pack-card locked"><span class="lock">🔒</span><div><strong>VOLUME 4</strong><span>COMING SOON</span></div></article>
-    </section>
-
-    <section id="tracklist" class="tracklist paper-panel">
-      <div class="section-head">
-        <h2>VOLUME 1 TRACKLIST</h2>
-      </div>
-      <ol>
-        <li><span class="num">01</span><div class="route"><span>Eve & Rihanna — Who’s That Girl</span><b>→</b><span>Shake It To The Max</span><b>→</b><span>50 Cent — Just a Lil Bit</span><b>→</b><span>Snoop Dogg & Pharrell Williams — Drop It Like It’s Hot</span></div></li>
-        <li><span class="num">02</span><div class="route"><span>Hugel — PYHU</span><b>→</b><span>Eminem — Without Me</span><b>→</b><span>PAPI x Shik Shak Shok</span></div></li>
-        <li><span class="num">03</span><div class="route"><span>Sean Paul — Temperature</span><b>→</b><span>Tokyo Drift</span><b>→</b><span>m.A.A.d City</span></div></li>
-        <li><span class="num">04</span><div class="route"><span>Black Eyed Peas — Shut Up</span><b>→</b><span>The Ting Tings — Shut Up And Let Me Go</span></div></li>
-        <li><span class="num">05</span><div class="route"><span>Axel F</span><b>→</b><span>Promiscuous</span></div></li>
-        <li><span class="num">06</span><div class="route"><span><strong>BONUS:</strong> Pornhub Intro</span><b>→</b><span>Jay-Z — Empire State Of Mind</span></div></li>
-      </ol>
-      <div class="track-note">SAME SONGS.<br>DIFFERENT ENERGY.</div>
-    </section>
-  </main>
-
-  <footer id="footer">
-    <div class="footer-logo"><img src="./assets/mukvik-logo.png" alt="MUKVIK" /></div>
-    <span>DJ TOOLS FOR REAL DJS.</span>
-    <span>© 2026</span>
-  </footer>
-
-  <dialog id="checkout">
-    <form method="dialog" class="checkout-card">
-      <button class="close" value="cancel" aria-label="Close">×</button>
-      <p class="checkout-kicker">ROUTINE PACK VOLUME 1</p>
-      <p class="checkout-price">$49</p>
-      <p class="checkout-includes">INCLUDES MP3 + VIDEOS</p>
-      <label>Email<input type="email" placeholder="you@email.com" required /></label>
-      <button class="cta full" value="default">CONTINUE</button>
-      <p class="checkout-note">Payment connection comes next.</p>
-    </form>
-  </dialog>
-
-  <script src="./app.js"></script>
-</body>
-</html>
+    </div>
+    <div class="product-stage">
+      <div class="club-poster"></div>
+      <img class="product" src="./assets/routine-pack.png?v=3" onerror="this.onerror=null;this.src='./assets/routine-box.webp?v=3'" alt="MUKVIK Routine Pack Volume 1">
+      <div class="real">REAL<br>DJS.<br>ONLY.</div>
+      <div class="culture">MUSIC<br>PEOPLE<br>CULTURE<br>ALWAYS.</div>
+      <div class="transitions">TRANSITIONS<br>BUILD BETTER<br>SETS.</div>
+    </div>
+  </section>
+  <section id="packs" class="pack-strip">
+    <article class="pack-card active-pack"><img src="./assets/routine-pack.png?v=3" onerror="this.onerror=null;this.src='./assets/routine-box.webp?v=3'" alt=""><div><strong>VOLUME 1</strong><span>ROUTINE PACK</span></div></article>
+    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 2</strong><span>COMING SOON</span></div></article>
+    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 3</strong><span>COMING SOON</span></div></article>
+    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 4</strong><span>COMING SOON</span></div></article>
+  </section>
+  <section id="tracklist" class="tracklist">
+    <h2>VOLUME 1 TRACKLIST</h2>
+    <ol>
+      <li><b>01</b><span>Eve & Rihanna — Who’s That Girl　→　Shake It To The Max　→　50 Cent — Just a Lil Bit　→　Snoop Dogg & Pharrell Williams — Drop It Like It’s Hot</span></li>
+      <li><b>02</b><span>Hugel — PYHU　→　Eminem — Without Me　→　PAPI x Shik Shak Shok</span></li>
+      <li><b>03</b><span>Sean Paul — Temperature　→　Tokyo Drift　→　m.A.A.d City</span></li>
+      <li><b>04</b><span>Black Eyed Peas — Shut Up　→　The Ting Tings — Shut Up And Let Me Go</span></li>
+      <li><b>05</b><span>Axel F　→　Promiscuous</span></li>
+      <li><b>06</b><span><strong>BONUS:</strong> Pornhub Intro　→　Jay-Z — Empire State Of Mind</span></li>
+    </ol><div class="track-note">SAME SONGS.<br>DIFFERENT ENERGY.</div>
+  </section>
+</main>
+<footer id="footer"><img src="./assets/mukvik-logo.png" alt="MUKVIK"><span>DJ TOOLS FOR REAL DJS.</span><span>© 2026</span></footer>
+<dialog id="checkout"><form method="dialog" class="checkout-card"><button class="close" value="cancel">×</button><p>ROUTINE PACK VOLUME 1</p><h2>$49</h2><p>INCLUDES MP3 + VIDEOS</p><label>Email<input type="email" placeholder="you@email.com" required></label><button class="cta" value="default">CONTINUE</button></form></dialog>
+<script src="./app.js"></script>
+</body></html>
