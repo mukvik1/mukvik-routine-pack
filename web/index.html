@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#050505" />
   <title>MUKVIK — Routine Pack Volume 1</title>
   <meta name="description" content="DJ Tools for Real DJs. Routine Pack Volume 1 by MUKVIK. Includes MP3 + Videos." />
-  <link rel="stylesheet" href="./styles.css?v=3" />
+  <link rel="stylesheet" href="./styles.css?v=10" />
 </head>
 <body>
 <div class="noise"></div>
 <header class="site-header">
   <a href="#top" class="logo-wrap"><img src="./assets/mukvik-logo.png" alt="MUKVIK"></a>
-  <nav><a class="active" href="#top">HOME</a><a href="#packs">PACKS</a><a href="#tracklist">DEMOS</a><a href="#footer">ABOUT</a></nav>
-  <button class="cart-button" data-buy aria-label="Cart">🛒</button>
+  <nav><a class="active" href="#top">HOME</a><a href="#packs">PACKS</a><a href="#tracklist">TRACKLIST</a><a href="#footer">ABOUT</a></nav>
+  <button class="cart-button" data-buy aria-label="Cart"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/></svg></button>
 </header>
 <main id="top">
   <section class="hero">
@@ -22,36 +22,35 @@
         <h1>DJ TOOLS<br>FOR <mark>REAL</mark> DJS.</h1>
         <p class="subtitle">ROUTINE PACK VOLUME 1</p><p class="price">$49</p>
         <button class="cta" data-buy>GET THE PACK <span>→</span></button>
-        <div class="includes"><i>▶</i><i>♫</i><b>INCLUDES MP3 + VIDEOS</b></div>
+        <div class="includes"><i aria-hidden="true"><span class="desktop-symbol">▶</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l12-7z"/></svg></i><i aria-hidden="true"><span class="desktop-symbol">♫</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18V5l11-2v13M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></svg></i><b>INCLUDES MP3 + VIDEOS</b></div>
       </div>
     </div>
-    <div class="product-stage">
-      <div class="club-poster"></div>
-      <img class="product" src="./assets/routine-pack.png?v=3" onerror="this.onerror=null;this.src='./assets/routine-box.webp?v=3'" alt="MUKVIK Routine Pack Volume 1">
-      <div class="real">REAL<br>DJS.<br>ONLY.</div>
-      <div class="culture">MUSIC<br>PEOPLE<br>CULTURE<br>ALWAYS.</div>
-      <div class="transitions">TRANSITIONS<br>BUILD BETTER<br>SETS.</div>
-    </div>
+    <section class="video-stage" aria-label="Routine videos">
+      <div class="video-heading"><span>SEE IT IN ACTION</span><span id="video-count" aria-live="polite">01 / 05</span></div>
+      <div class="video-frame"><video id="routine-player" poster="./assets/videos/poster-1.jpg" controls playsinline preload="auto" aria-label="MUKVIK routine video 1 of 5"></video></div>
+      <div class="video-selector" role="group" aria-label="Choose a video"><button type="button" class="video-choice selected" data-video="1" aria-pressed="true" aria-label="Show video 1"><img src="./assets/videos/poster-1.jpg" alt="" width="72" height="128"><span>VIDEO 01</span></button><button type="button" class="video-choice" data-video="2" aria-pressed="false" aria-label="Show video 2"><img src="./assets/videos/poster-2.jpg" alt="" width="72" height="128"><span>VIDEO 02</span></button><button type="button" class="video-choice" data-video="3" aria-pressed="false" aria-label="Show video 3"><img src="./assets/videos/poster-3.jpg" alt="" width="72" height="128"><span>VIDEO 03</span></button><button type="button" class="video-choice" data-video="4" aria-pressed="false" aria-label="Show video 4"><img src="./assets/videos/poster-4.jpg" alt="" width="72" height="128"><span>VIDEO 04</span></button><button type="button" class="video-choice" data-video="5" aria-pressed="false" aria-label="Show video 5"><img src="./assets/videos/poster-5.jpg" alt="" width="72" height="128"><span>VIDEO 05</span></button></div>
+      <a id="instagram-video-link" class="video-source" href="https://www.instagram.com/mukvik.ofc/" target="_blank" rel="noopener noreferrer" aria-label="MUKVIK on Instagram"><span>MUKVIK ON</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle class="video-source-dot" cx="17.4" cy="6.7" r="1"/></svg></a>
+    </section>
   </section>
   <section id="packs" class="pack-strip">
-    <article class="pack-card active-pack"><img src="./assets/routine-pack.png?v=3" onerror="this.onerror=null;this.src='./assets/routine-box.webp?v=3'" alt=""><div><strong>VOLUME 1</strong><span>ROUTINE PACK</span></div></article>
-    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 2</strong><span>COMING SOON</span></div></article>
-    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 3</strong><span>COMING SOON</span></div></article>
-    <article class="pack-card locked"><b>▣</b><div><strong>VOLUME 4</strong><span>COMING SOON</span></div></article>
+    <article class="pack-card active-pack"><div class="mini-product" aria-hidden="true"></div><div><strong>VOLUME 1</strong><span>ROUTINE PACK</span></div></article>
+    <article class="pack-card locked"><b><svg width="24" height="28" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="12" width="16" height="13" rx="2"/><path d="M7 12V7a5 5 0 0 1 10 0v5"/></svg></b><div><strong>VOLUME 2</strong><span>COMING SOON</span></div></article>
+    <article class="pack-card locked"><b><svg width="24" height="28" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="12" width="16" height="13" rx="2"/><path d="M7 12V7a5 5 0 0 1 10 0v5"/></svg></b><div><strong>VOLUME 3</strong><span>COMING SOON</span></div></article>
+    <article class="pack-card locked"><b><svg width="24" height="28" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="12" width="16" height="13" rx="2"/><path d="M7 12V7a5 5 0 0 1 10 0v5"/></svg></b><div><strong>VOLUME 4</strong><span>COMING SOON</span></div></article>
   </section>
   <section id="tracklist" class="tracklist">
     <h2>VOLUME 1 TRACKLIST</h2>
     <ol>
-      <li><b>01</b><span>Eve & Rihanna — Who’s That Girl　→　Shake It To The Max　→　50 Cent — Just a Lil Bit　→　Snoop Dogg & Pharrell Williams — Drop It Like It’s Hot</span></li>
-      <li><b>02</b><span>Hugel — PYHU　→　Eminem — Without Me　→　PAPI x Shik Shak Shok</span></li>
-      <li><b>03</b><span>Sean Paul — Temperature　→　Tokyo Drift　→　m.A.A.d City</span></li>
-      <li><b>04</b><span>Black Eyed Peas — Shut Up　→　The Ting Tings — Shut Up And Let Me Go</span></li>
-      <li><b>05</b><span>Axel F　→　Promiscuous</span></li>
-      <li><b>06</b><span><strong>BONUS:</strong> Pornhub Intro　→　Jay-Z — Empire State Of Mind</span></li>
+      <li><b>01</b><span class="track-sequence"><span class="track-step"><span class="track-title">Eve & Rihanna — Who’s That Girl</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Shake It To The Max</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">50 Cent — Just a Lil Bit</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Snoop Dogg & Pharrell Williams — Drop It Like It’s Hot</span></span></span></li>
+      <li><b>02</b><span class="track-sequence"><span class="track-step"><span class="track-title">Hugel — PYHU</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Eminem — Without Me</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">PAPI x Shik Shak Shok</span></span></span></li>
+      <li><b>03</b><span class="track-sequence"><span class="track-step"><span class="track-title">Sean Paul — Temperature</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Tokyo Drift</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">m.A.A.d City</span></span></span></li>
+      <li><b>04</b><span class="track-sequence"><span class="track-step"><span class="track-title">Black Eyed Peas — Shut Up</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">The Ting Tings — Shut Up And Let Me Go</span></span></span></li>
+      <li><b>05</b><span class="track-sequence"><span class="track-step"><span class="track-title">Axel F</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Promiscuous</span></span></span></li>
+      <li><b>06</b><span class="track-sequence"><span class="track-step"><span class="track-title"><strong>BONUS:</strong> Pornhub Intro</span></span><span class="track-step"><span class="track-gap">　</span><span class="track-arrow" aria-label="into">→</span><span class="track-gap">　</span><span class="track-title">Jay-Z — Empire State Of Mind</span></span></span></li>
     </ol><div class="track-note">SAME SONGS.<br>DIFFERENT ENERGY.</div>
   </section>
 </main>
-<footer id="footer"><img src="./assets/mukvik-logo.png" alt="MUKVIK"><span>DJ TOOLS FOR REAL DJS.</span><span>© 2026</span></footer>
-<dialog id="checkout"><form method="dialog" class="checkout-card"><button class="close" value="cancel">×</button><p>ROUTINE PACK VOLUME 1</p><h2>$49</h2><p>INCLUDES MP3 + VIDEOS</p><label>Email<input type="email" placeholder="you@email.com" required></label><button class="cta" value="default">CONTINUE</button></form></dialog>
-<script src="./app.js"></script>
+<footer id="footer"><img src="./assets/mukvik-logo.png" alt="MUKVIK"><span>DJ TOOLS FOR REAL DJS.</span><nav class="social-links" aria-label="MUKVIK social media"><a href="https://www.instagram.com/mukvik.ofc/" target="_blank" rel="noopener noreferrer" aria-label="MUKVIK on Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle class="social-dot" cx="17.4" cy="6.7" r="1"/></svg></a><a href="https://www.youtube.com/@mukvik-ofc" target="_blank" rel="noopener noreferrer" aria-label="MUKVIK on YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8.2a3 3 0 0 0-2.1-2.1C17 5.6 12 5.6 12 5.6s-5 0-6.9.5A3 3 0 0 0 3 8.2 31 31 0 0 0 2.6 12 31 31 0 0 0 3 15.8a3 3 0 0 0 2.1 2.1c1.9.5 6.9.5 6.9.5s5 0 6.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .4-3.8 31 31 0 0 0-.4-3.8Z"/><path class="social-play" d="m10 9 5 3-5 3Z"/></svg></a><a href="https://www.tiktok.com/@mukvik.ofc" target="_blank" rel="noopener noreferrer" aria-label="MUKVIK on TikTok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.4 3v11.1a4.8 4.8 0 1 1-4.1-4.7v3.1a1.8 1.8 0 1 0 1.1 1.6V3h3Zm0 0c.5 2.6 2.1 4.1 4.6 4.5v3.1a8.2 8.2 0 0 1-4.6-1.8Z"/></svg></a></nav></footer>
+<dialog id="checkout" aria-label="Get Routine Pack Volume 1"><form method="dialog" class="checkout-card"><button class="close" value="cancel" aria-label="Close">×</button><p>ROUTINE PACK VOLUME 1</p><h2>$49</h2><p>INCLUDES MP3 + VIDEOS</p><p class="checkout-notice">Online checkout is coming soon.<br>Contact MUKVIK to ask about the pack.</p><a class="cta" href="https://www.instagram.com/mukvik.ofc/" target="_blank" rel="noopener noreferrer">CONTACT MUKVIK ↗</a></form></dialog>
+<script src="./app.js?v=10"></script>
 </body></html>
