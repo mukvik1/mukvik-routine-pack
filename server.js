@@ -10,6 +10,7 @@ const apiKey = process.env.NOWPAYMENTS_API_KEY;
 const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
 const paymentRefs = new Map();
+const paymentLookups = new Map();
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.png': 'image/png',
@@ -93,8 +94,25 @@ async function checkout(req, res) {
 
 async function paymentStatus(url, res) {
   const orderId = readOrder(url.searchParams.get('order'));
-  const paymentId = url.searchParams.get('paymentId') || paymentRefs.get(orderId);
   if (!orderId) return json(res, 400, { error: 'Invalid order link.' });
+  let paymentId = url.searchParams.get('paymentId') || paymentRefs.get(orderId);
+  if (!paymentId && apiKey) {
+    const lastLookup = paymentLookups.get(orderId) || 0;
+    if (Date.now() - lastLookup > 15000) {
+      paymentLookups.set(orderId, Date.now());
+      try {
+        const listing = await provider('/v1/payment?limit=100&page=0&sortBy=created_at&orderBy=desc');
+        const payments = Array.isArray(listing) ? listing : (listing.data || listing.payments || []);
+        const match = payments.find(item => item.order_id === orderId && /^\d{1,24}$/.test(String(item.payment_id)));
+        if (match) {
+          paymentId = String(match.payment_id);
+          paymentRefs.set(orderId, paymentId);
+        }
+      } catch (error) {
+        console.error('Payment lookup error:', error.message);
+      }
+    }
+  }
   if (!paymentId) return json(res, 200, { status: 'waiting', message: 'Return to the payment page and wait for confirmation. If you have already paid, contact MUKVIK with your payment ID.' });
   if (!/^\d{1,24}$/.test(paymentId)) return json(res, 400, { error: 'Invalid payment ID.' });
   if (!apiKey || !deliveryUrl) return json(res, 503, { error: 'Payment check is temporarily unavailable.' });
