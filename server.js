@@ -9,6 +9,7 @@ const origin = process.env.PUBLIC_ORIGIN || 'https://mukvik-routine-pack-product
 const apiKey = process.env.NOWPAYMENTS_API_KEY;
 const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
+const cardCheckoutUrl = process.env.CARD_CHECKOUT_URL;
 const paymentRefs = new Map();
 const paymentLookups = new Map();
 const types = {
@@ -181,6 +182,14 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
+  if (req.method === 'GET' && url.pathname === '/api/payment-options') {
+    let cardUrl = null;
+    try {
+      const candidate = new URL(cardCheckoutUrl);
+      if (candidate.protocol === 'https:' && (candidate.hostname === 'patreon.com' || candidate.hostname.endsWith('.patreon.com'))) cardUrl = candidate.href;
+    } catch {}
+    return json(res, 200, { cardUrl });
+  }
   if (req.method === 'POST' && url.pathname === '/api/checkout') return checkout(req, res);
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
   if (req.method === 'POST' && url.pathname === '/api/nowpayments-ipn') return ipn(req, res);

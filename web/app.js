@@ -3,6 +3,13 @@ const checkout = document.getElementById('checkout');
 document.querySelectorAll('[data-buy]').forEach((btn) => {
   btn.addEventListener('click', () => checkout.showModal());
 });
+fetch('/api/payment-options').then(response => response.json()).then(options => {
+  if (!options.cardUrl) return;
+  const cardLink = document.getElementById('card-payment');
+  cardLink.href = options.cardUrl;
+  cardLink.hidden = false;
+  document.getElementById('card-pending').hidden = true;
+}).catch(() => {});
 
 checkout.addEventListener('click', (event) => {
   if (event.target === checkout) checkout.close();
@@ -26,7 +33,7 @@ checkoutButton.addEventListener('click', async () => {
     checkoutError.textContent = error.message;
     checkoutError.hidden = false;
     checkoutButton.disabled = false;
-    checkoutButton.innerHTML = 'PAY $49 <span>→</span>';
+    checkoutButton.innerHTML = '<strong>PAY WITH CRYPTO <span>→</span></strong><small>USDT ON TRON · SECURE CHECKOUT</small>';
   }
 });
 
