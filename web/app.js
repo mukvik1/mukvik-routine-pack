@@ -3,14 +3,6 @@ const checkout = document.getElementById('checkout');
 document.querySelectorAll('[data-buy]').forEach((btn) => {
   btn.addEventListener('click', () => checkout.showModal());
 });
-fetch('/api/payment-options').then(response => response.json()).then(options => {
-  if (!options.cardUrl) return;
-  const cardLink = document.getElementById('card-payment');
-  cardLink.href = options.cardUrl;
-  cardLink.hidden = false;
-  document.getElementById('card-pending').hidden = true;
-}).catch(() => {});
-
 checkout.addEventListener('click', (event) => {
   if (event.target === checkout) checkout.close();
 });
@@ -18,24 +10,29 @@ document.querySelectorAll('dialog .close').forEach(button => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });
 
-const checkoutButton = document.getElementById('checkout-button');
+const paymentButtons = [...document.querySelectorAll('[data-payment-method]')];
 const checkoutError = document.getElementById('checkout-error');
-checkoutButton.addEventListener('click', async () => {
-  checkoutButton.disabled = true;
-  checkoutButton.textContent = 'OPENING CHECKOUT…';
+paymentButtons.forEach(button => button.addEventListener('click', async () => {
+  const originalMarkup = button.innerHTML;
+  paymentButtons.forEach(option => { option.disabled = true; });
+  button.textContent = 'OPENING CHECKOUT…';
   checkoutError.hidden = true;
   try {
-    const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const response = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentMethod: button.dataset.paymentMethod })
+    });
     const data = await response.json();
     if (!response.ok || !data.invoiceUrl) throw new Error(data.error || 'Could not open checkout. Please try again.');
     window.location.assign(data.invoiceUrl);
   } catch (error) {
     checkoutError.textContent = error.message;
     checkoutError.hidden = false;
-    checkoutButton.disabled = false;
-    checkoutButton.innerHTML = '<strong>PAY WITH CRYPTO <span>→</span></strong><small>USDT ON TRON · SECURE CHECKOUT</small>';
+    button.innerHTML = originalMarkup;
+    paymentButtons.forEach(option => { option.disabled = false; });
   }
-});
+}));
 
 const resultDialog = document.getElementById('payment-result');
 const orderToken = new URLSearchParams(window.location.search).get('order');

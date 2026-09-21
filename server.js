@@ -9,7 +9,6 @@ const origin = process.env.PUBLIC_ORIGIN || 'https://mukvik-routine-pack-product
 const apiKey = process.env.NOWPAYMENTS_API_KEY;
 const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
-const cardCheckoutUrl = process.env.CARD_CHECKOUT_URL;
 const paymentRefs = new Map();
 const paymentLookups = new Map();
 const types = {
@@ -57,6 +56,18 @@ async function provider(url, options = {}) {
 }
 
 const checkouts = new Map();
+async function readJson(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 4096) throw new Error('Request is too large');
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
 async function checkout(req, res) {
   if (!apiKey || !ipnSecret || !deliveryUrl) return json(res, 503, { error: 'Checkout is temporarily unavailable. Please try again later.' });
   const ip = (String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0]).slice(0, 100);
@@ -69,19 +80,22 @@ async function checkout(req, res) {
   const orderId = crypto.randomBytes(16).toString('hex');
   const order = tokenFor(orderId);
   try {
+    const body = await readJson(req);
+    const paymentMethod = body.paymentMethod === 'card' ? 'card' : 'crypto';
+    const invoiceRequest = {
+      price_amount: 49,
+      price_currency: 'usd',
+      order_id: orderId,
+      order_description: 'MUKVIK Routine Pack Volume 1, MP3 + videos',
+      ipn_callback_url: `${origin}/api/nowpayments-ipn`,
+      success_url: `${origin}/?order=${encodeURIComponent(order)}`,
+      cancel_url: `${origin}/#packs`,
+      partially_paid_url: `${origin}/?order=${encodeURIComponent(order)}`
+    };
+    if (paymentMethod === 'crypto') invoiceRequest.pay_currency = 'usdttrc20';
     const invoice = await provider('/v1/invoice', {
       method: 'POST',
-      body: JSON.stringify({
-        price_amount: 49,
-        price_currency: 'usd',
-        pay_currency: 'usdttrc20',
-        order_id: orderId,
-        order_description: 'MUKVIK Routine Pack Volume 1, MP3 + videos',
-        ipn_callback_url: `${origin}/api/nowpayments-ipn`,
-        success_url: `${origin}/?order=${encodeURIComponent(order)}`,
-        cancel_url: `${origin}/#packs`,
-        partially_paid_url: `${origin}/?order=${encodeURIComponent(order)}`
-      })
+      body: JSON.stringify(invoiceRequest)
     });
     if (!invoice.invoice_url || !/^https:\/\/([a-z0-9-]+\.)?nowpayments\.io\//i.test(invoice.invoice_url)) {
       throw new Error('Unexpected checkout address');
@@ -182,14 +196,6 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
-  if (req.method === 'GET' && url.pathname === '/api/payment-options') {
-    let cardUrl = null;
-    try {
-      const candidate = new URL(cardCheckoutUrl);
-      if (candidate.protocol === 'https:' && (candidate.hostname === 'patreon.com' || candidate.hostname.endsWith('.patreon.com'))) cardUrl = candidate.href;
-    } catch {}
-    return json(res, 200, { cardUrl });
-  }
   if (req.method === 'POST' && url.pathname === '/api/checkout') return checkout(req, res);
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
   if (req.method === 'POST' && url.pathname === '/api/nowpayments-ipn') return ipn(req, res);
