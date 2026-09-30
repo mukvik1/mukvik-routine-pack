@@ -1,17 +1,11 @@
 const checkout = document.getElementById('checkout');
-let selectedProduct = 'pack';
 
 document.querySelectorAll('[data-buy]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    selectedProduct = btn.dataset.product || 'pack';
-    const isPack = selectedProduct === 'pack';
-    document.getElementById('checkout-product-name').textContent = isPack ? 'ROUTINE PACK VOLUME 1' : 'JUMP AROUND X EVERYBODY';
-    document.getElementById('checkout-product-price').textContent = isPack ? '$49' : '$1';
-    document.getElementById('checkout-product-details').textContent = isPack ? 'INCLUDES MP3 + VIDEOS' : '2 MP3 FILES · INSTANT DOWNLOAD';
-    checkout.showModal();
-  });
+  btn.addEventListener('click', () => checkout.showModal());
 });
-checkout.addEventListener('click', (event) => { if (event.target === checkout) checkout.close(); });
+checkout.addEventListener('click', (event) => {
+  if (event.target === checkout) checkout.close();
+});
 document.querySelectorAll('dialog .close').forEach(button => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });
@@ -23,7 +17,7 @@ checkoutButton.addEventListener('click', async () => {
   checkoutButton.textContent = 'OPENING CHECKOUT…';
   checkoutError.hidden = true;
   try {
-    const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId: selectedProduct }) });
+    const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     const data = await response.json();
     if (!response.ok || !data.invoiceUrl) throw new Error(data.error || 'Could not open checkout. Please try again.');
     window.location.assign(data.invoiceUrl);
@@ -47,13 +41,11 @@ async function checkPayment() {
     const response = await fetch(`/api/payment-status?order=${encodeURIComponent(orderToken)}&paymentId=${encodeURIComponent(paymentId || '')}`, { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'We could not check the payment yet.');
-    if (data.productName) document.getElementById('payment-product-name').textContent = data.productName;
     if (data.status === 'finished' && data.deliveryUrl) {
       document.getElementById('payment-title').textContent = 'PAYMENT COMPLETE';
-      document.getElementById('payment-message').textContent = 'Your download is ready. Save this page so you can return to it.';
+      document.getElementById('payment-message').textContent = 'Your pack is ready. Save this page so you can return to it.';
       const link = document.getElementById('delivery-link');
       link.href = data.deliveryUrl;
-      link.innerHTML = 'OPEN DOWNLOAD <span>→</span>';
       link.hidden = false;
       checkAgain.hidden = true;
       document.getElementById('payment-recovery').hidden = true;
