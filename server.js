@@ -85,10 +85,11 @@ async function checkout(req, res) {
   const orderId = `${product.code}_${crypto.randomBytes(16).toString('hex')}`; const order = tokenFor(orderId);
   try {
     const invoice = await provider('/v1/invoice', { method: 'POST', body: JSON.stringify({
-      price_amount: product.price, price_currency: 'usd', pay_currency: 'usdttrc20', order_id: orderId,
-      order_description: product.description, ipn_callback_url: `${origin}/api/nowpayments-ipn`,
-      success_url: `${origin}/?order=${encodeURIComponent(order)}`, cancel_url: `${origin}/${product.code === 'pack' ? '#packs' : '#routines'}`,
-      partially_paid_url: `${origin}/?order=${encodeURIComponent(order)}`
+      price_amount: product.price, price_currency: 'usd', order_id: orderId,
+      order_description: product.description, ipn_callback_url: `${apiOrigin}/api/nowpayments-ipn`,
+      success_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/?order=${encodeURIComponent(order)}`,
+      cancel_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/`,
+      partially_paid_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/?order=${encodeURIComponent(order)}`
     }) });
     if (!invoice.invoice_url || !/^https:\/\/([a-z0-9-]+\.)?nowpayments\.io\//i.test(invoice.invoice_url)) throw new Error('Unexpected checkout address');
     json(res, 200, { invoiceUrl: invoice.invoice_url });
