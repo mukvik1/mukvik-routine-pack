@@ -6,11 +6,19 @@ const crypto = require('crypto');
 const root = path.join(__dirname, 'web');
 const port = process.env.PORT || 3000;
 const origin = process.env.PUBLIC_ORIGIN || 'https://mukvik-routine-pack-production.up.railway.app';
+const storefrontOrigin = 'https://routinepack.download';
+const apiOrigin = 'https://mukvik-routine-pack-production.up.railway.app';
 const apiKey = process.env.NOWPAYMENTS_API_KEY;
 const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
+const products = {
+  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl },
+  'jump-around-x-everybody': { code: 'jump1', name: 'JUMP AROUND X EVERYBODY', price: 1, description: 'MUKVIK single routine: JUMP AROUND X EVERYBODY, 2 MP3 files', deliveryUrl: () => 'https://drive.google.com/drive/folders/12KF9oBIXcYtnmPrpiexAor2dRY4H5wZR?usp=sharing' }
+};
+const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
 const paymentRefs = new Map();
 const paymentLookups = new Map();
+const allowedOrigins = new Set([storefrontOrigin, 'https://www.routinepack.download', 'https://mukvik-routine-pack.mukvik1.chatgpt.site']);
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.png': 'image/png',
@@ -33,7 +41,7 @@ function tokenFor(orderId) {
 }
 
 function readOrder(token) {
-  if (typeof token !== 'string' || !/^[a-f0-9]{32}\.[a-f0-9]{64}$/.test(token) || !ipnSecret) return null;
+  if (typeof token !== 'string' || !/^[a-z0-9]{2,12}_[a-f0-9]{32}\.[a-f0-9]{64}$/.test(token) || !ipnSecret) return null;
   const [orderId, signature] = token.split('.');
   return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(sign(orderId), 'hex')) ? orderId : null;
 }
@@ -56,45 +64,41 @@ async function provider(url, options = {}) {
 }
 
 const checkouts = new Map();
-async function checkout(req, res) {
-  if (!apiKey || !ipnSecret || !deliveryUrl) return json(res, 503, { error: 'Checkout is temporarily unavailable. Please try again later.' });
-  const ip = (String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0]).slice(0, 100);
-  const now = Date.now();
-  const recent = (checkouts.get(ip) || []).filter(time => now - time < 60000);
-  if (recent.length >= 5) return json(res, 429, { error: 'Please wait a minute before trying again.' });
-  recent.push(now);
-  checkouts.set(ip, recent);
-
-  const orderId = crypto.randomBytes(16).toString('hex');
-  const order = tokenFor(orderId);
-  try {
-    const invoice = await provider('/v1/invoice', {
-      method: 'POST',
-      body: JSON.stringify({
-        price_amount: 49,
-        price_currency: 'usd',
-        pay_currency: 'usdttrc20',
-        order_id: orderId,
-        order_description: 'MUKVIK Routine Pack Volume 1, MP3 + videos',
-        ipn_callback_url: `${origin}/api/nowpayments-ipn`,
-        success_url: `${origin}/?order=${encodeURIComponent(order)}`,
-        cancel_url: `${origin}/#packs`,
-        partially_paid_url: `${origin}/?order=${encodeURIComponent(order)}`
-      })
-    });
-    if (!invoice.invoice_url || !/^https:\/\/([a-z0-9-]+\.)?nowpayments\.io\//i.test(invoice.invoice_url)) {
-      throw new Error('Unexpected checkout address');
-    }
-    json(res, 200, { invoiceUrl: invoice.invoice_url });
-  } catch (error) {
-    console.error('Checkout error:', error.message);
-    json(res, 502, { error: 'Could not open checkout. Please try again shortly.' });
-  }
+async function readJsonBody(req) {
+  const chunks = []; let size = 0;
+  for await (const chunk of req) { size += chunk.length; if (size > 16384) throw new Error('Payload too large'); chunks.push(chunk); }
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
+async function checkout(req, res) {
+  let payload;
+  try { payload = await readJsonBody(req); } catch { return json(res, 400, { error: 'Invalid checkout request.' }); }
+  const product = products[payload.productId || 'pack'];
+  if (!product) return json(res, 404, { error: 'This product is not available.' });
+  const productDeliveryUrl = product.deliveryUrl();
+  if (!apiKey || !ipnSecret || !productDeliveryUrl) return json(res, 503, { error: 'Checkout is temporarily unavailable. Please try again later.' });
+  const ip = (String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0]).slice(0, 100);
+  const now = Date.now(); const recent = (checkouts.get(ip) || []).filter(time => now - time < 60000);
+  if (recent.length >= 5) return json(res, 429, { error: 'Please wait a minute before trying again.' });
+  recent.push(now); checkouts.set(ip, recent);
+  const orderId = `${product.code}_${crypto.randomBytes(16).toString('hex')}`; const order = tokenFor(orderId);
+  try {
+    const invoice = await provider('/v1/invoice', { method: 'POST', body: JSON.stringify({
+      price_amount: product.price, price_currency: 'usd', pay_currency: 'usdttrc20', order_id: orderId,
+      order_description: product.description, ipn_callback_url: `${origin}/api/nowpayments-ipn`,
+      success_url: `${origin}/?order=${encodeURIComponent(order)}`, cancel_url: `${origin}/${product.code === 'pack' ? '#packs' : '#routines'}`,
+      partially_paid_url: `${origin}/?order=${encodeURIComponent(order)}`
+    }) });
+    if (!invoice.invoice_url || !/^https:\/\/([a-z0-9-]+\.)?nowpayments\.io\//i.test(invoice.invoice_url)) throw new Error('Unexpected checkout address');
+    json(res, 200, { invoiceUrl: invoice.invoice_url });
+  } catch (error) { console.error('Checkout error:', error.message); json(res, 502, { error: 'Could not open checkout. Please try again shortly.' }); }
+}
 async function paymentStatus(url, res) {
   const orderId = readOrder(url.searchParams.get('order'));
   if (!orderId) return json(res, 400, { error: 'Invalid order link.' });
+  const product = productsByCode[orderId.split('_')[0]];
+  if (!product) return json(res, 404, { error: 'Product not found.' });
   let paymentId = url.searchParams.get('paymentId') || paymentRefs.get(orderId);
   if (!paymentId && apiKey) {
     const lastLookup = paymentLookups.get(orderId) || 0;
@@ -104,33 +108,23 @@ async function paymentStatus(url, res) {
         const listing = await provider('/v1/payment?limit=100&page=0&sortBy=created_at&orderBy=desc');
         const payments = Array.isArray(listing) ? listing : (listing.data || listing.payments || []);
         const match = payments.find(item => item.order_id === orderId && /^\d{1,24}$/.test(String(item.payment_id)));
-        if (match) {
-          paymentId = String(match.payment_id);
-          paymentRefs.set(orderId, paymentId);
-        }
-      } catch (error) {
-        console.error('Payment lookup error:', error.message);
-      }
+        if (match) { paymentId = String(match.payment_id); paymentRefs.set(orderId, paymentId); }
+      } catch (error) { console.error('Payment lookup error:', error.message); }
     }
   }
-  if (!paymentId) return json(res, 200, { status: 'waiting', message: 'Return to the payment page and wait for confirmation. If you have already paid, contact MUKVIK with your payment ID.' });
+  if (!paymentId) return json(res, 200, { status: 'waiting', productName: product.name, message: 'Return to the payment page and wait for confirmation. If you have already paid, contact MUKVIK with your payment ID.' });
   if (!/^\d{1,24}$/.test(paymentId)) return json(res, 400, { error: 'Invalid payment ID.' });
-  if (!apiKey || !deliveryUrl) return json(res, 503, { error: 'Payment check is temporarily unavailable.' });
+  const productDeliveryUrl = product.deliveryUrl();
+  if (!apiKey || !productDeliveryUrl) return json(res, 503, { error: 'Payment check is temporarily unavailable.' });
   try {
     const payment = await provider(`/v1/payment/${paymentId}`);
-    if (payment.order_id !== orderId || Number(payment.price_amount) !== 49 || String(payment.price_currency).toLowerCase() !== 'usd') {
-      return json(res, 404, { error: 'Payment does not match this order.' });
-    }
+    if (payment.order_id !== orderId || Number(payment.price_amount) !== product.price || String(payment.price_currency).toLowerCase() !== 'usd') return json(res, 404, { error: 'Payment does not match this order.' });
     const status = String(payment.payment_status || '').toLowerCase();
-    if (status === 'finished') return json(res, 200, { status, deliveryUrl });
+    if (status === 'finished') return json(res, 200, { status, productName: product.name, deliveryUrl: productDeliveryUrl });
     const done = ['failed', 'expired', 'refunded'].includes(status);
-    json(res, 200, { status: done ? 'failed' : 'waiting', message: done ? 'The payment was not completed. You can start a new checkout.' : 'Your payment is being confirmed. This page checks again automatically.' });
-  } catch (error) {
-    console.error('Payment check error:', error.message);
-    json(res, 502, { error: 'We could not check the payment yet. Please try again.' });
-  }
+    json(res, 200, { status: done ? 'failed' : 'waiting', productName: product.name, message: done ? 'The payment was not completed. You can start a new checkout.' : 'Your payment is being confirmed. This page checks again automatically.' });
+  } catch (error) { console.error('Payment check error:', error.message); json(res, 502, { error: 'We could not check the payment yet. Please try again.' }); }
 }
-
 async function ipn(req, res) {
   if (!ipnSecret) return json(res, 503, { error: 'Unavailable' });
   const chunks = [];
@@ -147,8 +141,10 @@ async function ipn(req, res) {
   if (typeof signature !== 'string' || !/^[a-f0-9]{128}$/i.test(signature)) return json(res, 401, { error: 'Invalid signature' });
   const expected = crypto.createHmac('sha512', ipnSecret.trim()).update(JSON.stringify(sortDeep(payload))).digest('hex');
   if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) return json(res, 401, { error: 'Invalid signature' });
-  if (typeof payload.order_id === 'string' && /^[a-f0-9]{32}$/.test(payload.order_id) && /^\d{1,24}$/.test(String(payload.payment_id))) {
-    paymentRefs.set(payload.order_id, String(payload.payment_id));
+  const callbackOrderId = typeof payload.order_id === 'string' ? payload.order_id : '';
+  const callbackProduct = productsByCode[callbackOrderId.split('_')[0]];
+  if (callbackProduct && /^[a-z0-9]{2,12}_[a-f0-9]{32}$/.test(callbackOrderId) && /^\d{1,24}$/.test(String(payload.payment_id))) {
+    paymentRefs.set(callbackOrderId, String(payload.payment_id));
   }
   json(res, 200, { ok: true });
 }
@@ -178,6 +174,17 @@ function serveStatic(req, res, pathname) {
 }
 
 http.createServer(async (req, res) => {
+  const requestOrigin = req.headers.origin;
+  if (allowedOrigins.has(requestOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!allowedOrigins.has(requestOrigin)) return res.writeHead(403).end();
+    return res.writeHead(204).end();
+  }
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
