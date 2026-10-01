@@ -85,7 +85,7 @@ async function checkout(req, res) {
   const orderId = `${product.code}_${crypto.randomBytes(16).toString('hex')}`; const order = tokenFor(orderId);
   try {
     const invoice = await provider('/v1/invoice', { method: 'POST', body: JSON.stringify({
-      price_amount: product.price, price_currency: product.priceCurrency || 'usd', order_id: orderId,
+      price_amount: product.price, price_currency: product.priceCurrency || 'usd', pay_currency: product.priceCurrency || undefined, order_id: orderId,
       order_description: product.description, ipn_callback_url: `${apiOrigin}/api/nowpayments-ipn`,
       success_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/?order=${encodeURIComponent(order)}`,
       cancel_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/`,
