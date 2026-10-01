@@ -13,7 +13,7 @@ const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
 const products = {
   pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl },
-  'jump-around-x-everybody': { code: 'jump1', name: 'JUMP AROUND X EVERYBODY', price: 3, priceCurrency: 'usdttrc20', description: 'MUKVIK single routine: JUMP AROUND X EVERYBODY, 2 MP3 files', deliveryUrl: () => 'https://drive.google.com/drive/folders/12KF9oBIXcYtnmPrpiexAor2dRY4H5wZR?usp=sharing' }
+  'jump-around-x-everybody': { code: 'jump1', name: 'JUMP AROUND X EVERYBODY', price: 3, payCurrency: 'usdttrc20', description: 'MUKVIK single routine: JUMP AROUND X EVERYBODY, 2 MP3 files', deliveryUrl: () => 'https://drive.google.com/drive/folders/12KF9oBIXcYtnmPrpiexAor2dRY4H5wZR?usp=sharing' }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
 const paymentRefs = new Map();
@@ -85,7 +85,7 @@ async function checkout(req, res) {
   const orderId = `${product.code}_${crypto.randomBytes(16).toString('hex')}`; const order = tokenFor(orderId);
   try {
     const invoice = await provider('/v1/invoice', { method: 'POST', body: JSON.stringify({
-      price_amount: product.price, price_currency: product.priceCurrency || 'usd', pay_currency: product.priceCurrency || undefined, order_id: orderId,
+      price_amount: product.price, price_currency: product.priceCurrency || 'usd', pay_currency: product.payCurrency || undefined, order_id: orderId,
       order_description: product.description, ipn_callback_url: `${apiOrigin}/api/nowpayments-ipn`,
       success_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/?order=${encodeURIComponent(order)}`,
       cancel_url: `${storefrontOrigin}/${product.code === 'pack' ? 'packs' : 'routines'}/`,
