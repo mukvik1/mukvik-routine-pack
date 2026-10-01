@@ -12,8 +12,7 @@ const apiKey = process.env.NOWPAYMENTS_API_KEY;
 const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
 const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
 const products = {
-  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl },
-  'jump-around-x-everybody': { code: 'jump1', name: 'JUMP AROUND X EVERYBODY', price: 3, description: 'MUKVIK single routine: JUMP AROUND X EVERYBODY, 2 MP3 files', deliveryUrl: () => 'https://drive.google.com/drive/folders/12KF9oBIXcYtnmPrpiexAor2dRY4H5wZR?usp=sharing' }
+  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
 const paymentRefs = new Map();
