@@ -9,10 +9,10 @@ const origin = process.env.PUBLIC_ORIGIN || 'https://mukvik-routine-pack-product
 const storefrontOrigin = 'https://routinepack.download';
 const apiOrigin = 'https://mukvik-routine-pack-production.up.railway.app';
 const apiKey = process.env.NOWPAYMENTS_API_KEY;
-const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
-const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
-const products = {
-  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl }
+const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;const deliveryUrl = process.env.PRODUCT_DELIVERY_URL;
+const bundle4DeliveryUrl = process.env.ROUTINE_BUNDLE_DELIVERY_URL;
+const products = {  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl },
+  bundle4: { code: 'bundle4', name: '4 ROUTINES BUNDLE', price: 6, description: 'MUKVIK routines 01, 02, 04 and 06, eight audio files', deliveryUrl: () => bundle4DeliveryUrl }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
 const paymentRefs = new Map();
