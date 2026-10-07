@@ -6,8 +6,17 @@ const fs=require('node:fs');
 const http=require('node:http');
 const crypto=require('node:crypto');
 const {Pool}=require('pg');
-const {createCommerce}=require('../commerce');
+const {createCommerce,gmailRawMessage}=require('../commerce');
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
+test('Gmail MIME encodes Ukrainian and refuses header injection',()=>{
+ const encoded=gmailRawMessage({from:'Routine Pack <mukvik1@gmail.com>',to:'buyer@example.test',subject:'Ваше замовлення',text:'Покупка підтверджена'});
+ const raw=Buffer.from(encoded,'base64url').toString('utf8');
+ assert.match(raw,/^From: Routine Pack <mukvik1@gmail.com>\r\nTo: buyer@example.test\r\n/);
+ assert.match(raw,/Subject: =\?UTF-8\?B\?/);
+ assert.equal(Buffer.from(raw.split('\r\n\r\n')[1].replace(/\r\n/g,''),'base64').toString('utf8'),'Покупка підтверджена');
+ assert.throws(()=>gmailRawMessage({from:'a@gmail.com',to:'buyer@example.test\r\nBcc: b@example.test',subject:'Hi',text:'X'}));
+});
+
 const testDatabase=process.env.TEST_DATABASE_URL||process.env.DATABASE_URL;
 if(!testDatabase){test.skip('PostgreSQL integration tests require TEST_DATABASE_URL',()=>{});}
 else test('email login, cart, manual approval and one-use private download',async()=>{
@@ -19,7 +28,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
   const options={
    ...process.env,
    COMMERCE_ENABLED:'true',DATABASE_URL:testDatabase,WEB_ORIGIN:'https://routinepack.download',
-   ADMIN_EMAIL:'owner@example.test',SMTP_HOST:'localhost',SMTP_FROM:'orders@example.test',
+   ADMIN_EMAIL:'owner@example.test',SMTP_HOST:'localhost',SMTP_USER:'orders@example.test',SMTP_PASSWORD:'test-only',SMTP_FROM:'orders@example.test',
    GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify({client_email:'service@example.test',private_key:'fake-key'}),
    COMMERCE_FILES_JSON:JSON.stringify({routine3:[{name:'Routine 03.zip',fileId:'privateFile12345'}],routine5:[{name:'Routine 05.zip',fileId:'privateFile56789'}]})
   };
