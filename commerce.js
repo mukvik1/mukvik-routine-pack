@@ -65,7 +65,7 @@ function createCommerce(settings=process.env,overrides={}){
   const message={from:settings.SMTP_FROM,to,subject,text};
   if(overrides.sendMail)return overrides.sendMail(message);
   if(mode==='smtp')return smtp.sendMail(message);
-  const accessToken=await gmail.getAccessToken();
+  const accessToken=await (overrides.gmailAccessToken||gmail.getAccessToken.bind(gmail))();
   if(!accessToken?.token)throw new Error('Gmail authorization unavailable');
   const result=await (overrides.fetch||fetch)('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
    method:'POST',headers:{Authorization:'Bearer '+accessToken.token,'Content-Type':'application/json'},
