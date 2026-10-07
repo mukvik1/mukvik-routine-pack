@@ -133,6 +133,37 @@ else test('email login, cart, manual approval and one-use private download',asyn
   await api('/api/v2/auth/logout','POST',signed.data.accessToken);
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,401);
   assert.throws(()=>createCommerce({...options,SMTP_PASSWORD:''}),/Commerce config missing: SMTP_PASSWORD/);
+  // The owner panel stays available before Gmail and private Drive delivery are provisioned.
+  const monitorConfig={
+   COMMERCE_ENABLED:'false',TELEGRAM_ENABLED:'true',DATABASE_URL:testDatabase,
+   TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',
+   TELEGRAM_BOT_USERNAME:'Routinepack_bot',
+   TELEGRAM_ADMIN_CHAT_ID:'123456789',
+   TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'
+  };
+  const monitorCalls=[];
+  const monitor=createCommerce(monitorConfig,{telegramFetch:async(url,request)=>{
+   monitorCalls.push({method:url.split('/').at(-1),payload:JSON.parse(request.body)});
+   return new Response(JSON.stringify({ok:true,result:url.endsWith('/getMe')?{username:'Routinepack_bot'}:true}),{status:200});
+  }});
+  const monitorServer=http.createServer(async(req,res)=>{
+   const handled=await monitor.handle(req,res,new URL(req.url,'http://localhost'));
+   if(!handled){res.writeHead(404);res.end();}
+  });
+  try{
+   await new Promise(resolve=>monitorServer.listen(0,'127.0.0.1',resolve));
+   const monitorBase='http://127.0.0.1:'+monitorServer.address().port;
+   assert.equal((await fetch(monitorBase+'/api/v2/catalog')).status,404);
+   const derivedSecret=crypto.createHmac('sha256',monitorConfig.TELEGRAM_BOT_TOKEN).update('routinepack-telegram-webhook-v1').digest('hex');
+   const update={update_id:2000000+Math.floor(Math.random()*1000000),message:{from:{id:123456789},chat:{id:123456789},text:'/stats'}};
+   const notify=secret=>fetch(monitorBase+'/api/v2/telegram/webhook',{method:'POST',headers:{'X-Telegram-Bot-Api-Secret-Token':secret,'Content-Type':'application/json'},body:JSON.stringify(update)});
+   assert.equal((await notify('invalid')).status,401);
+   assert.equal((await notify(derivedSecret)).status,200);
+   assert.ok(monitorCalls.some(x=>x.method==='sendMessage'&&x.payload.text.includes('Orders:')));
+  }finally{
+   await new Promise(resolve=>monitorServer.close(resolve));
+   await monitor.close();
+  }
   const gmailCalls=[];
   const gmailConfig={...options,MAIL_PROVIDER:'gmail_api',GMAIL_OAUTH_CLIENT_ID:'test-client',GMAIL_OAUTH_CLIENT_SECRET:'test-secret',GMAIL_OAUTH_REFRESH_TOKEN:'test-refresh'};
   delete gmailConfig.SMTP_PASSWORD;
