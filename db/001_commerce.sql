@@ -83,3 +83,17 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   last_attempt_at TIMESTAMPTZ,
   UNIQUE(order_id, kind)
 );
+
+-- Telegram update IDs prevent repeated webhook processing. No token or payment data is stored.
+CREATE TABLE IF NOT EXISTS telegram_updates (
+  update_id BIGINT PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS telegram_notifications (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  order_id UUID NOT NULL REFERENCES orders(id),
+  kind TEXT NOT NULL CHECK(kind IN ('new_order','approved')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  sent_at TIMESTAMPTZ,
+  UNIQUE(order_id,kind)
+);
