@@ -206,6 +206,6 @@ http.createServer(async (req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return json(res, 400, { error: 'Invalid path' }); }
-  if (!commerce && (pathname === '/account' || pathname.startsWith('/account/'))) return json(res, 404, { error: 'Not found' });
+  if (process.env.COMMERCE_ENABLED !== 'true' && (pathname === '/account' || pathname.startsWith('/account/'))) return json(res, 404, { error: 'Not found' });
   serveStatic(req, res, pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));
