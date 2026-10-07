@@ -44,3 +44,17 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.equal(webhook.drop_pending_updates,false);
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
+
+test('A token for a different Telegram bot cannot register the owner webhook',async()=>{
+ const methods=[];
+ const bot=createTelegramBot({
+  TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',
+  TELEGRAM_WEBHOOK_SECRET:'very-secret-token-12345',TELEGRAM_ADMIN_CHAT_ID:'123456789',
+  TELEGRAM_BOT_USERNAME:'Rotinepack_bot',TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'
+ },{pool:{},approveOrder:async()=>{throw Error('No approval');},fetchImpl:async url=>{
+  methods.push(url.split('/').at(-1));
+  return new Response(JSON.stringify({ok:true,result:{username:'another_bot'}}),{status:200});
+ }});
+ await assert.rejects(bot.installWebhook(),/does not match/);
+ assert.deepEqual(methods,['getMe']);
+});
