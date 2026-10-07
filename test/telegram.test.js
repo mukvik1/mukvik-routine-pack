@@ -82,3 +82,27 @@ test('A token for a different Telegram bot cannot register the owner webhook',as
  await assert.rejects(bot.installWebhook(),/does not match/);
  assert.deepEqual(methods,['getMe']);
 });
+
+test('New-order notifications are in Russian and keep private file IDs out of messages',async()=>{
+ const sent=[];
+ const order='d482b8f8-8d36-49d9-ac09-4077a802d77b';
+ const db={query:async sql=>{
+  if(sql.includes('FROM telegram_notifications'))return {rows:[{id:1,order_id:order,kind:'new_order',status:'awaiting_manual_review',total_cents:4900,currency:'USD',email:'buyer@example.test'}]};
+  return {rowCount:1};
+ },release:()=>{}};
+ const bot=createTelegramBot({
+  TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',
+  TELEGRAM_ADMIN_CHAT_ID:'123456789',TELEGRAM_BOT_USERNAME:'Routinepack_bot',
+  TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'
+ },{pool:{connect:async()=>db},approveOrder:async()=>({}),fetchImpl:async(url,options)=>{
+  sent.push({method:url.split('/').at(-1),payload:JSON.parse(options.body)});
+  return new Response(JSON.stringify({ok:true,result:true}),{status:200});
+ }});
+ await bot.flushNotifications();
+ const message=sent.find(x=>x.method==='sendMessage').payload;
+ assert.match(message.text,/Новый заказ/);
+ assert.match(message.text,/Покупатель: buyer@example\\.test/);
+ assert.match(message.text,/Статус: ожидает проверки оплаты/);
+ assert.equal(message.reply_markup.inline_keyboard[0][0].text,'Посмотреть заказ');
+ assert.doesNotMatch(message.text,/privateFile|https:\/\/drive/);
+});
