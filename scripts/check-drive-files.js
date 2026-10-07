@@ -35,6 +35,7 @@ async function inspectDriveFolder(folderId,targets,token,{fetchImpl=fetch,log=co
    for(const file of entries)log('FOLDER FILE: '+JSON.stringify(file.path.slice(0,500)));
    for(const file of targets)log('MAPPING NAME: '+file.code+' '+JSON.stringify(file.name.slice(0,160)));
   }
+  return entries;
  }catch{log('FOLDER: network, timeout or invalid response.');}
 }
 
