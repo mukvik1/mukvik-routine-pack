@@ -13,10 +13,10 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   if(sql.includes('count(*)::int'))return {rows:[{orders:1,pending:1,approved:0,downloads:0}]};
   throw Error('Unexpected query: '+sql);
  },seen:new Set()};
- const config={TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',TELEGRAM_WEBHOOK_SECRET:'very-secret-token-12345',TELEGRAM_ADMIN_CHAT_ID:String(owner),TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'};
+ const config={TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',TELEGRAM_WEBHOOK_SECRET:'very-secret-token-12345',TELEGRAM_ADMIN_CHAT_ID:String(owner),TELEGRAM_BOT_USERNAME:'Rotinepack_bot',TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'};
  const bot=createTelegramBot(config,{pool,approveOrder:async id=>{granted.push(id);return {status:'approved'};},fetchImpl:async(url,options)=>{
   calls.push({method:url.split('/').at(-1),body:JSON.parse(options.body)});
-  return new Response(JSON.stringify({ok:true,result:true}),{status:200,headers:{'Content-Type':'application/json'}});
+  return new Response(JSON.stringify({ok:true,result:url.endsWith('/getMe')?{username:'Rotinepack_bot'}:true}),{status:200,headers:{'Content-Type':'application/json'}});
  }});
  const server=http.createServer((req,res)=>bot.handle(req,res));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -38,6 +38,7 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.deepEqual(granted,[order]);
   assert.equal(calls.filter(x=>x.method==='answerCallbackQuery').length,2);
   await bot.installWebhook();
+  assert.equal(calls.find(x=>x.method==='getMe').method,'getMe');
   const webhook=calls.find(x=>x.method==='setWebhook').body;
   assert.equal(webhook.secret_token,config.TELEGRAM_WEBHOOK_SECRET);
   assert.equal(webhook.drop_pending_updates,false);
