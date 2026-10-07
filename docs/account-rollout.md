@@ -1,6 +1,6 @@
 # Customer accounts and protected fulfillment (draft branch)
 
-The public Sites storefront and Railway backend are separate deployments. This branch adds the server-side account and order infrastructure plus a bilingual standalone /account/ portal hosted by Railway when commerce is enabled. The current Sites storefront still needs its purchase links wired into this portal; no production migration or payment-mode switch is triggered by opening this branch. The old crypto API remains untouched until the migration has been tested and explicitly switched off.
+The public Sites storefront and Railway backend are separate deployments. This branch adds the server-side account and order infrastructure plus a bilingual standalone /account/ portal hosted by Railway when commerce is enabled. The current Sites storefront still needs its purchase links wired into this portal; no production migration or payment-mode switch is triggered by opening this branch. Creation of new crypto checkouts has already been disabled in production; historical payment status remains for previous buyers.
 
 ## Before activation
 
@@ -32,3 +32,9 @@ Test simultaneous double approval, unverified login, expired/redeemed challenge 
 ## Current operational state
 
 A Railway PostgreSQL service and a private Google Drive staging folder have been created; approved product originals were copied privately and file IDs configured server-side. The previously issued public Drive URLs remain open until existing buyers are migrated. A Drive service account with reader permission on the private folder, SMTP credentials, production migration, and the Sites storefront link are still required. Never publish the server-side file IDs or service-account credentials in frontend HTML.
+
+## Telegram owner dashboard
+
+Optional `telegram.js` turns the same PostgreSQL orders and audit events into a private owner bot. Commands: `/orders` (last 20), `/pending`, `/order UUID` (items, buyer, status), `/stats` (counts and downloads), `/help`. A new order queues a durable notification with an order-review button; owner approval requires a second explicit confirmation and goes through the same locked transaction as the web admin. Duplicate Telegram update IDs and repeated approvals are idempotent. A delivery retry queue survives process restarts; no Drive file ID, payment token, or link is sent to the bot. Notifications require `telegram_notifications` and `telegram_updates` tables in `db/001_commerce.sql`.
+
+The owner must create a bot under their own Telegram account with [@BotFather](https://t.me/BotFather), record its bot token in Railway `TELEGRAM_BOT_TOKEN`, and obtain the *numeric* Telegram user/chat ID for their private chat. Configure `TELEGRAM_ADMIN_CHAT_ID`, a random `TELEGRAM_WEBHOOK_SECRET`, and the actual HTTPS Railway webhook endpoint in `TELEGRAM_WEBHOOK_URL`; never put them in code or a client. After the DB migration and account dependencies are working, enable `COMMERCE_ENABLED=true` and `TELEGRAM_ENABLED=true`. On startup the backend registers the webhook with Telegram using the secret header and retries pending order notifications. Check /stats, an unauthorized chat, a fake webhook, a duplicate callback, and a manually verified test payment before relying on approval. A bot token is not access to the owner's Telegram account; creation requires that owner's authenticated Telegram session. Existing historic purchases outside this PostgreSQL database cannot appear in /orders without a verified import.
