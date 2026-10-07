@@ -3,7 +3,9 @@ const crypto = require('node:crypto');
 
 function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   if (settings.TELEGRAM_ENABLED !== 'true') return null;
-  const {TELEGRAM_BOT_TOKEN: botToken, TELEGRAM_WEBHOOK_SECRET: webhookSecret, TELEGRAM_ADMIN_CHAT_ID: ownerId, TELEGRAM_WEBHOOK_URL: webhookUrl} = settings;
+  const {TELEGRAM_BOT_TOKEN: botToken, TELEGRAM_ADMIN_CHAT_ID: ownerId, TELEGRAM_WEBHOOK_URL: webhookUrl} = settings;
+  // Derive a separate webhook secret from the high-entropy BotFather token when no explicit secret is configured.
+  const webhookSecret = settings.TELEGRAM_WEBHOOK_SECRET || (botToken && crypto.createHmac('sha256',botToken).update('routinepack-telegram-webhook-v1').digest('hex'));
   if (!/^\d{5,15}:[A-Za-z0-9_-]{20,}$/.test(botToken || '') || !/^[A-Za-z0-9_-]{16,256}$/.test(webhookSecret || '') || !/^\d{4,20}$/.test(ownerId || '') || !/^https:\/\/[^\s/]+\/api\/v2\/telegram\/webhook$/.test(webhookUrl || '')) throw new Error('Telegram bot configuration is incomplete');
   const endpoint = 'https://api.telegram.org/bot' + botToken + '/';
   async function call(method, payload) {
