@@ -85,7 +85,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         'Почта: '+(emailReady?'учётные данные указаны, нужна проверка отправки':'нет серверных учётных данных'),
         'Защищённая выдача: '+(filesReady?'учётные данные указаны, нужна проверка доступа':'нет доступа сервера к закрытым файлам'),
         'Monobank: '+(settings.MONOBANK_ENABLED==='true'?'включён':'выключен')
-      ].join('\\n'));
+      ].join('\n'));
     }
     if(name==='/events') {
       const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
