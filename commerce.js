@@ -24,19 +24,29 @@ async function body(req){
  for await(const chunk of req){size+=chunk.length;if(size>8192){const error=new Error('payload too large');error.status=413;throw error;}parts.push(chunk);}
  try{return JSON.parse(Buffer.concat(parts).toString('utf8')||'{}');}catch{const error=new Error('invalid JSON');error.status=400;throw error;}
 }
+function gmailRawMessage({from,to,subject,text}){
+ if(!/^[^\r\n]{3,200}$/.test(from)||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||/[\r\n]/.test(subject))throw new Error('Invalid mail header');
+ const encodedSubject=Buffer.from(subject,'utf8').toString('base64');
+ const encodedBody=Buffer.from(text,'utf8').toString('base64').match(/.{1,76}/g)?.join('\r\n')||'';
+ const message=['From: '+from,'To: '+to,'Subject: =?UTF-8?B?'+encodedSubject+'?=','MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',encodedBody].join('\r\n');
+ return Buffer.from(message,'utf8').toString('base64url');
+}
 function createCommerce(settings=process.env,overrides={}){
  if(settings.COMMERCE_ENABLED!=='true')return null;
- const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_HOST','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON'];
+ const mode=settings.MAIL_PROVIDER||'smtp';
+ if(!['smtp','gmail_api'].includes(mode))throw new Error('Commerce config invalid: MAIL_PROVIDER');
+ const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON',...(mode==='smtp'?['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']:['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'])];
  for(const key of required)if(!settings[key])throw new Error('Commerce config missing: '+key);
  const webOrigin=new URL(settings.WEB_ORIGIN).origin;
  const adminEmail=settings.ADMIN_EMAIL.trim().toLowerCase();
  const files=JSON.parse(settings.COMMERCE_FILES_JSON);
  const credentials=JSON.parse(settings.GOOGLE_SERVICE_ACCOUNT_JSON);
  const {Pool}=require('pg');
- const mailer=require('nodemailer');
- const {GoogleAuth}=require('google-auth-library');
+ const {GoogleAuth,OAuth2Client}=require('google-auth-library');
  const pool=new Pool({connectionString:settings.DATABASE_URL,ssl:settings.DATABASE_SSL==='true'?{rejectUnauthorized:true}:undefined});
- const smtp=mailer.createTransport({host:settings.SMTP_HOST,port:Number(settings.SMTP_PORT||587),secure:Number(settings.SMTP_PORT||587)===465,auth:settings.SMTP_USER?{user:settings.SMTP_USER,pass:settings.SMTP_PASSWORD}:undefined});
+ const smtp=mode==='smtp'?require('nodemailer').createTransport({host:settings.SMTP_HOST,port:Number(settings.SMTP_PORT||587),secure:Number(settings.SMTP_PORT||587)===465,auth:{user:settings.SMTP_USER,pass:settings.SMTP_PASSWORD}}):null;
+ const gmail=mode==='gmail_api'?new OAuth2Client(settings.GMAIL_OAUTH_CLIENT_ID,settings.GMAIL_OAUTH_CLIENT_SECRET):null;
+ if(gmail)gmail.setCredentials({refresh_token:settings.GMAIL_OAUTH_REFRESH_TOKEN});
  const auth=new GoogleAuth({credentials,scopes:['https://www.googleapis.com/auth/drive.readonly']});
  function fileAt(code,index){
   const list=files[code];
@@ -52,7 +62,16 @@ function createCommerce(settings=process.env,overrides={}){
   return r.rows[0]||null;
  }
  async function send(to,subject,text){
-  await (overrides.sendMail||smtp.sendMail.bind(smtp))({from:settings.SMTP_FROM,to,subject,text});
+  const message={from:settings.SMTP_FROM,to,subject,text};
+  if(overrides.sendMail)return overrides.sendMail(message);
+  if(mode==='smtp')return smtp.sendMail(message);
+  const accessToken=await gmail.getAccessToken();
+  if(!accessToken?.token)throw new Error('Gmail authorization unavailable');
+  const result=await (overrides.fetch||fetch)('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+   method:'POST',headers:{Authorization:'Bearer '+accessToken.token,'Content-Type':'application/json'},
+   body:JSON.stringify({raw:gmailRawMessage(message)}),signal:AbortSignal.timeout(12000)
+  });
+  if(!result.ok)throw new Error('Gmail delivery unavailable');
  }
  async function start(req,res){
   const payload=await body(req),email=String(payload.email||'').trim().toLowerCase();
@@ -236,5 +255,5 @@ function createCommerce(settings=process.env,overrides={}){
  timer.unref?.();
  return {handle,close:async()=>{clearInterval(timer);await pool.end();}};
 }
-module.exports={createCommerce,CATALOG};
+module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);
