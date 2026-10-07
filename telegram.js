@@ -14,6 +14,10 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   const send = (text, options = {}) => call('sendMessage',{chat_id:ownerId,text,disable_web_page_preview:true,...options});
   async function installWebhook() {
+    if(settings.TELEGRAM_BOT_USERNAME) {
+      const identity=await call('getMe',{});
+      if(String(identity?.username||'').toLowerCase()!==settings.TELEGRAM_BOT_USERNAME.replace(/^@/,'').toLowerCase())throw new Error('Telegram bot username does not match configuration');
+    }
     return call('setWebhook',{url:webhookUrl,secret_token:webhookSecret,allowed_updates:['message','callback_query'],drop_pending_updates:false});
   }
   async function notify(orderId,kind) {
