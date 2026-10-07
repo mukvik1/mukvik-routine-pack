@@ -27,4 +27,4 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts
       - run: npm test
-      - run: node --check commerce.js && node --check telegram.js && node --check server.js && node --check sync-assets.js && node --check web/account/app.js
+      - run: node --check commerce.js && node --check telegram.js && node --check scripts/migrate.js && node --check server.js && node --check sync-assets.js && node --check web/account/app.js
