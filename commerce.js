@@ -142,6 +142,7 @@ function createCommerce(settings=process.env,overrides={}){
    }
    for(const p of products)await db.query('INSERT INTO order_items(order_id,product_code,name,price_cents) VALUES($1,$2,$3,$4)',[orderId,p.code,p.name,p.cents]);
    await db.query("INSERT INTO order_events(order_id,actor_id,event_type) VALUES($1,$2,'order_created')",[orderId,user.id]);
+   if(telegram)await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'new_order') ON CONFLICT DO NOTHING",[orderId]);
    await db.query('DELETE FROM cart_items WHERE customer_id=$1',[user.id]);
    await db.query('COMMIT');
    response(res,201,{order:created.rows[0],message:'Contact Mukvik to pay; access is granted only after approval.'});
@@ -160,22 +161,36 @@ function createCommerce(settings=process.env,overrides={}){
   const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,coalesce(json_agg(json_build_object('code',i.product_code,'name',i.name,'priceCents',i.price_cents) ORDER BY i.product_code) FILTER(WHERE i.product_code IS NOT NULL),'[]') AS items FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN order_items i ON i.order_id=o.id GROUP BY o.id,c.email ORDER BY o.created_at DESC LIMIT 100");
   response(res,200,{orders:r.rows});
  }
- async function approve(res,user,orderId){
+ async function approveResult(user,orderId){
   const db=await pool.connect();
   try{
    await db.query('BEGIN');
    const order=await db.query('SELECT id,customer_id,status FROM orders WHERE id=$1 FOR UPDATE',[orderId]);
-   if(!order.rowCount){await db.query('ROLLBACK');return response(res,404,{error:'Order not found.'});}
-   if(order.rows[0].status==='approved'){await db.query('COMMIT');return response(res,200,{status:'approved',alreadyApproved:true});}
-   if(order.rows[0].status!=='awaiting_manual_review'){await db.query('ROLLBACK');return response(res,409,{error:'Order cannot be approved.'});}
+   if(!order.rowCount){await db.query('ROLLBACK');return {http:404,error:'Order not found.'};}
+   if(order.rows[0].status==='approved'){await db.query('COMMIT');return {http:200,status:'approved',alreadyApproved:true};}
+   if(order.rows[0].status!=='awaiting_manual_review'){await db.query('ROLLBACK');return {http:409,error:'Order cannot be approved.'};}
    await db.query("UPDATE orders SET status='approved',approved_at=now(),approved_by=$2 WHERE id=$1",[orderId,user.id]);
    await db.query('INSERT INTO entitlements(order_id,customer_id,product_code) SELECT i.order_id,$2,i.product_code FROM order_items i WHERE i.order_id=$1 ON CONFLICT(order_id,product_code) DO NOTHING',[orderId,order.rows[0].customer_id]);
    await db.query("INSERT INTO order_events(order_id,actor_id,event_type) VALUES($1,$2,'manual_approved')",[orderId,user.id]);
    await db.query("INSERT INTO notification_outbox(order_id,kind) VALUES($1,'approved') ON CONFLICT(order_id,kind) DO NOTHING",[orderId]);
+   if(telegram)await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'approved') ON CONFLICT DO NOTHING",[orderId]);
    await db.query('COMMIT');
-   response(res,200,{status:'approved'});
+   return {http:200,status:'approved'};
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }
+ async function approve(res,user,orderId){
+  const result=await approveResult(user,orderId);
+  const {http,...payload}=result;
+  response(res,http,payload);
+ }
+ const telegram=require('./telegram').createTelegramBot(settings,{
+  pool,
+  approveOrder:async orderId=>{
+   const actor=await pool.query('INSERT INTO customers(id,email) VALUES($1,$2) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING id',[crypto.randomUUID(),adminEmail]);
+   return approveResult({id:actor.rows[0].id},orderId);
+  },
+  fetchImpl:overrides.telegramFetch||fetch
+ });
  async function flushNotifications(){
   const db=await pool.connect();
   try{
@@ -224,6 +239,7 @@ function createCommerce(settings=process.env,overrides={}){
  async function handle(req,res,url){
   if(!url.pathname.startsWith('/api/v2/'))return false;
   try{
+   if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'&&telegram){await telegram.handle(req,res);return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/start'){await start(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/redeem'){await redeem(req,res);return true;}
@@ -252,8 +268,11 @@ function createCommerce(settings=process.env,overrides={}){
   }
  }
  const timer=setInterval(()=>flushNotifications().catch(error=>console.error('Notification delivery unavailable:',error.code||error.name||'error')),60000);
+ const telegramTimer=telegram?setInterval(()=>telegram.flushNotifications().catch(error=>console.error('Telegram notification unavailable:',error.code||error.name||'error')),15000):null;
+ telegramTimer?.unref?.();
+ if(telegram)setImmediate(()=>telegram.installWebhook().catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
  timer.unref?.();
- return {handle,close:async()=>{clearInterval(timer);await pool.end();}};
+ return {handle,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);
