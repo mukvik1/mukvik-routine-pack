@@ -15,12 +15,30 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     return data.result;
   }
   const send = (text, options = {}) => call('sendMessage',{chat_id:ownerId,text,disable_web_page_preview:true,...options});
+  const statusLabels=Object.freeze({awaiting_manual_review:'ожидает проверки оплаты',approved:'подтверждён',cancelled:'отменён',refunded:'возврат'});
+  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',download_started:'начата загрузка'});
+  const statusLabel=value=>statusLabels[value]||'неизвестен';
+  const eventLabel=value=>eventLabels[value]||'другое событие';
+  const money=(cents,currency)=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:currency||'USD'}).format(cents/100);
+  const date=value=>new Date(value).toLocaleString('ru-RU',{timeZone:'UTC'})+' UTC';
   async function installWebhook() {
     if(settings.TELEGRAM_BOT_USERNAME) {
       const identity=await call('getMe',{});
       if(String(identity?.username||'').toLowerCase()!==settings.TELEGRAM_BOT_USERNAME.replace(/^@/,'').toLowerCase())throw new Error('Telegram bot username does not match configuration');
     }
-    return call('setWebhook',{url:webhookUrl,secret_token:webhookSecret,allowed_updates:['message','callback_query'],drop_pending_updates:false});
+    await call('setWebhook',{url:webhookUrl,secret_token:webhookSecret,allowed_updates:['message','callback_query'],drop_pending_updates:false});
+    try {
+      await call('setMyCommands',{scope:{type:'chat',chat_id:ownerId},language_code:'ru',commands:[
+        {command:'start',description:'Открыть панель владельца'},
+        {command:'help',description:'Показать команды'},
+        {command:'orders',description:'Последние заказы'},
+        {command:'pending',description:'Заказы на проверке'},
+        {command:'order',description:'Информация о заказе'},
+        {command:'stats',description:'Статистика заказов и загрузок'},
+        {command:'events',description:'Последние события'}
+      ]});
+    } catch(error) {console.error('Telegram command menu unavailable:',error.code||error.name||'error');}
+    return true;
   }
   async function notify(orderId,kind) {
     await pool.query('INSERT INTO telegram_notifications(order_id,kind) VALUES($1,$2) ON CONFLICT DO NOTHING',[orderId,kind]);
@@ -32,8 +50,8 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
       const pending=await db.query("SELECT n.id,n.order_id,n.kind,o.status,o.total_cents,o.currency,c.email FROM telegram_notifications n JOIN orders o ON o.id=n.order_id JOIN customers c ON c.id=o.customer_id WHERE n.sent_at IS NULL AND n.attempts<20 ORDER BY n.id LIMIT 10 FOR UPDATE OF n SKIP LOCKED");
       for(const n of pending.rows) {
         try {
-          const label=n.kind==='new_order'?'New order':'Order approved';
-          await send(label+'\n'+n.order_id+'\n'+n.email+'\n'+(n.total_cents/100).toFixed(2)+' '+n.currency+'\nStatus: '+n.status, n.kind==='new_order'?{reply_markup:{inline_keyboard:[[{text:'Review order',callback_data:'view:'+n.order_id}]]}}:{});
+          const label=n.kind==='new_order'?'Новый заказ':'Заказ подтверждён';
+          await send(label+'\nНомер: '+n.order_id+'\nПокупатель: '+n.email+'\nСумма: '+money(n.total_cents,n.currency)+'\nСтатус: '+statusLabel(n.status), n.kind==='new_order'?{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+n.order_id}]]}}:{});
           await db.query('UPDATE telegram_notifications SET sent_at=now(),attempts=attempts+1 WHERE id=$1',[n.id]);
         } catch {
           await db.query('UPDATE telegram_notifications SET attempts=attempts+1 WHERE id=$1',[n.id]);
@@ -44,31 +62,31 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   const orderIdPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   async function showOrder(id) {
-    if(!orderIdPattern.test(id))return send('Invalid order ID.');
-    const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,coalesce(string_agg(i.name || ' — ' || (i.price_cents / 100.0)::text || ' ' || o.currency,E'\n' ORDER BY i.product_code),'') AS items FROM orders o JOIN customers c ON c.id=o.customer_id JOIN order_items i ON i.order_id=o.id WHERE o.id=$1 GROUP BY o.id,c.email",[id]);
-    if(!r.rowCount)return send('Order not found.');
+    if(!orderIdPattern.test(id))return send('Неверный номер заказа.');
+    const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,json_agg(json_build_object('name',i.name,'price_cents',i.price_cents) ORDER BY i.product_code) AS items FROM orders o JOIN customers c ON c.id=o.customer_id JOIN order_items i ON i.order_id=o.id WHERE o.id=$1 GROUP BY o.id,c.email",[id]);
+    if(!r.rowCount)return send('Заказ не найден.');
     const x=r.rows[0];
-    const reply_markup=x.status==='awaiting_manual_review'?{inline_keyboard:[[{text:'I checked payment · approve',callback_data:'confirm:'+id}]]}:undefined;
-    await send('Order '+x.id+'\nBuyer: '+x.email+'\nStatus: '+x.status+'\nTotal: '+(x.total_cents/100).toFixed(2)+' '+x.currency+'\n'+x.items+'\nCreated: '+new Date(x.created_at).toISOString(),reply_markup?{reply_markup}:{});
+    const reply_markup=x.status==='awaiting_manual_review'?{inline_keyboard:[[{text:'Я проверил оплату · подтвердить',callback_data:'confirm:'+id}]]}:undefined;
+    await send('Заказ '+x.id+'\nПокупатель: '+x.email+'\nСтатус: '+statusLabel(x.status)+'\nСумма: '+money(x.total_cents,x.currency)+'\n'+x.items.map(item=>'• '+item.name+' — '+money(item.price_cents,x.currency)).join('\n')+'\nСоздан: '+date(x.created_at),reply_markup?{reply_markup}:{});
   }
   async function command(text) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/start'||name==='/help')return send('Routine Pack owner panel\n/orders — latest orders\n/pending — orders awaiting review\n/order UUID — order details\n/stats — order and delivery counts\n/events — recent order and download events\nApprove only after you have verified the payment yourself.');
+    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы на проверке\n/order UUID — подробности заказа\n/stats — статистика и загрузки\n/events — история событий\nОткрывайте доступ только после проверки оплаты.');
     if(name==='/events') {
       const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
-      return send(r.rows.length?r.rows.map(e=>new Date(e.created_at).toISOString()+' · '+e.event_type+' · '+e.order_id).join('\n'):'No events found.');
+      return send(r.rows.length?r.rows.map(e=>date(e.created_at)+' · '+eventLabel(e.event_type)+' · '+e.order_id).join('\n'):'Событий пока нет.');
     }
     if(name==='/stats') {
       const r=await pool.query("SELECT (SELECT count(*)::int FROM orders) AS orders,(SELECT count(*)::int FROM orders WHERE status='awaiting_manual_review') AS pending,(SELECT count(*)::int FROM orders WHERE status='approved') AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads");
       const x=r.rows[0];
-      return send('Orders: '+x.orders+'\nPending: '+x.pending+'\nApproved: '+x.approved+'\nDownloads started: '+x.downloads);
+      return send('Заказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
     }
     if(name==='/pending'||name==='/orders') {
       const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,c.email FROM orders o JOIN customers c ON c.id=o.customer_id WHERE ($1::boolean=false OR o.status='awaiting_manual_review') ORDER BY o.created_at DESC LIMIT 20",[name==='/pending']);
-      return send(r.rows.length?r.rows.map(o=>o.id+' · '+o.status+' · '+(o.total_cents/100).toFixed(2)+' '+o.currency+' · '+o.email).join('\n'):'No orders found.');
+      return send(r.rows.length?r.rows.map(o=>o.id+' · '+statusLabel(o.status)+' · '+money(o.total_cents,o.currency)+' · '+o.email).join('\n'):'Заказов пока нет.');
     }
     if(name==='/order')return showOrder(arg||'');
-    return send('Use /help for available commands.');
+    return send('Список команд: /help');
   }
   function authorized(id,chat) {return String(id)===ownerId && String(chat)===ownerId;}
   async function handle(req,res) {
@@ -96,13 +114,13 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         const [action,id]=data.split(':');
         if(orderIdPattern.test(id||'')&&action==='view')await showOrder(id);
         if(orderIdPattern.test(id||'')&&action==='confirm') {
-          await send('Final check: confirm payment for order '+id+'?',{reply_markup:{inline_keyboard:[[{text:'Yes · grant access',callback_data:'approve:'+id},{text:'Cancel',callback_data:'cancel:'+id}]]}});
+          await send('Вы лично проверили оплату заказа '+id+'? После подтверждения покупатель получит доступ.',{reply_markup:{inline_keyboard:[[{text:'Да · открыть доступ',callback_data:'approve:'+id},{text:'Отмена',callback_data:'cancel:'+id}]]}});
         }
         if(orderIdPattern.test(id||'')&&action==='approve') {
           const result=await approveOrder(id);
-          await send(result.status==='approved'?'Access granted for '+id+(result.alreadyApproved?' (already approved)':''):('Could not approve '+id+': '+result.error));
+          await send(result.status==='approved'?'Доступ по заказу '+id+' открыт'+(result.alreadyApproved?' (уже был открыт)':''):('Не удалось подтвердить заказ '+id+': '+(result.error==='Customer purchases are not enabled.'?'выдача покупателям ещё не включена':result.error==='Order cannot be approved.'?'заказ нельзя подтвердить в текущем статусе':'проверьте заказ и попробуйте позже')));
         }
-        if(action==='cancel')await send('Approval cancelled.');
+        if(action==='cancel')await send('Подтверждение отменено.');
       }
       reply(200);
     }catch(error) {

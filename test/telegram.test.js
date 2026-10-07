@@ -11,6 +11,9 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
  const pool={query:async(sql,args)=>{
   if(sql.includes('telegram_updates')){if(pool.seen.has(args[0]))return {rowCount:0};pool.seen.add(args[0]);return {rowCount:1};}
   if(sql.includes('count(*)::int'))return {rows:[{orders:1,pending:1,approved:0,downloads:0}]};
+  if(sql.includes('json_agg'))return {rowCount:1,rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',created_at:'2026-10-01T12:00:00Z',email:'buyer@example.test',items:[{name:'ROUTINE 03',price_cents:600}]}]};
+  if(sql.includes('FROM orders o JOIN customers c'))return {rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',email:'buyer@example.test'}]};
+  if(sql.includes('FROM order_events e'))return {rows:[{order_id:order,event_type:'order_created',created_at:'2026-10-01T12:00:00Z'}]};
   throw Error('Unexpected query: '+sql);
  },seen:new Set()};
  const config={TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',TELEGRAM_WEBHOOK_SECRET:'very-secret-token-12345',TELEGRAM_ADMIN_CHAT_ID:String(owner),TELEGRAM_BOT_USERNAME:'Routinepack_bot',TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'};
@@ -37,11 +40,32 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.equal((await send(callback(5,'approve:'+order))).status,200);
   assert.deepEqual(granted,[order]);
   assert.equal(calls.filter(x=>x.method==='answerCallbackQuery').length,2);
+  assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Заказов: 1/);
+  async function textCommand(id,value){
+   return send({update_id:id,message:{from:{id:owner},chat:{id:owner},text:value}});
+  }
+  assert.equal((await textCommand(6,'/help')).status,200);
+  assert.equal((await textCommand(7,'/orders')).status,200);
+  assert.equal((await textCommand(8,'/order '+order)).status,200);
+  assert.equal((await textCommand(9,'/events')).status,200);
+  const messages=calls.filter(x=>x.method==='sendMessage').map(x=>x.body.text);
+  assert.ok(messages.some(x=>x.includes('Панель владельца Routine Pack')));
+  assert.ok(messages.some(x=>x.includes('ожидает проверки оплаты')));
+  assert.ok(messages.some(x=>x.includes('Покупатель: buyer@example.test')));
+  assert.ok(messages.some(x=>x.includes('создан заказ')));
+  assert.ok(messages.some(x=>x.includes('Вы лично проверили оплату заказа')));
+  assert.ok(messages.some(x=>x.includes('Доступ по заказу')));
+  assert.ok(!messages.some(x=>/Order approved|Final check|No orders|Access granted|Buyer:|Status:|Orders:/.test(x)));
+
   await bot.installWebhook();
   assert.equal(calls.find(x=>x.method==='getMe').method,'getMe');
   const webhook=calls.find(x=>x.method==='setWebhook').body;
   assert.equal(webhook.secret_token,config.TELEGRAM_WEBHOOK_SECRET);
   assert.equal(webhook.drop_pending_updates,false);
+  const menu=calls.find(x=>x.method==='setMyCommands').body;
+  assert.equal(menu.language_code,'ru');
+  assert.equal(menu.scope.chat_id,String(owner));
+  assert.equal(menu.commands.find(x=>x.command==='orders').description,'Последние заказы');
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 
@@ -57,4 +81,28 @@ test('A token for a different Telegram bot cannot register the owner webhook',as
  }});
  await assert.rejects(bot.installWebhook(),/does not match/);
  assert.deepEqual(methods,['getMe']);
+});
+
+test('New-order notifications are in Russian and keep private file IDs out of messages',async()=>{
+ const sent=[];
+ const order='d482b8f8-8d36-49d9-ac09-4077a802d77b';
+ const db={query:async sql=>{
+  if(sql.includes('FROM telegram_notifications'))return {rows:[{id:1,order_id:order,kind:'new_order',status:'awaiting_manual_review',total_cents:4900,currency:'USD',email:'buyer@example.test'}]};
+  return {rowCount:1};
+ },release:()=>{}};
+ const bot=createTelegramBot({
+  TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',
+  TELEGRAM_ADMIN_CHAT_ID:'123456789',TELEGRAM_BOT_USERNAME:'Routinepack_bot',
+  TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'
+ },{pool:{connect:async()=>db},approveOrder:async()=>({}),fetchImpl:async(url,options)=>{
+  sent.push({method:url.split('/').at(-1),payload:JSON.parse(options.body)});
+  return new Response(JSON.stringify({ok:true,result:true}),{status:200});
+ }});
+ await bot.flushNotifications();
+ const message=sent.find(x=>x.method==='sendMessage').payload;
+ assert.match(message.text,/Новый заказ/);
+ assert.ok(message.text.includes('Покупатель: buyer@example.test'));
+ assert.match(message.text,/Статус: ожидает проверки оплаты/);
+ assert.equal(message.reply_markup.inline_keyboard[0][0].text,'Посмотреть заказ');
+ assert.doesNotMatch(message.text,/privateFile|https:\/\/drive/);
 });

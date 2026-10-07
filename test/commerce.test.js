@@ -159,7 +159,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
    const notify=secret=>fetch(monitorBase+'/api/v2/telegram/webhook',{method:'POST',headers:{'X-Telegram-Bot-Api-Secret-Token':secret,'Content-Type':'application/json'},body:JSON.stringify(update)});
    assert.equal((await notify('invalid')).status,401);
    assert.equal((await notify(derivedSecret)).status,200);
-   assert.ok(monitorCalls.some(x=>x.method==='sendMessage'&&x.payload.text.includes('Orders:')));
+   assert.ok(monitorCalls.some(x=>x.method==='sendMessage'&&x.payload.text.includes('Заказов:')));
   }finally{
    await new Promise(resolve=>monitorServer.close(resolve));
    await monitor.close();

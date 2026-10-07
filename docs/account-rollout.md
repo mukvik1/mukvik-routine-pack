@@ -42,3 +42,7 @@ The owner supplied https://t.me/Routinepack_bot as the intended bot. Telegram's 
 ### Owner monitoring before buyer accounts
 
 The bot can run with `COMMERCE_ENABLED=false` and `TELEGRAM_ENABLED=true` as soon as the PostgreSQL schema is migrated with `node scripts/migrate.js`. In this mode private owner commands show existing records while sign-in, buyer APIs and account pages remain disabled; approval cannot grant any access. `TELEGRAM_ADMIN_CHAT_ID=169348023` was supplied by the owner. If `TELEGRAM_WEBHOOK_SECRET` is absent, the backend derives a 256-bit webhook secret using HMAC-SHA256 from the BotFather token and a fixed domain separator. The derived value never leaves the server except the HTTPS `setWebhook` call to Telegram. The configured `TELEGRAM_BOT_USERNAME=Routinepack_bot` must match Telegram `getMe` before setting the webhook. Historic crypto purchases are outside this PostgreSQL database and will not appear in the bot until imported and verified.
+
+### Language of owner controls
+
+Telegram replies, order and payment-status labels, notifications, confirmation buttons and the owner's scoped command menu are in Russian. Telegram command names (`/start`, `/help`, `/orders`, `/pending`, `/order`, `/stats`, `/events`) remain ASCII for Telegram compatibility; product titles, email addresses and currency codes are preserved. Customer storefront locales remain English and Ukrainian.
