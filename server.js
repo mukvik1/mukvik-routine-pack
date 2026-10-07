@@ -159,7 +159,7 @@ async function ipn(req, res) {
 }
 
 function serveStatic(req, res, pathname) {
-  const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, ''));
   const filePath = path.resolve(root, relativePath);
   if (!filePath.startsWith(`${root}${path.sep}`)) return json(res, 403, { error: 'Forbidden' });
   fs.stat(filePath, (error, stat) => {
