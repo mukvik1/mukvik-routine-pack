@@ -97,3 +97,18 @@ CREATE TABLE IF NOT EXISTS telegram_notifications (
   sent_at TIMESTAMPTZ,
   UNIQUE(order_id,kind)
 );
+
+-- Confirmed registrations and actual cart changes; also a durable owner notification queue.
+CREATE TABLE IF NOT EXISTS customer_activity (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  customer_id UUID NOT NULL REFERENCES customers(id),
+  kind TEXT NOT NULL CHECK(kind IN ('registered','cart_updated')),
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  sent_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS customer_activity_registration_idx
+  ON customer_activity(customer_id) WHERE kind='registered';
+CREATE INDEX IF NOT EXISTS customer_activity_pending_idx
+  ON customer_activity(id) WHERE sent_at IS NULL;

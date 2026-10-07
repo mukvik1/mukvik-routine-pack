@@ -16,7 +16,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   const send = (text, options = {}) => call('sendMessage',{chat_id:ownerId,text,disable_web_page_preview:true,...options});
   const statusLabels=Object.freeze({awaiting_manual_review:'ожидает проверки оплаты',approved:'подтверждён',cancelled:'отменён',refunded:'возврат'});
-  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',download_started:'начата загрузка'});
+  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',download_started:'начата загрузка',registered:'подтверждена регистрация',cart_updated:'изменена корзина'});
   const statusLabel=value=>statusLabels[value]||'неизвестен';
   const eventLabel=value=>eventLabels[value]||'другое событие';
   const money=(cents,currency)=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:currency||'USD'}).format(cents/100);
@@ -58,6 +58,22 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
           await db.query('UPDATE telegram_notifications SET attempts=attempts+1 WHERE id=$1',[n.id]);
         }
       }
+      const activity=await db.query("SELECT a.id,a.kind,a.payload,c.email FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE a.sent_at IS NULL AND a.attempts<20 ORDER BY a.id LIMIT 10 FOR UPDATE OF a SKIP LOCKED");
+      for(const a of activity.rows){
+        try {
+          const lines=[a.kind==='registered'?'Новый зарегистрированный покупатель':'Изменение корзины','Покупатель: '+a.email];
+          if(a.kind==='registered')lines.push('Email подтверждён.');
+          else {
+            for(const item of a.payload.added||[])lines.push('Добавлено: '+item.name);
+            for(const item of a.payload.removed||[])lines.push('Убрано: '+item.name);
+            lines.push('В корзине: '+((a.payload.products||[]).map(item=>item.name).join(', ')||'пусто'));
+          }
+          await send(lines.join('\n'));
+          await db.query('UPDATE customer_activity SET sent_at=now(),attempts=attempts+1 WHERE id=$1',[a.id]);
+        } catch {
+          await db.query('UPDATE customer_activity SET attempts=attempts+1 WHERE id=$1',[a.id]);
+        }
+      }
       await db.query('COMMIT');
     } catch(error) {await db.query('ROLLBACK');throw error;} finally {db.release();}
   }
@@ -74,7 +90,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
     if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы на проверке\n/order UUID — подробности заказа\n/stats — статистика и загрузки\n/status — состояние подключений\n/events — история событий\nОткрывайте доступ только после проверки оплаты.');
     if(name==='/status') {
-      const emailReady=settings.MAIL_PROVIDER==='gmail_api'
+      const emailReady=settings.MAIL_PROVIDER==='resend'?Boolean(settings.RESEND_API_KEY&&settings.SMTP_FROM):settings.MAIL_PROVIDER==='gmail_api'
         ? ['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'].every(key=>Boolean(settings[key]))
         : settings.MAIL_PROVIDER==='smtp'&&['SMTP_HOST','SMTP_USER','SMTP_PASSWORD'].every(key=>Boolean(settings[key]));
       const filesReady=Boolean(settings.GOOGLE_SERVICE_ACCOUNT_JSON&&settings.COMMERCE_FILES_JSON);
@@ -88,8 +104,8 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
       ].join('\n'));
     }
     if(name==='/events') {
-      const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
-      return send(r.rows.length?r.rows.map(e=>date(e.created_at)+' · '+eventLabel(e.event_type)+' · '+e.order_id).join('\n'):'Событий пока нет.');
+      const r=await pool.query("SELECT * FROM (SELECT e.order_id,e.event_type,e.created_at,c.email FROM order_events e JOIN orders o ON o.id=e.order_id JOIN customers c ON c.id=o.customer_id UNION ALL SELECT NULL::uuid AS order_id,a.kind AS event_type,a.created_at,c.email FROM customer_activity a JOIN customers c ON c.id=a.customer_id) history ORDER BY created_at DESC LIMIT 20");
+      return send(r.rows.length?r.rows.map(e=>date(e.created_at)+' · '+eventLabel(e.event_type)+' · '+(e.email||'')+(e.order_id?' · '+e.order_id:'')).join('\n').slice(0,4000):'Событий пока нет.');
     }
     if(name==='/stats') {
       const r=await pool.query("SELECT (SELECT count(*)::int FROM orders) AS orders,(SELECT count(*)::int FROM orders WHERE status='awaiting_manual_review') AS pending,(SELECT count(*)::int FROM orders WHERE status='approved') AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads");

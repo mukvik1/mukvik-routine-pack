@@ -56,6 +56,15 @@ else test('email login, cart, manual approval and one-use private download',asyn
   assert.equal((await api('/api/v2/admin/orders','GET',buyer.secret)).status,403);
   assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','nonexistent']})).status,400);
   assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','routine5','routine3'],priceCents:1})).status,200);
+  const cartActivity=await pool.query("SELECT payload FROM customer_activity WHERE customer_id=$1 AND kind='cart_updated'",[buyer.customer]);
+  assert.equal(cartActivity.rowCount,1);
+  assert.deepEqual(cartActivity.rows[0].payload.added.map(x=>x.code),['routine3','routine5']);
+  await Promise.all([api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine5','routine3']}),api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','routine5']})]);
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM customer_activity WHERE customer_id=$1",[buyer.customer])).rows[0].n,1);
+  assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3']})).status,200);
+  const removedItem=await pool.query("SELECT payload FROM customer_activity WHERE customer_id=$1 ORDER BY id DESC LIMIT 1",[buyer.customer]);
+  assert.deepEqual(removedItem.rows[0].payload.removed.map(x=>x.code),['routine5']);
+  assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','routine5']})).status,200);
   const idempotencyKey=crypto.randomUUID();
   const created=await api('/api/v2/orders','POST',buyer.secret,{idempotencyKey,totalCents:1});
   assert.equal(created.status,201);
@@ -124,6 +133,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
   const loginEmail='new-'+suffix+'@example.test';
   const requested=await api('/api/v2/auth/start','POST',null,{email:loginEmail});
   assert.equal(requested.status,202);
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[loginEmail])).rows[0].n,0);
   const match=/#ticket=([a-zA-Z0-9_-]+)/.exec(emails.at(-1).text);
   assert.ok(match);
   const signed=await api('/api/v2/auth/redeem','POST',null,{ticket:match[1]});
@@ -132,6 +142,32 @@ else test('email login, cart, manual approval and one-use private download',asyn
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,200);
   await api('/api/v2/auth/logout','POST',signed.data.accessToken);
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,401);
+  await api('/api/v2/auth/start','POST',null,{email:loginEmail});
+  const nextLogin=/#ticket=([a-zA-Z0-9_-]+)/.exec(emails.at(-1).text)[1];
+  assert.equal((await api('/api/v2/auth/redeem','POST',null,{ticket:nextLogin})).status,200);
+  const registered=await pool.query("SELECT a.id,a.attempts FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[loginEmail]);
+  assert.equal(registered.rowCount,1);
+  const activityMessages=[];
+  let rejectRegistration=true;
+  const activityBot=require('../telegram').createTelegramBot(telegramConfig,{pool,approveOrder:async()=>{},fetchImpl:async(url,request)=>{
+   const payload=JSON.parse(request.body);
+   if(rejectRegistration&&payload.text?.includes('Новый зарегистрированный покупатель'))return new Response('{"ok":false}',{status:503});
+   activityMessages.push(payload);
+   return new Response('{"ok":true,"result":true}',{status:200});
+  }});
+  await activityBot.flushNotifications();
+  const retry=await pool.query('SELECT sent_at,attempts FROM customer_activity WHERE id=$1',[registered.rows[0].id]);
+  assert.equal(retry.rows[0].sent_at,null);
+  assert.equal(retry.rows[0].attempts,1);
+  rejectRegistration=false;
+  await activityBot.flushNotifications();
+  const delivered=activityMessages.filter(x=>x.text?.includes('Новый зарегистрированный покупатель'));
+  assert.equal(delivered.length,1);
+  assert.ok(delivered[0].text.includes(loginEmail));
+  assert.ok(activityMessages.some(x=>x.text?.includes('Добавлено: YEAH X LA VIDA ES UN CARNAVAL')));
+  const beforeRetry=activityMessages.length;
+  await activityBot.flushNotifications();
+  assert.equal(activityMessages.length,beforeRetry);
   assert.throws(()=>createCommerce({...options,SMTP_PASSWORD:''}),/Commerce config missing: SMTP_PASSWORD/);
   // The owner panel stays available before Gmail and private Drive delivery are provisioned.
   const monitorConfig={
@@ -184,6 +220,54 @@ else test('email login, cart, manual approval and one-use private download',asyn
   }finally{
    await new Promise(resolve=>gmailServer.close(resolve));
    await gmailCommerce.close();
+  }
+  const resendCalls=[];
+  let resendFailure=false;
+  const resendConfig={...options,MAIL_PROVIDER:'resend',RESEND_API_KEY:'test-resend-key',SMTP_FROM:'Routine Pack <orders@example.test>'};
+  delete resendConfig.SMTP_PASSWORD;
+  assert.throws(()=>createCommerce({...resendConfig,RESEND_API_KEY:''}),/Commerce config missing: RESEND_API_KEY/);
+  const resendCommerce=createCommerce(resendConfig,{fetch:async(url,request)=>{
+   resendCalls.push({url,headers:request.headers,body:JSON.parse(request.body)});
+   return new Response(resendFailure?'{"message":"provider detail must not leak"}':'{"id":"test-message"}',{status:resendFailure?503:200});
+  }});
+  const resendServer=http.createServer(async(req,res)=>resendCommerce.handle(req,res,new URL(req.url,'http://localhost')));
+  try{
+   await new Promise(resolve=>resendServer.listen(0,'127.0.0.1',resolve));
+   const endpoint='http://127.0.0.1:'+resendServer.address().port;
+   const login=()=>fetch(endpoint+'/api/v2/auth/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'resend-'+suffix+'@example.test'})});
+   assert.equal((await login()).status,202);
+   const sent=resendCalls[0];
+   assert.equal(sent.url,'https://api.resend.com/emails');
+   assert.equal(sent.headers.Authorization,'Bearer test-resend-key');
+   assert.deepEqual(sent.body.to,['resend-'+suffix+'@example.test']);
+   assert.equal(sent.body.from,resendConfig.SMTP_FROM);
+   assert.match(sent.headers['Idempotency-Key'],/^signin\/[a-f0-9]{64}$/);
+   const ticket=/#ticket=([a-zA-Z0-9_-]+)/.exec(sent.body.text)[1];
+   const redeemed=await fetch(endpoint+'/api/v2/auth/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})});
+   assert.equal(redeemed.status,200);
+   resendFailure=true;
+   const failed=await login();
+   assert.equal(failed.status,503);
+   assert.equal((await failed.json()).error,'Service temporarily unavailable.');
+   await resendCommerce.flushNotifications();
+   const pending=await pool.query('SELECT id,order_id,sent_at,attempts FROM notification_outbox ORDER BY id');
+   assert.ok(pending.rows.length>0);
+   assert.ok(pending.rows.every(row=>row.sent_at===null&&row.attempts===1));
+   resendFailure=false;
+   await resendCommerce.flushNotifications();
+   assert.ok((await pool.query('SELECT sent_at FROM notification_outbox')).rows.every(row=>row.sent_at));
+   for(const row of pending.rows){
+    const attempts=resendCalls.filter(call=>call.headers['Idempotency-Key']==='order/'+row.order_id+'/approved');
+    assert.equal(attempts.length,2);
+    assert.deepEqual(attempts[0].body,attempts[1].body);
+    assert.ok(attempts[1].body.text.includes('/account/'));
+   }
+   const count=resendCalls.length;
+   await resendCommerce.flushNotifications();
+   assert.equal(resendCalls.length,count);
+  }finally{
+   await new Promise(resolve=>resendServer.close(resolve));
+   await resendCommerce.close();
   }
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));

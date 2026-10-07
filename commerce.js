@@ -56,8 +56,8 @@ function createCommerce(settings=process.env,overrides={}){
  }
 
  const mode=settings.MAIL_PROVIDER||'smtp';
- if(!['smtp','gmail_api'].includes(mode))throw new Error('Commerce config invalid: MAIL_PROVIDER');
- const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON',...(mode==='smtp'?['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']:['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'])];
+ if(!['smtp','gmail_api','resend'].includes(mode))throw new Error('Commerce config invalid: MAIL_PROVIDER');
+ const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON',...(mode==='resend'?['RESEND_API_KEY']:mode==='smtp'?['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']:['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'])];
  for(const key of required)if(!settings[key])throw new Error('Commerce config missing: '+key);
  const webOrigin=new URL(settings.WEB_ORIGIN).origin;
  const adminEmail=settings.ADMIN_EMAIL.trim().toLowerCase();
@@ -83,10 +83,20 @@ function createCommerce(settings=process.env,overrides={}){
   const r=await pool.query("SELECT c.id,c.email FROM sessions s JOIN customers c ON c.id=s.customer_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()",[sha(match[1])]);
   return r.rows[0]||null;
  }
- async function send(to,subject,text){
+ async function send(to,subject,text,idempotencyKey){
   const message={from:settings.SMTP_FROM,to,subject,text};
   if(overrides.sendMail)return overrides.sendMail(message);
   if(mode==='smtp')return smtp.sendMail(message);
+  if(mode==='resend'){
+   const result=await (overrides.fetch||fetch)('https://api.resend.com/emails',{
+    method:'POST',headers:{Authorization:'Bearer '+settings.RESEND_API_KEY,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},
+    body:JSON.stringify({...message,to:[to]}),signal:AbortSignal.timeout(12000)
+   });
+   if(!result.ok)throw new Error('Resend delivery unavailable');
+   const accepted=await result.json();
+   if(typeof accepted.id!=='string'||!accepted.id)throw new Error('Resend delivery not accepted');
+   return;
+  }
   const accessToken=await (overrides.gmailAccessToken||gmail.getAccessToken.bind(gmail))();
   if(!accessToken?.token)throw new Error('Gmail authorization unavailable');
   const result=await (overrides.fetch||fetch)('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
@@ -105,7 +115,7 @@ function createCommerce(settings=process.env,overrides={}){
   const secret=token();
   await pool.query("INSERT INTO login_challenges(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '15 minutes')",[sha(secret),id]);
   const link=webOrigin+'/account/#ticket='+encodeURIComponent(secret);
-  await send(email,'Routine Pack — sign in','Open this link to sign in. It expires in 15 minutes:\n'+link+'\n\nВідкрийте посилання для входу. Воно діє 15 хвилин.');
+  await send(email,'Routine Pack — sign in','Open this link to sign in. It expires in 15 minutes:\n'+link+'\n\nВідкрийте посилання для входу. Воно діє 15 хвилин.','signin/'+sha(secret));
   return response(res,202,{message:'If you can receive email at this address, check your inbox.'});
  }
  async function redeem(req,res){
@@ -118,6 +128,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(!claim.rowCount){await db.query('ROLLBACK');return response(res,410,{error:'This sign-in link has expired or was used.'});}
    const access=token();
    await db.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),claim.rows[0].customer_id]);
+   await db.query("INSERT INTO customer_activity(customer_id,kind) VALUES($1,'registered') ON CONFLICT DO NOTHING",[claim.rows[0].customer_id]);
    await db.query('COMMIT');
    return response(res,200,{accessToken:access,expiresIn:1209600});
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
@@ -134,8 +145,17 @@ function createCommerce(settings=process.env,overrides={}){
   const db=await pool.connect();
   try{
    await db.query('BEGIN');
+   // Serialize cart writes for this customer, including an initially empty cart.
+   await db.query('SELECT id FROM customers WHERE id=$1 FOR UPDATE',[user.id]);
+   const previous=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code',[user.id]);
+   const before=previous.rows.map(item=>item.product_code);
    await db.query('DELETE FROM cart_items WHERE customer_id=$1',[user.id]);
    for(const code of codes)await db.query('INSERT INTO cart_items(customer_id,product_code) VALUES($1,$2)',[user.id,code]);
+   const added=codes.filter(code=>!before.includes(code)),removed=before.filter(code=>!codes.includes(code));
+   if(added.length||removed.length){
+    const describe=code=>({code,name:CATALOG[code]?.name||code});
+    await db.query("INSERT INTO customer_activity(customer_id,kind,payload) VALUES($1,'cart_updated',$2::jsonb)",[user.id,JSON.stringify({added:added.map(describe),removed:removed.map(describe),products:codes.map(describe)})]);
+   }
    await db.query('COMMIT');
    response(res,200,{productCodes:codes});
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
@@ -150,6 +170,7 @@ function createCommerce(settings=process.env,overrides={}){
   const db=await pool.connect();
   try{
    await db.query('BEGIN');
+   await db.query('SELECT id FROM customers WHERE id=$1 FOR UPDATE',[user.id]);
    const prior=await db.query('SELECT id,status,total_cents FROM orders WHERE customer_id=$1 AND idempotency_key=$2',[user.id,key]);
    if(prior.rowCount){await db.query('COMMIT');return response(res,200,{order:prior.rows[0]});}
    const c=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code FOR UPDATE',[user.id]);
@@ -220,7 +241,7 @@ function createCommerce(settings=process.env,overrides={}){
    const list=await db.query("SELECT n.id,o.id AS order_id,c.email FROM notification_outbox n JOIN orders o ON o.id=n.order_id JOIN customers c ON c.id=o.customer_id WHERE n.sent_at IS NULL AND n.attempts<20 ORDER BY n.id LIMIT 10 FOR UPDATE OF n SKIP LOCKED");
    for(const row of list.rows){
     try{
-     await send(row.email,'Routine Pack — your order is ready','Your order '+row.order_id+' is approved. Sign in to your account at '+webOrigin+'/account/ to download your purchases.\n\nВаше замовлення підтверджено. Увійдіть в особистий кабінет для завантаження.');
+     await send(row.email,'Routine Pack — your order is ready','Your order '+row.order_id+' is approved. Sign in to your account at '+webOrigin+'/account/ to download your purchases.\n\nВаше замовлення підтверджено. Увійдіть в особистий кабінет для завантаження.','order/'+row.order_id+'/approved');
      await db.query("UPDATE notification_outbox SET sent_at=now(),attempts=attempts+1,last_attempt_at=now() WHERE id=$1",[row.id]);
     }catch{
      await db.query("UPDATE notification_outbox SET attempts=attempts+1,last_attempt_at=now() WHERE id=$1",[row.id]);
@@ -294,7 +315,7 @@ function createCommerce(settings=process.env,overrides={}){
  telegramTimer?.unref?.();
  if(telegram)setImmediate(()=>telegram.installWebhook().then(()=>console.log('Telegram webhook registered for @'+String(settings.TELEGRAM_BOT_USERNAME||'owner-bot').replace(/[^A-Za-z0-9_]/g,''))).catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
  timer.unref?.();
- return {handle,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
+ return {handle,flushNotifications,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);

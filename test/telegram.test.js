@@ -90,6 +90,7 @@ test('New-order notifications are in Russian and keep private file IDs out of me
  const sent=[];
  const order='d482b8f8-8d36-49d9-ac09-4077a802d77b';
  const db={query:async sql=>{
+  if(sql.includes('FROM customer_activity'))return {rows:[]};
   if(sql.includes('FROM telegram_notifications'))return {rows:[{id:1,order_id:order,kind:'new_order',status:'awaiting_manual_review',total_cents:4900,currency:'USD',email:'buyer@example.test'}]};
   return {rowCount:1};
  },release:()=>{}};
