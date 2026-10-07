@@ -1,0 +1,15 @@
+name: Legacy checkout safety
+on:
+  push:
+    branches: [fix/disable-legacy-crypto-invoices]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check server.js
+      - run: node --test test/crypto-disabled.test.js
