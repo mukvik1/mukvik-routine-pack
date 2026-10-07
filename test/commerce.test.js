@@ -103,6 +103,28 @@ else test('email login, cart, manual approval and one-use private download',asyn
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,200);
   await api('/api/v2/auth/logout','POST',signed.data.accessToken);
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,401);
+  assert.throws(()=>createCommerce({...options,SMTP_PASSWORD:''}),/Commerce config missing: SMTP_PASSWORD/);
+  const gmailCalls=[];
+  const gmailConfig={...options,MAIL_PROVIDER:'gmail_api',GMAIL_OAUTH_CLIENT_ID:'test-client',GMAIL_OAUTH_CLIENT_SECRET:'test-secret',GMAIL_OAUTH_REFRESH_TOKEN:'test-refresh'};
+  delete gmailConfig.SMTP_PASSWORD;
+  const gmailCommerce=createCommerce(gmailConfig,{
+   gmailAccessToken:async()=>({token:'mock-access-token'}),
+   fetch:async(url,request)=>{gmailCalls.push({url,request});return new Response('{"id":"mock-message"}',{status:200});}
+  });
+  const gmailServer=http.createServer(async(req,res)=>gmailCommerce.handle(req,res,new URL(req.url,'http://localhost')));
+  try{
+   await new Promise(resolve=>gmailServer.listen(0,'127.0.0.1',resolve));
+   const sent=await fetch('http://127.0.0.1:'+gmailServer.address().port+'/api/v2/auth/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'gmail-'+suffix+'@example.test'})});
+   assert.equal(sent.status,202);
+   assert.equal(gmailCalls.length,1);
+   assert.equal(gmailCalls[0].url,'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+   assert.equal(gmailCalls[0].request.headers.Authorization,'Bearer mock-access-token');
+   const mime=Buffer.from(JSON.parse(gmailCalls[0].request.body).raw,'base64url').toString('utf8');
+   assert.match(mime,new RegExp('To: gmail-'+suffix+'@example\\.test'));
+  }finally{
+   await new Promise(resolve=>gmailServer.close(resolve));
+   await gmailCommerce.close();
+  }
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));
   if(commerce)await commerce.close();
