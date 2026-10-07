@@ -1,14 +1,14 @@
 # Customer accounts and protected fulfillment (draft branch)
 
-The public Sites storefront and Railway backend are separate deployments. This branch adds **server-side account and order infrastructure only**; no production migration or payment-mode switch is triggered by opening the branch. The old crypto API remains untouched until the migration has been tested and explicitly switched off.
+The public Sites storefront and Railway backend are separate deployments. This branch adds the server-side account and order infrastructure plus a bilingual standalone /account/ portal hosted by Railway when commerce is enabled. The current Sites storefront still needs its purchase links wired into this portal; no production migration or payment-mode switch is triggered by opening this branch. The old crypto API remains untouched until the migration has been tested and explicitly switched off.
 
 ## Before activation
 
 1. Provision PostgreSQL and run `db/001_commerce.sql` against staging, then production only after staging tests pass. Keep backups and verify that repeated migration runs are harmless.
 2. Create a private Drive folder that is **not** shared with anyone who has a link; copy original ZIPs into it. Share that folder only with a service account as reader. Its JSON credentials live in server-side `GOOGLE_SERVICE_ACCOUNT_JSON`, never in git/Sites source. Assign individual original files to product codes in server-side `COMMERCE_FILES_JSON`. Existing shared links must stay available for prior purchasers until their access is migrated, then remove their public permissions. Do not use the public folder as a protected source.
-3. Configure SMTP and `ADMIN_EMAIL` to a verified owner mailbox. Registration is passwordless: requesting an email link creates a customer record; opening the link in /account/ signs in. Only that exact verified email gets admin routes. Don't infer this address from a connected Google account.
+3. Configure SMTP and `ADMIN_EMAIL` to a verified owner mailbox (the owner has specified an address, already stored as a Railway variable). Registration is passwordless: requesting an email link creates a customer record; opening the link in /account/ signs in. Only that exact verified email gets admin routes. Don't infer this address from a connected Google account.
 4. Set `WEB_ORIGIN`, deploy backend staging and the matching bilingual account/cart UI in the Sites source. The standalone legacy GitHub `web/` directory is not the current Sites frontend.
-5. Only after email, migrations, file mapping and cross-origin UI work, set `COMMERCE_ENABLED=true` and roll out. An unconfigured service fails closed. Keep monobank disabled until merchant credentials exist.
+5. Only after email, migrations, file mapping and UI testing, set `COMMERCE_ENABLED=true` and roll out. If email sign-in links target the standalone Railway portal, set `WEB_ORIGIN` to its verified HTTPS origin. If they target Sites, install the matching /account/ page into the Sites source first. The current Sites source is distinct from this GitHub repository. An unconfigured service fails closed. Keep monobank disabled until merchant credentials exist.
 
 ## Intended API
 
@@ -24,3 +24,7 @@ The seller checks an actual payment out of band via Contact Mukvik, then approve
 ## Security checks before rollout
 
 Test simultaneous double approval, unverified login, expired/redeemed challenge and ticket, unauthorized account, wrong product, cancelled/refunded order, Drive permissions, retry after interrupted download, protected originals inaccessible by direct URL, both locales, mobile layout, and unchanged Contact Mukvik checkout. Verify legacy URLs already issued to buyers and migrate them intentionally. Run lint, tests, build, migration rollback rehearsal.
+
+## Current operational state
+
+A Railway PostgreSQL service and a private Google Drive staging folder have been created; approved product originals were copied privately and file IDs configured server-side. The previously issued public Drive URLs remain open until existing buyers are migrated. A Drive service account with reader permission on the private folder, SMTP credentials, production migration, and the Sites storefront link are still required. Never publish the server-side file IDs or service-account credentials in frontend HTML.
