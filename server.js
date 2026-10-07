@@ -23,6 +23,7 @@ const products = {  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 
   routine9: { code: 'routine9', name: 'I KHOW YOU WANT ME X CHANDELIER', price: 5, description: 'MUKVIK routine 09, two audio files', deliveryUrl: () => routine09DeliveryUrl }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
+const commerce = require('./commerce').createCommerce();
 const paymentRefs = new Map();
 const paymentLookups = new Map();
 const allowedOrigins = new Set([storefrontOrigin, 'https://www.routinepack.download', 'https://mukvik-routine-pack.mukvik1.chatgpt.site']);
@@ -158,7 +159,7 @@ async function ipn(req, res) {
 }
 
 function serveStatic(req, res, pathname) {
-  const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, ''));
   const filePath = path.resolve(root, relativePath);
   if (!filePath.startsWith(`${root}${path.sep}`)) return json(res, 403, { error: 'Forbidden' });
   fs.stat(filePath, (error, stat) => {
@@ -186,8 +187,8 @@ http.createServer(async (req, res) => {
   if (allowedOrigins.has(requestOrigin)) {
     res.setHeader('Access-Control-Allow-Origin', requestOrigin);
     res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   }
   if (req.method === 'OPTIONS') {
     if (!allowedOrigins.has(requestOrigin)) return res.writeHead(403).end();
@@ -196,6 +197,7 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
+  if (commerce && await commerce.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/checkout') return json(res, 410, { error: 'Online checkout is unavailable. Contact MUKVIK to purchase.' });
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
   if (req.method === 'POST' && url.pathname === '/api/nowpayments-ipn') return ipn(req, res);
@@ -204,5 +206,6 @@ http.createServer(async (req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return json(res, 400, { error: 'Invalid path' }); }
+  if (process.env.COMMERCE_ENABLED !== 'true' && (pathname === '/account' || pathname.startsWith('/account/'))) return json(res, 404, { error: 'Not found' });
   serveStatic(req, res, pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));

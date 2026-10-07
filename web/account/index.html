@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Account · Routine Pack</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="https://routinepack.download/">MUKVIK<span> · ROUTINE PACK</span></a>
+    <nav aria-label="Language"><button type="button" class="lang active" id="lang-en" aria-pressed="true">English</button><button type="button" class="lang" id="lang-uk" aria-pressed="false">Українська</button></nav>
+  </header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow" id="eyebrow">YOUR LIBRARY</p>
+      <h1 id="title">Account & downloads</h1>
+      <p id="intro">Build your cart, check your orders and access approved purchases.</p>
+    </section>
+    <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+    <section class="card" id="auth-card">
+      <h2 id="signin-heading">Sign in or register</h2>
+      <p id="signin-help">Enter your email. We'll send you a one-time sign-in link.</p>
+      <form id="signin-form">
+        <label for="email" id="email-label">Email</label>
+        <div class="input-row"><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button id="signin-button" type="submit">Send sign-in link</button></div>
+      </form>
+    </section>
+    <section class="card" id="profile-card" hidden>
+      <div class="row"><div><h2 id="profile-heading">Your account</h2><p id="profile-email"></p></div><button type="button" class="subtle" id="logout">Sign out</button></div>
+    </section>
+    <section class="card" id="catalog-card">
+      <div class="row"><div><p class="eyebrow" id="catalog-kicker">SHOP</p><h2 id="catalog-heading">Routines and packs</h2></div><a href="https://routinepack.download/" class="subtle" id="site-link">View the site</a></div>
+      <div id="products" class="products"></div>
+    </section>
+    <section class="card" id="cart-card" hidden>
+      <h2 id="cart-heading">Your cart</h2>
+      <p id="cart-total" class="total"></p>
+      <button id="order-button" type="button">Create order</button>
+      <p class="hint" id="cart-note">We'll confirm your purchase after you contact MUKVIK.</p>
+    </section>
+    <section class="card" id="orders-card" hidden>
+      <h2 id="orders-heading">Your orders</h2>
+      <div id="orders"></div>
+    </section>
+    <section class="card" id="admin-card" hidden>
+      <p class="eyebrow" id="admin-kicker">OWNER</p>
+      <h2 id="admin-heading">Orders awaiting approval</h2>
+      <p id="admin-note">Verify payment yourself before approving an order.</p>
+      <div id="admin-orders"></div>
+    </section>
+  </main>
+  <footer><span id="footer-text">Routine Pack · Digital downloads</span><a href="https://www.instagram.com/mukvik.ofc/" target="_blank" rel="noopener noreferrer">Contact MUKVIK ↗</a></footer>
+</body>
+</html>
