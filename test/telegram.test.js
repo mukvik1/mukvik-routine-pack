@@ -101,7 +101,7 @@ test('New-order notifications are in Russian and keep private file IDs out of me
  await bot.flushNotifications();
  const message=sent.find(x=>x.method==='sendMessage').payload;
  assert.match(message.text,/Новый заказ/);
- assert.match(message.text,/Покупатель: buyer@example\\.test/);
+ assert.ok(message.text.includes('Покупатель: buyer@example.test'));
  assert.match(message.text,/Статус: ожидает проверки оплаты/);
  assert.equal(message.reply_markup.inline_keyboard[0][0].text,'Посмотреть заказ');
  assert.doesNotMatch(message.text,/privateFile|https:\/\/drive/);
