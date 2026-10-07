@@ -196,7 +196,7 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
-  if (req.method === 'POST' && url.pathname === '/api/checkout') return checkout(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/checkout') return json(res, 410, { error: 'Online checkout is unavailable. Contact MUKVIK to purchase.' });
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
   if (req.method === 'POST' && url.pathname === '/api/nowpayments-ipn') return ipn(req, res);
   if (url.pathname.startsWith('/api/')) return json(res, 404, { error: 'Not found' });
