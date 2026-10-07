@@ -92,6 +92,35 @@ else test('email login, cart, manual approval and one-use private download',asyn
   await pool.query("UPDATE orders SET status='refunded' WHERE id=$1",[order.id]);
   assert.equal((await api(next.data.url)).status,410);
   assert.equal((await api(ticketPath,'POST',buyer.secret)).status,403);
+  // Real PostgreSQL integration: a verified Telegram owner callback grants exactly one entitlement.
+  const botCalls=[];
+  const telegramConfig={...options,TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',TELEGRAM_WEBHOOK_SECRET:'integration-secret-123456',TELEGRAM_ADMIN_CHAT_ID:'123456789',TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'};
+  const botCommerce=createCommerce(telegramConfig,{
+   sendMail:async message=>emails.push(message),
+   driveToken:async()=> 'test-drive-token',
+   telegramFetch:async(url,request)=>{botCalls.push({method:url.split('/').at(-1),payload:JSON.parse(request.body)});return new Response(JSON.stringify({ok:true,result:true}),{status:200});}
+  });
+  const botServer=http.createServer(async(req,res)=>{await botCommerce.handle(req,res,new URL(req.url,'http://localhost'));});
+  try{
+   await new Promise(resolve=>botServer.listen(0,'127.0.0.1',resolve));
+   assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine5']})).status,200);
+   const pending=await api('/api/v2/orders','POST',buyer.secret,{idempotencyKey:crypto.randomUUID()});
+   assert.equal(pending.status,201);
+   const botOrder=pending.data.order.id;
+   const botBase='http://127.0.0.1:'+botServer.address().port;
+   const callback=async(updateId,userId,action)=>fetch(botBase+'/api/v2/telegram/webhook',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Bot-Api-Secret-Token':telegramConfig.TELEGRAM_WEBHOOK_SECRET},body:JSON.stringify({update_id:updateId,callback_query:{id:'query-'+updateId,from:{id:userId},message:{chat:{id:userId}},data:action+':'+botOrder}})});
+   assert.equal((await callback(100,999999999,'approve')).status,200);
+   assert.equal((await pool.query('SELECT count(*)::int AS n FROM entitlements WHERE order_id=$1',[botOrder])).rows[0].n,0);
+   assert.equal((await callback(101,123456789,'confirm')).status,200);
+   assert.equal((await callback(102,123456789,'approve')).status,200);
+   assert.equal((await callback(102,123456789,'approve')).status,200);
+   assert.equal((await pool.query('SELECT count(*)::int AS n FROM entitlements WHERE order_id=$1',[botOrder])).rows[0].n,1);
+   assert.equal((await pool.query("SELECT count(*)::int AS n FROM order_events WHERE order_id=$1 AND event_type='manual_approved'",[botOrder])).rows[0].n,1);
+   assert.equal(botCalls.filter(call=>call.method==='sendMessage').length,2);
+  }finally{
+   await new Promise(resolve=>botServer.close(resolve));
+   await botCommerce.close();
+  }
   const loginEmail='new-'+suffix+'@example.test';
   const requested=await api('/api/v2/auth/start','POST',null,{email:loginEmail});
   assert.equal(requested.status,202);
