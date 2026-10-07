@@ -48,11 +48,13 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.equal((await textCommand(7,'/orders')).status,200);
   assert.equal((await textCommand(8,'/order '+order)).status,200);
   assert.equal((await textCommand(9,'/events')).status,200);
+  assert.equal((await textCommand(10,'/status')).status,200);
   const messages=calls.filter(x=>x.method==='sendMessage').map(x=>x.body.text);
   assert.ok(messages.some(x=>x.includes('Панель владельца Routine Pack')));
   assert.ok(messages.some(x=>x.includes('ожидает проверки оплаты')));
   assert.ok(messages.some(x=>x.includes('Покупатель: buyer@example.test')));
   assert.ok(messages.some(x=>x.includes('создан заказ')));
+  assert.ok(messages.some(x=>x.includes('Почта: нет серверных учётных данных')&&x.includes('Защищённая выдача: нет доступа сервера')));
   assert.ok(messages.some(x=>x.includes('Вы лично проверили оплату заказа')));
   assert.ok(messages.some(x=>x.includes('Доступ по заказу')));
   assert.ok(!messages.some(x=>/Order approved|Final check|No orders|Access granted|Buyer:|Status:|Orders:/.test(x)));
@@ -66,6 +68,7 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.equal(menu.language_code,'ru');
   assert.equal(menu.scope.chat_id,String(owner));
   assert.equal(menu.commands.find(x=>x.command==='orders').description,'Последние заказы');
+  assert.equal(menu.commands.find(x=>x.command==='status').description,'Состояние подключений');
  }finally{await new Promise(resolve=>server.close(resolve));}
 });
 

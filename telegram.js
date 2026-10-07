@@ -35,6 +35,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         {command:'pending',description:'Заказы на проверке'},
         {command:'order',description:'Информация о заказе'},
         {command:'stats',description:'Статистика заказов и загрузок'},
+        {command:'status',description:'Состояние подключений'},
         {command:'events',description:'Последние события'}
       ]});
     } catch(error) {console.error('Telegram command menu unavailable:',error.code||error.name||'error');}
@@ -71,7 +72,21 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   async function command(text) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы на проверке\n/order UUID — подробности заказа\n/stats — статистика и загрузки\n/events — история событий\nОткрывайте доступ только после проверки оплаты.');
+    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы на проверке\n/order UUID — подробности заказа\n/stats — статистика и загрузки\n/status — состояние подключений\n/events — история событий\nОткрывайте доступ только после проверки оплаты.');
+    if(name==='/status') {
+      const emailReady=settings.MAIL_PROVIDER==='gmail_api'
+        ? ['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'].every(key=>Boolean(settings[key]))
+        : settings.MAIL_PROVIDER==='smtp'&&['SMTP_HOST','SMTP_USER','SMTP_PASSWORD'].every(key=>Boolean(settings[key]));
+      const filesReady=Boolean(settings.GOOGLE_SERVICE_ACCOUNT_JSON&&settings.COMMERCE_FILES_JSON);
+      return send([
+        'Состояние Routine Pack',
+        'Бот: на связи',
+        'Кабинет и корзина: '+(settings.COMMERCE_ENABLED==='true'?'включены':'выключены'),
+        'Почта: '+(emailReady?'учётные данные указаны, нужна проверка отправки':'нет серверных учётных данных'),
+        'Защищённая выдача: '+(filesReady?'учётные данные указаны, нужна проверка доступа':'нет доступа сервера к закрытым файлам'),
+        'Monobank: '+(settings.MONOBANK_ENABLED==='true'?'включён':'выключен')
+      ].join('\n'));
+    }
     if(name==='/events') {
       const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
       return send(r.rows.length?r.rows.map(e=>date(e.created_at)+' · '+eventLabel(e.event_type)+' · '+e.order_id).join('\n'):'Событий пока нет.');
