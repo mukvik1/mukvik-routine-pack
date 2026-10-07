@@ -47,7 +47,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   async function command(text) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/start'||name==='/help')return send('Routine Pack owner panel\n/orders — latest orders\n/pending — orders awaiting review\n/order UUID — order details\n/stats — order and delivery counts\nApprove only after you have verified the payment yourself.');
+    if(name==='/start'||name==='/help')return send('Routine Pack owner panel\n/orders — latest orders\n/pending — orders awaiting review\n/order UUID — order details\n/stats — order and delivery counts\n/events — recent order and download events\nApprove only after you have verified the payment yourself.');
     if(name==='/events') {
       const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
       return send(r.rows.length?r.rows.map(e=>new Date(e.created_at).toISOString()+' · '+e.event_type+' · '+e.order_id).join('\\n'):'No events found.');
