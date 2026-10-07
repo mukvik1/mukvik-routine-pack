@@ -42,7 +42,7 @@ function createCommerce(settings=process.env,overrides={}){
   });
   const timer=setInterval(()=>telegram.flushNotifications().catch(error=>console.error('Telegram notification unavailable:',error.code||error.name||'error')),15000);
   timer.unref?.();
-  setImmediate(()=>telegram.installWebhook().catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
+  setImmediate(()=>telegram.installWebhook().then(()=>console.log('Telegram webhook registered for @'+String(settings.TELEGRAM_BOT_USERNAME||'owner-bot').replace(/[^A-Za-z0-9_]/g,''))).catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
   return {
    handle:async(req,res,url)=>{
     if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'){
@@ -292,7 +292,7 @@ function createCommerce(settings=process.env,overrides={}){
  const timer=setInterval(()=>flushNotifications().catch(error=>console.error('Notification delivery unavailable:',error.code||error.name||'error')),60000);
  const telegramTimer=telegram?setInterval(()=>telegram.flushNotifications().catch(error=>console.error('Telegram notification unavailable:',error.code||error.name||'error')),15000):null;
  telegramTimer?.unref?.();
- if(telegram)setImmediate(()=>telegram.installWebhook().catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
+ if(telegram)setImmediate(()=>telegram.installWebhook().then(()=>console.log('Telegram webhook registered for @'+String(settings.TELEGRAM_BOT_USERNAME||'owner-bot').replace(/[^A-Za-z0-9_]/g,''))).catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
  timer.unref?.();
  return {handle,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
 }
