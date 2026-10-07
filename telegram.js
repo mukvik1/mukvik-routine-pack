@@ -50,7 +50,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     if(name==='/start'||name==='/help')return send('Routine Pack owner panel\n/orders — latest orders\n/pending — orders awaiting review\n/order UUID — order details\n/stats — order and delivery counts\n/events — recent order and download events\nApprove only after you have verified the payment yourself.');
     if(name==='/events') {
       const r=await pool.query("SELECT e.order_id,e.event_type,e.created_at FROM order_events e ORDER BY e.id DESC LIMIT 20");
-      return send(r.rows.length?r.rows.map(e=>new Date(e.created_at).toISOString()+' · '+e.event_type+' · '+e.order_id).join('\\n'):'No events found.');
+      return send(r.rows.length?r.rows.map(e=>new Date(e.created_at).toISOString()+' · '+e.event_type+' · '+e.order_id).join('\n'):'No events found.');
     }
     if(name==='/stats') {
       const r=await pool.query("SELECT (SELECT count(*)::int FROM orders) AS orders,(SELECT count(*)::int FROM orders WHERE status='awaiting_manual_review') AS pending,(SELECT count(*)::int FROM orders WHERE status='approved') AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads");
