@@ -17,6 +17,10 @@ GET /api/v2/catalog and GET/PUT /api/v2/cart expose allowed products; POST /api/
 
 Never show a success state or grant entitlements based on a redirect. Monobank confirmation must be a separate signed callback, an API status recheck, order amount/currency/reference validation, and one atomic idempotent entitlement transaction.
 
+## Gmail delivery on Railway
+
+The connected Gmail account matches the verified admin address `mukvik1@gmail.com`. The connected ChatGPT Gmail grant cannot be transferred to the Railway server. Use `MAIL_PROVIDER=gmail_api` (HTTPS) on Railway, with Gmail API enabled, an OAuth client with the narrow `gmail.send` scope, and an offline refresh token authorized by that mailbox. Put `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` only in Railway secret variables. Never paste them into git, frontend source or an email. Send a real test message only after the authorization is configured and the sign-in page is reachable. Google's external app Testing mode expires offline consent after seven days; confirm an approved long-lived OAuth setup before customer launch. The optional SMTP path needs a Google app password and a Railway plan that permits outbound SMTP.
+
 ## Manual approval
 
 The seller checks an actual payment out of band via Contact Mukvik, then approves the order in the admin panel. Database order row locking and unique entitlements make retries safe. A notification outbox sends the buyer a sign-in link and can retry a failed email. The email does not include a public file address.
