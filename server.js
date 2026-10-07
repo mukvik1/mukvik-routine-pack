@@ -198,7 +198,10 @@ http.createServer(async (req, res) => {
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
   if (commerce && await commerce.handle(req, res, url)) return;
-  if (req.method === 'POST' && url.pathname === '/api/checkout') return checkout(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/checkout') {
+    if (process.env.LEGACY_CRYPTO_CHECKOUT_ENABLED !== 'true') return json(res, 410, { error: 'Online checkout is unavailable. Contact MUKVIK to purchase.' });
+    return checkout(req, res);
+  }
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
   if (req.method === 'POST' && url.pathname === '/api/nowpayments-ipn') return ipn(req, res);
   if (url.pathname.startsWith('/api/')) return json(res, 404, { error: 'Not found' });
