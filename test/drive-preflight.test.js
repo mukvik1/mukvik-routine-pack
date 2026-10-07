@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {checkDriveFiles}=require('../scripts/check-drive-files');
+const {checkDriveFiles,inspectDriveFolder}=require('../scripts/check-drive-files');
 const {CATALOG}=require('../commerce');
 const settings={GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify({client_email:'reader@example.test',private_key:'private-test-key'}),COMMERCE_FILES_JSON:JSON.stringify(Object.fromEntries(Object.keys(CATALOG).map(code=>[code,[{name:'Purchase.zip',fileId:'private-file-'+code}]])))};
 
@@ -18,6 +18,24 @@ test('Drive preflight reads each mapped product and stops streams without loggin
  assert.equal(requests.length,Object.keys(CATALOG).length*2);
  assert.equal(cancelled.length,Object.keys(CATALOG).length);
  assert.ok(!logs.join('\n').includes('private-'));
+});
+
+test('Folder diagnostic follows pages and subfolders and distinguishes stale IDs without exposing names',async()=>{
+ const logs=[];
+ await inspectDriveFolder('private-folder-root',[{id:'stale-file',name:'private-name.zip'}],'private-token',{log:x=>logs.push(x),fetchImpl:async url=>{
+  const parsed=new URL(url);
+  if(parsed.pathname.endsWith('/private-folder-root'))return new Response(JSON.stringify({mimeType:'application/vnd.google-apps.folder'}));
+  const parent=parsed.searchParams.get('q');
+  if(parent.includes('private-subfolder'))return new Response(JSON.stringify({files:[{id:'new-file',name:'private-name.zip',mimeType:'application/zip'}]}));
+  if(parsed.searchParams.has('pageToken'))return new Response(JSON.stringify({files:[]}));
+  return new Response(JSON.stringify({nextPageToken:'private-page',files:[{id:'private-subfolder',mimeType:'application/vnd.google-apps.folder'}]}));
+ }});
+ assert.ok(logs.includes('FOLDER: readable; 1 files across 2 folders.'));
+ assert.ok(logs.some(x=>x.includes('0/1 mapped entries found by ID; 1/1 have a unique exact name match')));
+ assert.ok(!logs.join('\n').includes('private-'));
+ const denied=[];
+ await inspectDriveFolder('private-folder-root',[],'private-token',{log:x=>denied.push(x),fetchImpl:async()=>new Response('',{status:404})});
+ assert.deepEqual(denied,['FOLDER: metadata HTTP 404']);
 });
 
 test('Drive preflight rejects missing mappings, denied metadata and unreadable content',async()=>{
