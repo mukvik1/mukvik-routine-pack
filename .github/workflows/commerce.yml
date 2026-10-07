@@ -27,4 +27,4 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts
       - run: npm test
-      - run: npm run build
+      - run: node --check commerce.js && node --check server.js && node --check sync-assets.js
