@@ -32,7 +32,29 @@ function gmailRawMessage({from,to,subject,text}){
  return Buffer.from(message,'utf8').toString('base64url');
 }
 function createCommerce(settings=process.env,overrides={}){
- if(settings.COMMERCE_ENABLED!=='true')return null;
+ if(settings.COMMERCE_ENABLED!=='true'){
+  if(settings.TELEGRAM_ENABLED!=='true')return null;
+  if(!settings.DATABASE_URL)throw new Error('Telegram config missing: DATABASE_URL');
+  const {Pool}=require('pg');
+  const pool=new Pool({connectionString:settings.DATABASE_URL,ssl:settings.DATABASE_SSL==='true'?{rejectUnauthorized:true}:undefined});
+  const telegram=require('./telegram').createTelegramBot(settings,{
+   pool,approveOrder:async()=>({error:'Customer purchases are not enabled.'}),fetchImpl:overrides.telegramFetch||fetch
+  });
+  const timer=setInterval(()=>telegram.flushNotifications().catch(error=>console.error('Telegram notification unavailable:',error.code||error.name||'error')),15000);
+  timer.unref?.();
+  setImmediate(()=>telegram.installWebhook().catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
+  return {
+   handle:async(req,res,url)=>{
+    if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'){
+     try{await telegram.handle(req,res);}catch(error){console.error('Telegram webhook unavailable:',error.code||error.name||'error');if(!res.headersSent){res.writeHead(503);res.end();}}
+     return true;
+    }
+    return false;
+   },
+   close:async()=>{clearInterval(timer);await pool.end();}
+  };
+ }
+
  const mode=settings.MAIL_PROVIDER||'smtp';
  if(!['smtp','gmail_api'].includes(mode))throw new Error('Commerce config invalid: MAIL_PROVIDER');
  const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON',...(mode==='smtp'?['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']:['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'])];
