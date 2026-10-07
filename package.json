@@ -4,9 +4,15 @@
   "private": true,
   "scripts": {
     "build": "node sync-assets.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.15.1",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.13.3"
   }
 }
