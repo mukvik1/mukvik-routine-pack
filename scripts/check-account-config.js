@@ -39,7 +39,7 @@ async function main(){
  if(settings.DATABASE_URL){
   const pool=new Pool({connectionString:settings.DATABASE_URL,connectionTimeoutMillis:5000,query_timeout:5000,ssl:settings.DATABASE_SSL==='true'?{rejectUnauthorized:true}:undefined});
   try{
-   const tables=['customers','login_challenges','sessions','cart_items','orders','order_items','entitlements','download_tickets','order_events','notification_outbox','telegram_updates','telegram_notifications','customer_activity'];
+   const tables=['customers','login_challenges','sessions','cart_items','orders','order_items','entitlements','download_tickets','order_events','notification_outbox','telegram_updates','telegram_notifications','customer_activity','password_auth_challenges','password_login_attempts','registration_email_outbox'];
    const result=await pool.query('SELECT name,to_regclass(name) IS NOT NULL AS present FROM unnest($1::text[]) AS name',[tables]);
    for(const table of result.rows)if(!table.present)fail('Database schema: missing '+table.name);
   }catch{fail('Database connection/schema: check failed');}finally{await pool.end();}

@@ -127,6 +127,36 @@ CREATE TABLE IF NOT EXISTS email_codes (
 );
 CREATE INDEX IF NOT EXISTS email_codes_customer_created_idx ON email_codes(customer_id,created_at DESC);
 
+-- Passwords are stored only as scrypt hashes. A confirmation challenge never
+-- creates a usable account until the email owner supplies its one-use code.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS password_auth_challenges (
+ id UUID PRIMARY KEY,
+ email TEXT NOT NULL CHECK(email=lower(email)),
+ kind TEXT NOT NULL CHECK(kind IN ('register','reset')),
+ nickname TEXT,
+ password_hash TEXT,
+ code_hash TEXT NOT NULL,
+ attempts INTEGER NOT NULL DEFAULT 0,
+ expires_at TIMESTAMPTZ NOT NULL,
+ used_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_auth_challenges_email_created_idx ON password_auth_challenges(email,created_at DESC);
+CREATE TABLE IF NOT EXISTS password_login_attempts (
+ id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ email_hash TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_login_attempts_email_created_idx ON password_login_attempts(email_hash,created_at DESC);
+CREATE TABLE IF NOT EXISTS registration_email_outbox (
+ customer_id UUID PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+ attempts INTEGER NOT NULL DEFAULT 0,
+ last_attempt_at TIMESTAMPTZ,
+ sent_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS oauth_states (
  state_hash TEXT PRIMARY KEY,
  provider TEXT NOT NULL,

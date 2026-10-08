@@ -131,22 +131,27 @@ else test('email login, cart, manual approval and one-use private download',asyn
    await botCommerce.close();
   }
   const loginEmail='new-'+suffix+'@example.test';
-  const requested=await api('/api/v2/auth/start','POST',null,{email:loginEmail});
+  const requested=await api('/api/v2/auth/password/register/start','POST',null,{email:loginEmail,nickname:'DJ New',password:'simplepass123'});
   assert.equal(requested.status,202);
   assert.equal((await pool.query("SELECT count(*)::int AS n FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[loginEmail])).rows[0].n,0);
-  const match=/#ticket=([a-zA-Z0-9_-]+)/.exec(emails.at(-1).text);
+  const match=/confirmation code: (\d{8})/.exec(emails.findLast(message=>message.to===loginEmail).text);
   assert.ok(match);
-  const signed=await api('/api/v2/auth/redeem','POST',null,{ticket:match[1]});
+  const signed=await api('/api/v2/auth/password/register/confirm','POST',null,{challengeId:requested.data.challengeId,code:match[1]});
   assert.equal(signed.status,200);
-  assert.equal((await api('/api/v2/auth/redeem','POST',null,{ticket:match[1]})).status,410);
+  assert.equal((await api('/api/v2/auth/password/register/confirm','POST',null,{challengeId:requested.data.challengeId,code:match[1]})).status,410);
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,200);
   await api('/api/v2/auth/logout','POST',signed.data.accessToken);
   assert.equal((await api('/api/v2/me','GET',signed.data.accessToken)).status,401);
-  await api('/api/v2/auth/start','POST',null,{email:loginEmail});
-  const nextLogin=/#ticket=([a-zA-Z0-9_-]+)/.exec(emails.at(-1).text)[1];
-  assert.equal((await api('/api/v2/auth/redeem','POST',null,{ticket:nextLogin})).status,200);
+  assert.equal((await api('/api/v2/auth/password/login','POST',null,{email:loginEmail,password:'wrongpassword'})).status,401);
+  assert.equal((await api('/api/v2/auth/password/login','POST',null,{email:loginEmail,password:'simplepass123'})).status,200);
+  assert.equal((await api('/api/v2/auth/start','POST',null,{email:loginEmail})).status,410);
   const registered=await pool.query("SELECT a.id,a.attempts FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[loginEmail]);
   assert.equal(registered.rowCount,1);
+  for(let i=0;i<10&&!emails.some(message=>message.to==='owner@example.test'&&message.text.includes(loginEmail));i++){
+   await commerce.flushRegistrationEmails();
+   await new Promise(resolve=>setTimeout(resolve,10));
+  }
+  assert.equal(emails.filter(message=>message.to==='owner@example.test'&&message.text.includes(loginEmail)).length,1);
   const activityMessages=[];
   let rejectRegistration=true;
   const activityBot=require('../telegram').createTelegramBot(telegramConfig,{pool,approveOrder:async()=>{},fetchImpl:async(url,request)=>{
@@ -210,13 +215,13 @@ else test('email login, cart, manual approval and one-use private download',asyn
   const gmailServer=http.createServer(async(req,res)=>gmailCommerce.handle(req,res,new URL(req.url,'http://localhost')));
   try{
    await new Promise(resolve=>gmailServer.listen(0,'127.0.0.1',resolve));
-   const sent=await fetch('http://127.0.0.1:'+gmailServer.address().port+'/api/v2/auth/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'gmail-'+suffix+'@example.test'})});
+   const sent=await fetch('http://127.0.0.1:'+gmailServer.address().port+'/api/v2/auth/password/reset/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:loginEmail})});
    assert.equal(sent.status,202);
    assert.equal(gmailCalls.length,1);
    assert.equal(gmailCalls[0].url,'https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
    assert.equal(gmailCalls[0].request.headers.Authorization,'Bearer mock-access-token');
    const mime=Buffer.from(JSON.parse(gmailCalls[0].request.body).raw,'base64url').toString('utf8');
-   assert.match(mime,new RegExp('To: gmail-'+suffix+'@example\\.test'));
+   assert.ok(mime.includes('To: '+loginEmail));
   }finally{
    await new Promise(resolve=>gmailServer.close(resolve));
    await gmailCommerce.close();
@@ -234,19 +239,19 @@ else test('email login, cart, manual approval and one-use private download',asyn
   try{
    await new Promise(resolve=>resendServer.listen(0,'127.0.0.1',resolve));
    const endpoint='http://127.0.0.1:'+resendServer.address().port;
-   const login=()=>fetch(endpoint+'/api/v2/auth/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'resend-'+suffix+'@example.test'})});
-   assert.equal((await login()).status,202);
+   const reset=()=>fetch(endpoint+'/api/v2/auth/password/reset/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:loginEmail})});
+   const started=await reset();assert.equal(started.status,202);
    const sent=resendCalls[0];
    assert.equal(sent.url,'https://api.resend.com/emails');
    assert.equal(sent.headers.Authorization,'Bearer test-resend-key');
-   assert.deepEqual(sent.body.to,['resend-'+suffix+'@example.test']);
+   assert.deepEqual(sent.body.to,[loginEmail]);
    assert.equal(sent.body.from,resendConfig.SMTP_FROM);
-   assert.match(sent.headers['Idempotency-Key'],/^signin\/[a-f0-9]{64}$/);
-   const ticket=/#ticket=([a-zA-Z0-9_-]+)/.exec(sent.body.text)[1];
-   const redeemed=await fetch(endpoint+'/api/v2/auth/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})});
+   assert.match(sent.headers['Idempotency-Key'],/^password\/reset\/[a-f0-9-]{36}$/);
+   const code=/reset code: (\d{8})/.exec(sent.body.text)[1];
+   const redeemed=await fetch(endpoint+'/api/v2/auth/password/reset/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challengeId:(await started.json()).challengeId,code,password:'anotherpass123'})});
    assert.equal(redeemed.status,200);
    resendFailure=true;
-   const failed=await login();
+   const failed=await reset();
    assert.equal(failed.status,503);
    assert.equal((await failed.json()).error,'Service temporarily unavailable.');
    await resendCommerce.flushNotifications();
@@ -270,22 +275,27 @@ else test('email login, cart, manual approval and one-use private download',asyn
    await resendCommerce.close();
   }
   const otpEmail='otp-'+suffix+'@example.test';
-  const started=await api('/api/v2/auth/code/start','POST',null,{email:otpEmail,nickname:'DJ Test'});
+  const started=await api('/api/v2/auth/password/register/start','POST',null,{email:otpEmail,nickname:'DJ Test',password:'samplepass123'});
   assert.equal(started.status,202);
   assert.equal((await pool.query("SELECT count(*)::int AS n FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[otpEmail])).rows[0].n,0);
-  const otpCode=/confirmation code: (\d{8})/.exec(emails.at(-1).text)[1];
+  const otpCode=/confirmation code: (\d{8})/.exec(emails.findLast(message=>message.to===otpEmail).text)[1];
   const otpChallenge={challengeId:started.data.challengeId,code:otpCode};
   const wrongCode=otpCode==='00000000'?'11111111':'00000000';
-  assert.equal((await api('/api/v2/auth/code/verify','POST',null,{...otpChallenge,code:wrongCode})).status,400);
-  const concurrent=await Promise.all([api('/api/v2/auth/code/verify','POST',null,otpChallenge),api('/api/v2/auth/code/verify','POST',null,otpChallenge)]);
+  assert.equal((await api('/api/v2/auth/password/register/confirm','POST',null,{...otpChallenge,code:wrongCode})).status,400);
+  const concurrent=await Promise.all([api('/api/v2/auth/password/register/confirm','POST',null,otpChallenge),api('/api/v2/auth/password/register/confirm','POST',null,otpChallenge)]);
   assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,410]);
   const otpSession=concurrent.find(r=>r.status===200).data.accessToken;
   const otpProfile=await api('/api/v2/me','GET',otpSession);
   assert.equal(otpProfile.data.email,otpEmail);assert.equal(otpProfile.data.nickname,'DJ Test');
-  const locked=await api('/api/v2/auth/code/start','POST',null,{email:otpEmail});
-  const lockedCode=/confirmation code: (\d{8})/.exec(emails.at(-1).text)[1];
-  for(let i=0;i<5;i++)assert.equal((await api('/api/v2/auth/code/verify','POST',null,{challengeId:locked.data.challengeId,code:lockedCode==='00000000'?'11111111':'00000000'})).status,400);
-  assert.equal((await api('/api/v2/auth/code/verify','POST',null,{challengeId:locked.data.challengeId,code:lockedCode})).status,410);
+  const locked=await api('/api/v2/auth/password/reset/start','POST',null,{email:otpEmail});
+  const lockedCode=/reset code: (\d{8})/.exec(emails.findLast(message=>message.to===otpEmail).text)[1];
+  for(let i=0;i<5;i++)assert.equal((await api('/api/v2/auth/password/reset/confirm','POST',null,{challengeId:locked.data.challengeId,code:lockedCode==='00000000'?'11111111':'00000000',password:'newpass123'})).status,400);
+  assert.equal((await api('/api/v2/auth/password/reset/confirm','POST',null,{challengeId:locked.data.challengeId,code:lockedCode,password:'newpass123'})).status,410);
+  const recovery=await api('/api/v2/auth/password/reset/start','POST',null,{email:otpEmail});
+  const recoveryCode=/reset code: (\d{8})/.exec(emails.findLast(message=>message.to===otpEmail).text)[1];
+  assert.equal((await api('/api/v2/auth/password/reset/confirm','POST',null,{challengeId:recovery.data.challengeId,code:recoveryCode,password:'newpass123'})).status,200);
+  assert.equal((await api('/api/v2/me','GET',otpSession)).status,401);
+  assert.equal((await api('/api/v2/auth/password/login','POST',null,{email:otpEmail,password:'newpass123'})).status,200);
   assert.deepEqual((await api('/api/v2/auth/providers')).data,{google:false,facebook:false,apple:false});
   assert.equal((await api('/api/v2/auth/oauth/google?origin=https://evil.example')).status,503);
 

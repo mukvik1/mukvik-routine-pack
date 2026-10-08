@@ -21,12 +21,16 @@
     </section>
     <p id="message" class="message" role="status" aria-live="polite" hidden></p>
     <section class="card" id="auth-card">
-      <h2 id="signin-heading">Sign in or register</h2>
-      <p id="signin-help">Enter your email. We'll send you a one-time sign-in link.</p>
+      <h2 id="signin-heading">Sign in</h2>
+      <p id="signin-help">Sign in with your email and password.</p>
       <form id="signin-form">
         <label for="email" id="email-label">Email</label>
-        <div class="input-row"><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button id="signin-button" type="submit">Send sign-in link</button></div>
+        <input id="email" name="email" type="email" autocomplete="email" required maxlength="254">
+        <label for="password" id="password-label">Password</label>
+        <div class="input-row"><input id="password" name="password" type="password" autocomplete="current-password" required><button id="signin-button" type="submit">Sign in</button></div>
       </form>
+      <p><a id="register-link" href="https://routinepack.download/?auth=register">Create an account on the main site</a></p>
+      <p><a id="recover-link" href="https://routinepack.download/?auth=reset">Forgot password? Recover it on the main site.</a></p>
     </section>
     <section class="card" id="profile-card" hidden>
       <div class="row"><div><h2 id="profile-heading">Your account</h2><p id="profile-email"></p></div><button type="button" class="subtle" id="logout">Sign out</button></div>

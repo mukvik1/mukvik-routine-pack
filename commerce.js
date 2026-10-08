@@ -1,6 +1,7 @@
 (function commerceModule(require,module,exports){
 'use strict';
 const crypto=require('node:crypto');
+const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
 const CATALOG=Object.freeze({
@@ -13,6 +14,7 @@ const CATALOG=Object.freeze({
  routine9:{name:'I KHOW YOU WANT ME X CHANDELIER',cents:500}
 });
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const validEmail=email=>email.length>=5&&email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const token=()=>crypto.randomBytes(32).toString('base64url');
 function response(res,status,body){
@@ -164,6 +166,109 @@ function createCommerce(settings=process.env,overrides={}){
    try{await db.query('BEGIN');const customer=await db.query('INSERT INTO customers(id,email,nickname) VALUES($1,$2,$3) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING id',[crypto.randomUUID(),email,String(nickname||'').trim().slice(0,40)||null]);access=token();await db.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),customer.rows[0].id]);await db.query("INSERT INTO customer_activity(customer_id,kind) VALUES($1,'registered') ON CONFLICT DO NOTHING",[customer.rows[0].id]);await db.query('COMMIT');}catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
    oauthReply(res,row.origin,{accessToken:access});
   }catch{oauthReply(res,row.origin,{error:'Social sign-in failed.'});}
+ }
+ async function startPasswordRegistration(req,res){
+  const payload=await body(req),email=String(payload.email||'').trim().toLowerCase(),nickname=String(payload.nickname||'').trim();
+  if(!validEmail(email))return response(res,400,{error:'Enter a valid email address.'});
+  if(!nickname||nickname.length>40||/[\x00-\x1f\x7f]/.test(nickname))return response(res,400,{error:'Enter a nickname (up to 40 characters).'});
+  if(!validPassword(payload.password))return response(res,400,{error:'Password must contain 8 to 128 characters.'});
+  const existing=await pool.query('SELECT password_hash FROM customers WHERE email=$1',[email]);
+  if(existing.rows[0]?.password_hash)return response(res,202,{challengeId:crypto.randomUUID(),expiresIn:600});
+  const recent=await pool.query("SELECT count(*)::int AS n FROM password_auth_challenges WHERE email=$1 AND created_at>now()-interval '15 minutes'",[email]);
+  if(recent.rows[0].n>=5)return response(res,429,{error:'Please wait before requesting another code.'});
+  const id=crypto.randomUUID(),code=String(crypto.randomInt(0,100000000)).padStart(8,'0');
+  const passwordHash=await hashPassword(payload.password);
+  await pool.query("INSERT INTO password_auth_challenges(id,email,kind,nickname,password_hash,code_hash,expires_at) VALUES($1,$2,'register',$3,$4,$5,now()+interval '10 minutes')",[id,email,nickname,passwordHash,sha(id+':'+code)]);
+  try{await send(email,'MUKVIK — confirm your account / Підтвердьте акаунт','Your account confirmation code: '+code+'\nValid for 10 minutes. Never share this code.\n\nКод підтвердження акаунта: '+code+'\nДіє 10 хвилин. Нікому не повідомляйте код.','password/register/'+id);}
+  catch(error){await pool.query('UPDATE password_auth_challenges SET used_at=now() WHERE id=$1',[id]);throw error;}
+  response(res,202,{challengeId:id,expiresIn:600});
+ }
+ async function confirmPasswordChallenge(req,res,kind){
+  const payload=await body(req),id=String(payload.challengeId||''),code=String(payload.code||'');
+  if(!uuidPattern.test(id)||!/^\d{8}$/.test(code))return response(res,400,{error:'Enter the 8-digit code from your email.'});
+  if(kind==='reset'&&!validPassword(payload.password))return response(res,400,{error:'Password must contain 8 to 128 characters.'});
+  const newPasswordHash=kind==='reset'?await hashPassword(payload.password):null;
+  const db=await pool.connect();let access,customerId,email;
+  try{
+   await db.query('BEGIN');
+   const result=await db.query('SELECT * FROM password_auth_challenges WHERE id=$1 AND kind=$2 FOR UPDATE',[id,kind]);
+   const row=result.rows[0];
+   if(!row||row.used_at||new Date(row.expires_at)<=new Date()||row.attempts>=5){await db.query('ROLLBACK');return response(res,410,{error:'Code expired or used. Request a new code.'});}
+   if(!crypto.timingSafeEqual(Buffer.from(row.code_hash,'hex'),Buffer.from(sha(id+':'+code),'hex'))){
+    await db.query('UPDATE password_auth_challenges SET attempts=attempts+1 WHERE id=$1',[id]);await db.query('COMMIT');return response(res,400,{error:'Incorrect code.'});
+   }
+   email=row.email;
+   await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',[email]);
+   const customer=await db.query('SELECT id,password_hash FROM customers WHERE email=$1 FOR UPDATE',[email]);
+   if(kind==='register'){
+    if(customer.rows[0]?.password_hash){await db.query('ROLLBACK');return response(res,409,{error:'This account already exists. Sign in or reset your password.'});}
+    if(customer.rowCount){customerId=customer.rows[0].id;await db.query('UPDATE customers SET password_hash=$2,email_verified_at=now(),nickname=coalesce(nickname,$3) WHERE id=$1',[customerId,row.password_hash,row.nickname]);}
+    else{customerId=crypto.randomUUID();await db.query('INSERT INTO customers(id,email,nickname,password_hash,email_verified_at) VALUES($1,$2,$3,$4,now())',[customerId,email,row.nickname,row.password_hash]);}
+    await db.query('UPDATE sessions SET revoked_at=now() WHERE customer_id=$1 AND revoked_at IS NULL',[customerId]);
+    access=token();
+    await db.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),customerId]);
+    await db.query("INSERT INTO customer_activity(customer_id,kind) VALUES($1,'registered') ON CONFLICT DO NOTHING",[customerId]);
+    await db.query('INSERT INTO registration_email_outbox(customer_id) VALUES($1) ON CONFLICT DO NOTHING',[customerId]);
+   }else{
+    if(!customer.rowCount){await db.query('ROLLBACK');return response(res,410,{error:'Code expired or used. Request a new code.'});}
+    customerId=customer.rows[0].id;
+    await db.query('UPDATE customers SET password_hash=$2,email_verified_at=coalesce(email_verified_at,now()) WHERE id=$1',[customerId,newPasswordHash]);
+    await db.query('UPDATE sessions SET revoked_at=now() WHERE customer_id=$1 AND revoked_at IS NULL',[customerId]);
+   }
+   await db.query('UPDATE password_auth_challenges SET used_at=now() WHERE email=$1 AND used_at IS NULL',[email]);
+   await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+  if(kind==='register'){
+   response(res,200,{accessToken:access,expiresIn:1209600});
+   setImmediate(()=>flushRegistrationEmails().catch(error=>console.error('Registration notification unavailable:',error.code||error.name||'error')));
+  }else{
+   response(res,200,{message:'Password updated. Sign in with your new password.'});
+   setImmediate(()=>send(email,'MUKVIK — password changed / Пароль змінено','Your Routine Pack password was changed. If this was not you, contact MUKVIK.\n\nПароль Routine Pack змінено. Якщо це були не ви, зв’яжіться з MUKVIK.','password/changed/'+id).catch(error=>console.error('Password change notice unavailable:',error.code||error.name||'error')));
+  }
+ }
+ async function loginWithPassword(req,res){
+  const payload=await body(req),email=String(payload.email||'').trim().toLowerCase(),password=payload.password;
+  if(!validEmail(email)||!validPassword(password))return response(res,401,{error:'Incorrect email or password.'});
+  const emailHash=sha(email);
+  await pool.query('INSERT INTO password_login_attempts(email_hash) VALUES($1)',[emailHash]);
+  const attempts=await pool.query("SELECT count(*)::int AS n FROM password_login_attempts WHERE email_hash=$1 AND created_at>now()-interval '15 minutes'",[emailHash]);
+  if(attempts.rows[0].n>10)return response(res,429,{error:'Too many attempts. Try again later.'});
+  const customer=await pool.query('SELECT id,password_hash,email_verified_at FROM customers WHERE email=$1',[email]);
+  const row=customer.rows[0];
+  const matches=row?.password_hash?await verifyPassword(password,row.password_hash):(await hashPassword(password),false);
+  if(!matches||!row.email_verified_at)return response(res,401,{error:'Incorrect email or password.'});
+  const access=token();
+  await pool.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),row.id]);
+  await pool.query('DELETE FROM password_login_attempts WHERE email_hash=$1',[emailHash]);
+  response(res,200,{accessToken:access,expiresIn:1209600});
+ }
+ async function startPasswordReset(req,res){
+  const payload=await body(req),email=String(payload.email||'').trim().toLowerCase();
+  if(!validEmail(email))return response(res,400,{error:'Enter a valid email address.'});
+  const id=crypto.randomUUID();
+  const customer=await pool.query('SELECT id FROM customers WHERE email=$1',[email]);
+  if(!customer.rowCount)return response(res,202,{challengeId:id,expiresIn:600});
+  const recent=await pool.query("SELECT count(*)::int AS n FROM password_auth_challenges WHERE email=$1 AND created_at>now()-interval '15 minutes'",[email]);
+  if(recent.rows[0].n>=5)return response(res,429,{error:'Please wait before requesting another code.'});
+  const code=String(crypto.randomInt(0,100000000)).padStart(8,'0');
+  await pool.query("INSERT INTO password_auth_challenges(id,email,kind,code_hash,expires_at) VALUES($1,$2,'reset',$3,now()+interval '10 minutes')",[id,email,sha(id+':'+code)]);
+  try{await send(email,'MUKVIK — password reset / Відновлення пароля','Your password reset code: '+code+'\nValid for 10 minutes. Never share this code.\n\nКод відновлення пароля: '+code+'\nДіє 10 хвилин. Нікому не повідомляйте код.','password/reset/'+id);}
+  catch(error){await pool.query('UPDATE password_auth_challenges SET used_at=now() WHERE id=$1',[id]);throw error;}
+  response(res,202,{challengeId:id,expiresIn:600});
+ }
+ async function flushRegistrationEmails(){
+  const db=await pool.connect();
+  try{
+   await db.query('BEGIN');
+   const list=await db.query("SELECT o.customer_id,c.email,c.nickname FROM registration_email_outbox o JOIN customers c ON c.id=o.customer_id WHERE o.sent_at IS NULL AND o.attempts<20 AND (o.last_attempt_at IS NULL OR o.last_attempt_at<now()-interval '1 minute') ORDER BY c.created_at LIMIT 10 FOR UPDATE OF o SKIP LOCKED");
+   for(const row of list.rows){
+    try{
+     await send(adminEmail,'MUKVIK — new account / Новий акаунт','A new account was confirmed.\nEmail: '+row.email+'\nNickname: '+(row.nickname||'—')+'\n\nПідтверджено новий акаунт.\nEmail: '+row.email+'\nНікнейм: '+(row.nickname||'—'),'registration/'+row.customer_id);
+     await db.query('UPDATE registration_email_outbox SET sent_at=now(),attempts=attempts+1,last_attempt_at=now() WHERE customer_id=$1',[row.customer_id]);
+    }catch{await db.query('UPDATE registration_email_outbox SET attempts=attempts+1,last_attempt_at=now() WHERE customer_id=$1',[row.customer_id]);}
+   }
+   await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }
  async function startCode(req,res){
   const payload=await body(req),email=String(payload.email||'').trim().toLowerCase();
@@ -386,11 +491,13 @@ function createCommerce(settings=process.env,overrides={}){
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
-   if(req.method==='POST'&&url.pathname==='/api/v2/auth/code/start'){await startCode(req,res);return true;}
-   if(req.method==='POST'&&url.pathname==='/api/v2/auth/code/verify'){await verifyCode(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/reset/start'){await startPasswordReset(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/reset/confirm'){await confirmPasswordChallenge(req,res,'reset');return true;}
+   if(req.method==='POST'&&['/api/v2/auth/code/start','/api/v2/auth/code/verify','/api/v2/auth/start','/api/v2/auth/redeem'].includes(url.pathname)){response(res,410,{error:'Use password sign-in or password recovery.'});return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/auth/providers'){response(res,200,Object.fromEntries(Object.entries(providerConfig).map(([key,c])=>[key,Boolean(c.client&&c.secret)])));return true;}
-   if(req.method==='POST'&&url.pathname==='/api/v2/auth/start'){await start(req,res);return true;}
-   if(req.method==='POST'&&url.pathname==='/api/v2/auth/redeem'){await redeem(req,res);return true;}
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
    const user=await session(req);
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
@@ -415,12 +522,16 @@ function createCommerce(settings=process.env,overrides={}){
    return true;
   }
  }
- const timer=setInterval(()=>flushNotifications().catch(error=>console.error('Notification delivery unavailable:',error.code||error.name||'error')),60000);
+ const timer=setInterval(()=>{
+  flushNotifications().catch(error=>console.error('Notification delivery unavailable:',error.code||error.name||'error'));
+  flushRegistrationEmails().catch(error=>console.error('Registration notification unavailable:',error.code||error.name||'error'));
+  pool.query("DELETE FROM password_login_attempts WHERE created_at<now()-interval '1 day'").catch(error=>console.error('Login attempt cleanup unavailable:',error.code||error.name||'error'));
+ },60000);
  const telegramTimer=telegram?setInterval(()=>telegram.flushNotifications().catch(error=>console.error('Telegram notification unavailable:',error.code||error.name||'error')),15000):null;
  telegramTimer?.unref?.();
  if(telegram)setImmediate(()=>telegram.installWebhook().then(()=>console.log('Telegram webhook registered for @'+String(settings.TELEGRAM_BOT_USERNAME||'owner-bot').replace(/[^A-Za-z0-9_]/g,''))).catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
  timer.unref?.();
- return {handle,flushNotifications,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
+ return {handle,flushNotifications,flushRegistrationEmails,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);
