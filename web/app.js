@@ -1,32 +1,8 @@
-const checkout = document.getElementById('checkout');
-
-document.querySelectorAll('[data-buy]').forEach((btn) => {
-  btn.addEventListener('click', () => checkout.showModal());
-});
-checkout.addEventListener('click', (event) => {
-  if (event.target === checkout) checkout.close();
+document.querySelectorAll('[data-buy]').forEach(button => {
+  button.addEventListener('click', () => window.location.assign('/account/'));
 });
 document.querySelectorAll('dialog .close').forEach(button => {
   button.addEventListener('click', () => button.closest('dialog').close());
-});
-
-const checkoutButton = document.getElementById('checkout-button');
-const checkoutError = document.getElementById('checkout-error');
-checkoutButton.addEventListener('click', async () => {
-  checkoutButton.disabled = true;
-  checkoutButton.textContent = 'OPENING CHECKOUT…';
-  checkoutError.hidden = true;
-  try {
-    const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-    const data = await response.json();
-    if (!response.ok || !data.invoiceUrl) throw new Error(data.error || 'Could not open checkout. Please try again.');
-    window.location.assign(data.invoiceUrl);
-  } catch (error) {
-    checkoutError.textContent = error.message;
-    checkoutError.hidden = false;
-    checkoutButton.disabled = false;
-    checkoutButton.innerHTML = '<strong>PAY WITH USDT <span>→</span></strong><small>TRON NETWORK · BINANCE OR ANY CRYPTO WALLET</small>';
-  }
 });
 
 const resultDialog = document.getElementById('payment-result');
