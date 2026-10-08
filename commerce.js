@@ -94,7 +94,7 @@ function createCommerce(settings=process.env,overrides={}){
     method:'POST',headers:{Authorization:'Bearer '+settings.RESEND_API_KEY,'Content-Type':'application/json',...(idempotencyKey?{'Idempotency-Key':idempotencyKey}:{})},
     body:JSON.stringify({...message,to:[to]}),signal:AbortSignal.timeout(12000)
    });
-   if(!result.ok)throw new Error('Resend delivery unavailable');
+   if(!result.ok)throw new Error('Resend delivery unavailable: HTTP '+result.status);
    const accepted=await result.json();
    if(typeof accepted.id!=='string'||!accepted.id)throw new Error('Resend delivery not accepted');
    return;
@@ -105,7 +105,7 @@ function createCommerce(settings=process.env,overrides={}){
    method:'POST',headers:{Authorization:'Bearer '+accessToken.token,'Content-Type':'application/json'},
    body:JSON.stringify({raw:gmailRawMessage(message)}),signal:AbortSignal.timeout(12000)
   });
-  if(!result.ok)throw new Error('Gmail delivery unavailable');
+  if(!result.ok)throw new Error('Gmail delivery unavailable: HTTP '+result.status);
  }
  const oauthOrigin='https://mukvik-routine-pack-production.up.railway.app';
  const allowedAuthOrigins=new Set(['https://routinepack.download','https://www.routinepack.download','https://mukvik-routine-pack.mukvik1.chatgpt.site']);
@@ -517,7 +517,7 @@ function createCommerce(settings=process.env,overrides={}){
    response(res,404,{error:'Not found.'});return true;
   }catch(error){
    if(error.status){response(res,error.status,{error:error.message});return true;}
-   console.error('Commerce request failed:',error.code||error.name||'error');
+   console.error('Commerce request failed:',error.code||error.message||error.name||'error');
    if(!res.headersSent)response(res,503,{error:'Service temporarily unavailable.'});else res.destroy();
    return true;
   }
