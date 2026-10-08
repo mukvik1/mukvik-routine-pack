@@ -3,13 +3,7 @@ const path = require('path');
 
 const origin = 'https://mukvik-routine-pack.mukvik1.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
-const files = [
-  'assets/artwork.png',
-  'assets/mukvik-logo.png',
-  'assets/routine-pack.png',
-  ...Array.from({ length: 5 }, (_, index) => `assets/videos/poster-${index + 1}.jpg`),
-  ...Array.from({ length: 5 }, (_, index) => `assets/videos/video-${index + 1}.mp4`)
-];
+const files = require('./config/site-assets.json');
 
 if (!token) throw new Error('SITES_BYPASS_TOKEN is required during the Railway build');
 
@@ -24,7 +18,7 @@ async function download(relativePath) {
   console.log(`Downloaded ${relativePath}`);
 }
 
-Promise.all(files.map(download)).catch((error) => {
+(async()=>{let next=0;await Promise.all(Array.from({length:6},async()=>{while(next<files.length){const file=files[next++];await download(file);}}));})().catch((error) => {
   console.error(error.message);
   process.exit(1);
 });

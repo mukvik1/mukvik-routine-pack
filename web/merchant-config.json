@@ -1,0 +1,12 @@
+{
+  "legalName": null,
+  "taxId": null,
+  "registrationAddress": null,
+  "supportEmail": null,
+  "supportPhone": null,
+  "publicBankDetails": null,
+  "refundTerms": {"en": null, "uk": null},
+  "dataRetention": {"en": null, "uk": null},
+  "productLicense": {"en": null, "uk": null},
+  "approved": false
+}

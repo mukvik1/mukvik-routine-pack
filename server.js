@@ -31,7 +31,7 @@ const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml',
-  '.webp': 'image/webp', '.mp4': 'video/mp4', '.m3u8': 'application/vnd.apple.mpegurl',
+  '.woff': 'font/woff', '.woff2': 'font/woff2', '.webp': 'image/webp', '.mp4': 'video/mp4', '.m3u8': 'application/vnd.apple.mpegurl',
   '.m4s': 'video/iso.segment'
 };
 
@@ -159,7 +159,7 @@ async function ipn(req, res) {
 }
 
 function serveStatic(req, res, pathname) {
-  const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, ''));
+  const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, '')+(pathname.endsWith('/')?'index.html':''));
   const filePath = path.resolve(root, relativePath);
   if (!filePath.startsWith(`${root}${path.sep}`)) return json(res, 403, { error: 'Forbidden' });
   fs.stat(filePath, (error, stat) => {

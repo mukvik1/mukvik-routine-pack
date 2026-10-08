@@ -1,0 +1,104 @@
+[
+  {
+    "id": "pack1",
+    "preview": "/assets/lesson-previews/pack-1-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-1-blurred.jpg",
+    "duration": 40.0,
+    "sourceDuration": 99.392,
+    "width": 720,
+    "height": 1280,
+    "redaction": {
+      "baked": true,
+      "height": 586,
+      "sigma": 45
+    },
+    "sha256": "797524427950f1abfd07d2998e3b7cf634128354112e26f30761ac3bcf8af411",
+    "posterSha256": "d7b3e54d31ab54a9dcbe5c0923a7c971910e9e9deb89dacaac11d73b19256a30",
+    "sourceSha256": "f6f272e9786d4655661d9a1f56b0d2418b538ef6d9fcfc1643b5a4af0779d18b"
+  },
+  {
+    "id": "pack2",
+    "preview": "/assets/lesson-previews/pack-2-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-2-blurred.jpg",
+    "duration": 40.0,
+    "sourceDuration": 73.514667,
+    "width": 720,
+    "height": 1280,
+    "redaction": {
+      "baked": true,
+      "height": 586,
+      "sigma": 45
+    },
+    "sha256": "c941ff657290c22d3664f025b83048841d8cd9cddc7899dab38251ecf9ed2ba2",
+    "posterSha256": "903f247b639544a0ab77647eb90a8c1e67f3db32558ebcfa898c88f620bc26b7",
+    "sourceSha256": "60944848548fac550125e656e94ab78c27129fe861473691d50ba21dc8472eb7"
+  },
+  {
+    "id": "pack3",
+    "preview": "/assets/lesson-previews/pack-3-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-3-blurred.jpg",
+    "duration": 40.0,
+    "sourceDuration": 109.034667,
+    "width": 720,
+    "height": 1280,
+    "redaction": {
+      "baked": true,
+      "height": 586,
+      "sigma": 45
+    },
+    "sha256": "f41cf75c70ab07ac2f47ab3cd5754c6226df9d56683eec845685ab02e0b689c9",
+    "posterSha256": "8b0416cc87b9d2f3761f0183598576e59c32d4398d4f5718da2b0898dd8e8dee",
+    "sourceSha256": "54fd7e48f891dc6df59bb8f8096bc66bd62f6bb1d2c42f23b22b82473d097123"
+  },
+  {
+    "id": "pack4",
+    "preview": "/assets/lesson-previews/pack-4-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-4-blurred.jpg",
+    "duration": 28.758,
+    "sourceDuration": 28.757333,
+    "width": 720,
+    "height": 1280,
+    "redaction": {
+      "baked": true,
+      "height": 586,
+      "sigma": 45
+    },
+    "sha256": "8aec5691526719d8e725657208fc6d0bc3ca52c8cd612bcfb0922eb5fae2ae8d",
+    "posterSha256": "9bf7e115f52c2c51fac3bc37293ed23ec1129bb904338c9cbdb270281a38cad7",
+    "sourceSha256": "196f5076e164f62a63bb7dcfb541576b796a0665a385190b1c706e635d27e52b"
+  },
+  {
+    "id": "pack5",
+    "preview": "/assets/lesson-previews/pack-5-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-5-blurred.jpg",
+    "duration": 40.0,
+    "sourceDuration": 40.746667,
+    "width": 720,
+    "height": 1220,
+    "redaction": {
+      "baked": true,
+      "height": 596,
+      "sigma": 45
+    },
+    "sha256": "c81a73738c9d2aa51a7a2db2b64420bf068c198f2202bfaf38229222fc81cca8",
+    "posterSha256": "d246f23615d58a40a47dbba1e717f838566bd7f7a77e68ab9582a67615333c20",
+    "sourceSha256": "66d7ef16ef20c91a76dc126ac340cf151eccf050ac4da18d2fdec66c4966730d"
+  },
+  {
+    "id": "pack6",
+    "preview": "/assets/lesson-previews/pack-6-blurred.mp4",
+    "poster": "/assets/lesson-previews/pack-6-blurred.jpg",
+    "duration": 32.64,
+    "sourceDuration": 32.64,
+    "width": 720,
+    "height": 1280,
+    "redaction": {
+      "baked": true,
+      "height": 586,
+      "sigma": 45
+    },
+    "sha256": "030edea2a8e8f33b73222ed4288b231e11f754e85e92125792b1d09a6dccf280",
+    "posterSha256": "de2d8f8b14c233b5886e508a555caf8b55a807b5506cd2a3e740c097f18b2c58",
+    "sourceSha256": "04a982c79a6f69b0b9d61d81ef94a2e3c6525ef64cc5f7d54ce1ce151448dd94"
+  }
+]

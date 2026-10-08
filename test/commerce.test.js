@@ -269,6 +269,26 @@ else test('email login, cart, manual approval and one-use private download',asyn
    await new Promise(resolve=>resendServer.close(resolve));
    await resendCommerce.close();
   }
+  const otpEmail='otp-'+suffix+'@example.test';
+  const started=await api('/api/v2/auth/code/start','POST',null,{email:otpEmail,nickname:'DJ Test'});
+  assert.equal(started.status,202);
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE c.email=$1 AND a.kind='registered'",[otpEmail])).rows[0].n,0);
+  const otpCode=/confirmation code: (\d{8})/.exec(emails.at(-1).text)[1];
+  const otpChallenge={challengeId:started.data.challengeId,code:otpCode};
+  const wrongCode=otpCode==='00000000'?'11111111':'00000000';
+  assert.equal((await api('/api/v2/auth/code/verify','POST',null,{...otpChallenge,code:wrongCode})).status,400);
+  const concurrent=await Promise.all([api('/api/v2/auth/code/verify','POST',null,otpChallenge),api('/api/v2/auth/code/verify','POST',null,otpChallenge)]);
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,410]);
+  const otpSession=concurrent.find(r=>r.status===200).data.accessToken;
+  const otpProfile=await api('/api/v2/me','GET',otpSession);
+  assert.equal(otpProfile.data.email,otpEmail);assert.equal(otpProfile.data.nickname,'DJ Test');
+  const locked=await api('/api/v2/auth/code/start','POST',null,{email:otpEmail});
+  const lockedCode=/confirmation code: (\d{8})/.exec(emails.at(-1).text)[1];
+  for(let i=0;i<5;i++)assert.equal((await api('/api/v2/auth/code/verify','POST',null,{challengeId:locked.data.challengeId,code:lockedCode==='00000000'?'11111111':'00000000'})).status,400);
+  assert.equal((await api('/api/v2/auth/code/verify','POST',null,{challengeId:locked.data.challengeId,code:lockedCode})).status,410);
+  assert.deepEqual((await api('/api/v2/auth/providers')).data,{google:false,facebook:false,apple:false});
+  assert.equal((await api('/api/v2/auth/oauth/google?origin=https://evil.example')).status,503);
+
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));
   if(commerce)await commerce.close();

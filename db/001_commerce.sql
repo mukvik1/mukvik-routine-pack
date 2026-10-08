@@ -112,3 +112,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS customer_activity_registration_idx
   ON customer_activity(customer_id) WHERE kind='registered';
 CREATE INDEX IF NOT EXISTS customer_activity_pending_idx
   ON customer_activity(id) WHERE sent_at IS NULL;
+
+-- Email confirmation for the in-store dialog; legacy sign-in links stay valid.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS nickname TEXT;
+CREATE TABLE IF NOT EXISTS email_codes (
+ id UUID PRIMARY KEY,
+ customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+ code_hash TEXT NOT NULL,
+ nickname TEXT,
+ attempts INTEGER NOT NULL DEFAULT 0,
+ expires_at TIMESTAMPTZ NOT NULL,
+ used_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_codes_customer_created_idx ON email_codes(customer_id,created_at DESC);
+
+CREATE TABLE IF NOT EXISTS oauth_states (
+ state_hash TEXT PRIMARY KEY,
+ provider TEXT NOT NULL,
+ origin TEXT NOT NULL,
+ nonce TEXT NOT NULL,
+ verifier TEXT NOT NULL,
+ expires_at TIMESTAMPTZ NOT NULL,
+ used_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

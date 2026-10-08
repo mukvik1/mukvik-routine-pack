@@ -80,7 +80,7 @@ function createCommerce(settings=process.env,overrides={}){
  async function session(req){
   const match=/^Bearer ([a-zA-Z0-9_-]{40,100})$/.exec(String(req.headers.authorization||''));
   if(!match)return null;
-  const r=await pool.query("SELECT c.id,c.email FROM sessions s JOIN customers c ON c.id=s.customer_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()",[sha(match[1])]);
+  const r=await pool.query("SELECT c.id,c.email,c.nickname FROM sessions s JOIN customers c ON c.id=s.customer_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()",[sha(match[1])]);
   return r.rows[0]||null;
  }
  async function send(to,subject,text,idempotencyKey){
@@ -104,6 +104,106 @@ function createCommerce(settings=process.env,overrides={}){
    body:JSON.stringify({raw:gmailRawMessage(message)}),signal:AbortSignal.timeout(12000)
   });
   if(!result.ok)throw new Error('Gmail delivery unavailable');
+ }
+ const oauthOrigin='https://mukvik-routine-pack-production.up.railway.app';
+ const allowedAuthOrigins=new Set(['https://routinepack.download','https://www.routinepack.download','https://mukvik-routine-pack.mukvik1.chatgpt.site']);
+ const providerConfig={
+  google:{client:settings.AUTH_GOOGLE_CLIENT_ID,secret:settings.AUTH_GOOGLE_CLIENT_SECRET,authorize:'https://accounts.google.com/o/oauth2/v2/auth',exchange:'https://oauth2.googleapis.com/token',scope:'openid email profile'},
+  facebook:{client:settings.AUTH_FACEBOOK_CLIENT_ID,secret:settings.AUTH_FACEBOOK_CLIENT_SECRET,authorize:'https://www.facebook.com/v22.0/dialog/oauth',exchange:'https://graph.facebook.com/v22.0/oauth/access_token',scope:'email,public_profile'},
+  apple:{client:settings.AUTH_APPLE_CLIENT_ID,secret:settings.AUTH_APPLE_CLIENT_SECRET,authorize:'https://appleid.apple.com/auth/authorize',exchange:'https://appleid.apple.com/auth/token',scope:'name email'}
+ };
+ function oauthReply(res,origin,result){
+  const nonce=crypto.randomBytes(16).toString('base64');
+  const data=JSON.stringify({type:'mukvik-auth',...result}).replace(/</g,'\\u003c');
+  res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'nonce-"+nonce+"'; base-uri 'none'; frame-ancestors 'none'"});
+  res.end('<!doctype html><html><head><meta name="color-scheme" content="dark"></head><body><p>You can close this window.</p><script nonce="'+nonce+'">if(window.opener){window.opener.postMessage('+data+','+JSON.stringify(origin)+');window.close();}</script></body></html>');
+ }
+ async function oauth(req,res,url,provider,callback){
+  const config=providerConfig[provider];
+  if(!config?.client||!config.secret)return response(res,503,{error:'Social sign-in is not configured yet.'});
+  const redirect=oauthOrigin+'/api/v2/auth/oauth/'+provider+'/callback';
+  if(!callback){
+   const origin=url.searchParams.get('origin');if(!allowedAuthOrigins.has(origin))return response(res,400,{error:'Invalid sign-in origin.'});
+   const state=token(),nonce=token(),verifier=token();
+   await pool.query("INSERT INTO oauth_states(state_hash,provider,origin,nonce,verifier,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval '10 minutes')",[sha(state),provider,origin,nonce,verifier]);
+   const params=new URLSearchParams({client_id:config.client,redirect_uri:redirect,response_type:'code',scope:config.scope,state,nonce});
+   if(provider==='google'){params.set('code_challenge',crypto.createHash('sha256').update(verifier).digest('base64url'));params.set('code_challenge_method','S256');}
+   if(provider==='apple')params.set('response_mode','form_post');
+   res.writeHead(302,{Location:config.authorize+'?'+params,'Cache-Control':'no-store'});res.end();return;
+  }
+  let params=url.searchParams;
+  if(req.method==='POST'){let raw='';for await(const chunk of req){raw+=chunk.toString();if(raw.length>8192)return response(res,413,{error:'Payload too large.'});}params=new URLSearchParams(raw);}
+  const state=params.get('state');if(!state||!/^[-\w]{40,100}$/.test(state))return response(res,400,{error:'Invalid sign-in state.'});
+  const claim=await pool.query("UPDATE oauth_states SET used_at=now() WHERE state_hash=$1 AND provider=$2 AND used_at IS NULL AND expires_at>now() RETURNING *",[sha(state),provider]);
+  const row=claim.rows[0];if(!row)return response(res,410,{error:'Sign-in expired. Please try again.'});
+  try{
+   const code=params.get('code');if(!code||params.has('error'))throw Error('OAuth cancelled');
+   const payload=new URLSearchParams({client_id:config.client,client_secret:config.secret,code,redirect_uri:redirect,grant_type:'authorization_code'});
+   if(provider==='google')payload.set('code_verifier',row.verifier);
+   const exchanged=await fetch(config.exchange,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:payload,signal:AbortSignal.timeout(15000)});
+   if(!exchanged.ok)throw Error('OAuth exchange failed');const tokens=await exchanged.json();
+   let email,nickname;
+   if(provider==='facebook'){
+    if(!tokens.access_token)throw Error('Missing access token');
+    const identity=await fetch('https://graph.facebook.com/v22.0/me?fields=id,name,email',{headers:{Authorization:'Bearer '+tokens.access_token},signal:AbortSignal.timeout(15000)});
+    if(!identity.ok)throw Error('OAuth profile failed');const profile=await identity.json();email=profile.email;nickname=profile.name;
+   }else{
+    if(!tokens.id_token)throw Error('Missing ID token');
+    const verifier=new OAuth2Client();let profile;
+    if(provider==='google'){const verified=await verifier.verifyIdToken({idToken:tokens.id_token,audience:config.client});profile=verified.getPayload();}
+    else{
+     const keys=await fetch('https://appleid.apple.com/auth/keys',{signal:AbortSignal.timeout(15000)});if(!keys.ok)throw Error('Apple keys unavailable');const jwks=await keys.json(),certs={};
+     for(const key of jwks.keys||[])certs[key.kid]=crypto.createPublicKey({key,format:'jwk'}).export({type:'spki',format:'pem'});
+     const verified=await verifier.verifySignedJwtWithCertsAsync(tokens.id_token,certs,config.client,['https://appleid.apple.com']);profile=verified.getPayload();
+    }
+    if(!profile||profile.nonce!==row.nonce||![true,'true'].includes(profile.email_verified))throw Error('Unverified identity');
+    email=profile.email;nickname=profile.name;
+   }
+   email=String(email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)throw Error('Email required');
+   const db=await pool.connect();let access;
+   try{await db.query('BEGIN');const customer=await db.query('INSERT INTO customers(id,email,nickname) VALUES($1,$2,$3) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING id',[crypto.randomUUID(),email,String(nickname||'').trim().slice(0,40)||null]);access=token();await db.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),customer.rows[0].id]);await db.query("INSERT INTO customer_activity(customer_id,kind) VALUES($1,'registered') ON CONFLICT DO NOTHING",[customer.rows[0].id]);await db.query('COMMIT');}catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+   oauthReply(res,row.origin,{accessToken:access});
+  }catch{oauthReply(res,row.origin,{error:'Social sign-in failed.'});}
+ }
+ async function startCode(req,res){
+  const payload=await body(req),email=String(payload.email||'').trim().toLowerCase();
+  const nickname=String(payload.nickname||'').trim().slice(0,40);
+  if(email.length<5||email.length>254||!(/^[^\s@]+@[^\s@]+\.[^\s@]+$/).test(email))return response(res,400,{error:'Enter a valid email address.'});
+  const db=await pool.connect();let id,customerId,code;
+  try{
+   await db.query('BEGIN');
+   const customer=await db.query("INSERT INTO customers(id,email) VALUES($1,$2) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING id",[crypto.randomUUID(),email]);
+   customerId=customer.rows[0].id;
+   await db.query('SELECT id FROM customers WHERE id=$1 FOR UPDATE',[customerId]);
+   const recent=await db.query("SELECT count(*)::int AS n FROM email_codes WHERE customer_id=$1 AND created_at>now()-interval '15 minutes'",[customerId]);
+   if(recent.rows[0].n>=5){await db.query('ROLLBACK');return response(res,429,{error:'Please wait before requesting another code.'});}
+   id=crypto.randomUUID();code=String(crypto.randomInt(0,100000000)).padStart(8,'0');
+   await db.query("INSERT INTO email_codes(id,customer_id,code_hash,nickname,expires_at) VALUES($1,$2,$3,$4,now()+interval '10 minutes')",[id,customerId,sha(id+':'+code),nickname||null]);
+   await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+  try{await send(email,'MUKVIK — confirmation code / Код підтвердження','Your confirmation code: '+code+'\nValid for 10 minutes. Enter it in the window on the MUKVIK website. Never share this code.\n\nВаш код підтвердження: '+code+'\nДіє 10 хвилин. Введіть його у вікні на сайті MUKVIK. Нікому не повідомляйте код.','code/'+id);}
+  catch(error){await pool.query('UPDATE email_codes SET used_at=now() WHERE id=$1',[id]);throw error;}
+  response(res,202,{challengeId:id,expiresIn:600});
+ }
+ async function verifyCode(req,res){
+  const payload=await body(req);
+  if(!uuidPattern.test(String(payload.challengeId||''))||!/^\d{8}$/.test(String(payload.code||'')))return response(res,400,{error:'Enter the 8-digit code from your email.'});
+  const db=await pool.connect();
+  try{
+   await db.query('BEGIN');
+   const claim=await db.query('SELECT * FROM email_codes WHERE id=$1 FOR UPDATE',[payload.challengeId]);
+   const row=claim.rows[0];
+   if(!row||row.used_at||new Date(row.expires_at)<=new Date()||row.attempts>=5){await db.query('ROLLBACK');return response(res,410,{error:'Code expired or used. Request a new code.'});}
+   if(!crypto.timingSafeEqual(Buffer.from(row.code_hash,'hex'),Buffer.from(sha(payload.challengeId+':'+payload.code),'hex'))){
+    await db.query('UPDATE email_codes SET attempts=attempts+1 WHERE id=$1',[row.id]);await db.query('COMMIT');return response(res,400,{error:'Incorrect code.'});
+   }
+   await db.query('UPDATE email_codes SET used_at=now() WHERE id=$1',[row.id]);
+   if(row.nickname)await db.query('UPDATE customers SET nickname=coalesce(nickname,$2) WHERE id=$1',[row.customer_id,row.nickname]);
+   const access=token();
+   await db.query("INSERT INTO sessions(token_hash,customer_id,expires_at) VALUES($1,$2,now()+interval '14 days')",[sha(access),row.customer_id]);
+   await db.query("INSERT INTO customer_activity(customer_id,kind) VALUES($1,'registered') ON CONFLICT DO NOTHING",[row.customer_id]);
+   await db.query('COMMIT');response(res,200,{accessToken:access,expiresIn:1209600});
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }
  async function start(req,res){
   const payload=await body(req),email=String(payload.email||'').trim().toLowerCase();
@@ -198,7 +298,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
   }
-  response(res,200,{email:user.email,admin:user.email===adminEmail,orders:[...orders.values()]});
+  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,orders:[...orders.values()]});
  }
  async function adminOrders(res){
   const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,coalesce(json_agg(json_build_object('code',i.product_code,'name',i.name,'priceCents',i.price_cents) ORDER BY i.product_code) FILTER(WHERE i.product_code IS NOT NULL),'[]') AS items FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN order_items i ON i.order_id=o.id GROUP BY o.id,c.email ORDER BY o.created_at DESC LIMIT 100");
@@ -283,7 +383,12 @@ function createCommerce(settings=process.env,overrides={}){
   if(!url.pathname.startsWith('/api/v2/'))return false;
   try{
    if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'&&telegram){await telegram.handle(req,res);return true;}
+   const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
+   if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/code/start'){await startCode(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/code/verify'){await verifyCode(req,res);return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/auth/providers'){response(res,200,Object.fromEntries(Object.entries(providerConfig).map(([key,c])=>[key,Boolean(c.client&&c.secret)])));return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/start'){await start(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/redeem'){await redeem(req,res);return true;}
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
