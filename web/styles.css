@@ -82,3 +82,6 @@ html[lang=uk] .preview-toggle{font-family:'Routine Inter',Arial,sans-serif;lette
 @media(min-width:681px) and (max-width:1240px){.site-header{grid-template-columns:minmax(0,1fr) auto auto}.menu-button{display:block}.site-header nav{display:none;position:absolute;left:0;right:0;top:100%;padding:18px;grid-template-columns:1fr;background:#080808;border:1px solid #555}.site-header.menu-open nav{display:grid}.site-header nav a{padding:12px;font-size:15px}.language-switch{grid-column:1/-1}}
 @media(max-width:680px){.site-header{grid-template-columns:minmax(0,1fr) auto;gap:8px}.menu-button{grid-column:2}.store-header-actions{grid-column:1/-1;justify-content:space-between;width:100%}.language-switch{grid-column:1/-1}.store-auth-actions{flex-wrap:wrap}.store-user-menu{max-width:calc(100vw - 100px)}.store-dialog{padding:22px}.store-dialog h2{font-size:25px}.store-user-entries{right:auto;left:0}}
 .store-tabs button[aria-pressed=true]{border-color:#3174ff;color:#9fbeff}
+
+.home-video-section .video-selector{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:760px){.home-video-section .video-selector{grid-template-columns:repeat(3,minmax(0,1fr))}}

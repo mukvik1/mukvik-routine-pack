@@ -104,7 +104,7 @@ if (player) {
   videoChoices.forEach((choice, index) => choice.addEventListener('click', () => {
     loadVideo(choice.dataset.video, true);
     videoChoices.forEach((item) => { const active = item === choice; item.classList.toggle('selected', active); item.setAttribute('aria-pressed', String(active)); });
-    const counter = document.getElementById('video-count'); if (counter) counter.textContent = `${String(index + 1).padStart(2, '0')} / 05`;
+    const counter = document.getElementById('video-count'); if (counter) counter.textContent = `${String(index + 1).padStart(2, '0')} / ${String(videoChoices.length).padStart(2, '0')}`;
   }));
 }
 
@@ -164,3 +164,10 @@ document.querySelectorAll('[data-direct-download]').forEach((link) => link.addEv
  checkAgain?.addEventListener('click',status);
  status();
 })();
+
+// Keep demos from playing over each other when switching between routines.
+document.querySelectorAll('video').forEach(video => {
+  video.addEventListener('play', () => {
+    document.querySelectorAll('video').forEach(other => { if (other !== video) other.pause(); });
+  });
+});
