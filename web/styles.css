@@ -85,3 +85,10 @@ html[lang=uk] .preview-toggle{font-family:'Routine Inter',Arial,sans-serif;lette
 
 .home-video-section .video-selector{grid-template-columns:repeat(6,minmax(0,1fr))}
 @media(max-width:760px){.home-video-section .video-selector{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Volume 1 previews use the same video-and-description rows as free routines. */
+.tracklist li.routine-preview-row{display:grid;grid-template-columns:170px minmax(0,1fr);gap:28px;align-items:center;padding:26px 0}
+.routine-preview-media{min-width:0}.routine-preview-media video{display:block;width:100%;height:auto;aspect-ratio:9/16;object-fit:contain;background:#080808;border-radius:12px;overflow:hidden}
+.routine-preview-copy{min-width:0;display:flex;flex-direction:column;gap:14px}.routine-preview-copy>b{font-size:14px;color:#7a8390;font-weight:500}.routine-preview-copy>span{font-size:22px;line-height:1.45;overflow-wrap:anywhere}.routine-preview-copy .routine-preview-note{margin:0;font-size:13px;line-height:1.5;color:#687385}
+@media(max-width:760px){.tracklist li.routine-preview-row{grid-template-columns:clamp(100px,28vw,150px) minmax(0,1fr);gap:18px;padding:24px 0}.routine-preview-copy{gap:10px}.routine-preview-copy>span{font-size:18px;line-height:1.4}.routine-preview-copy .routine-preview-note{font-size:11px}}
+@media(max-width:360px){.tracklist li.routine-preview-row{grid-template-columns:90px minmax(0,1fr);gap:12px}.routine-preview-copy>span{font-size:16px}}
