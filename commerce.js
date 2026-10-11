@@ -68,6 +68,7 @@ function createCommerce(settings=process.env,overrides={}){
  const {Pool}=require('pg');
  const {GoogleAuth,OAuth2Client}=require('google-auth-library');
  const pool=new Pool({connectionString:settings.DATABASE_URL,ssl:settings.DATABASE_SSL==='true'?{rejectUnauthorized:true}:undefined});
+ const monobank=require('./monobank').createMonobank(settings,{pool,fetch:overrides.monobankFetch||overrides.fetch});
  const smtp=mode==='smtp'?require('nodemailer').createTransport({host:settings.SMTP_HOST,port:Number(settings.SMTP_PORT||587),secure:Number(settings.SMTP_PORT||587)===465,auth:{user:settings.SMTP_USER,pass:settings.SMTP_PASSWORD}}):null;
  const gmail=mode==='gmail_api'?new OAuth2Client(settings.GMAIL_OAUTH_CLIENT_ID,settings.GMAIL_OAUTH_CLIENT_SECRET):null;
  if(gmail)gmail.setCredentials({refresh_token:settings.GMAIL_OAUTH_REFRESH_TOKEN});
@@ -393,7 +394,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(telegram)await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'new_order') ON CONFLICT DO NOTHING",[orderId]);
    await db.query('DELETE FROM cart_items WHERE customer_id=$1',[user.id]);
    await db.query('COMMIT');
-   response(res,201,{order:created.rows[0],message:'Contact Mukvik to pay; access is granted only after approval.'});
+   response(res,201,{order:created.rows[0],message:monobank?'Proceed to secure Monobank checkout to pay in UAH.':'Contact Mukvik to pay; access is granted only after approval.'});
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }
  async function me(res,user){
@@ -488,6 +489,7 @@ function createCommerce(settings=process.env,overrides={}){
   if(!url.pathname.startsWith('/api/v2/'))return false;
   try{
    if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'&&telegram){await telegram.handle(req,res);return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/monobank/webhook'&&monobank){await monobank.webhook(req,res);return true;}
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
@@ -506,6 +508,8 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&url.pathname==='/api/v2/cart'){await cart(res,user);return true;}
    if(req.method==='PUT'&&url.pathname==='/api/v2/cart'){await putCart(req,res,user);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/orders'){await newOrder(req,res,user);return true;}
+   const monoCheckout=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank$/.exec(url.pathname);
+   if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){await monobank.checkout(res,monoCheckout[1],user);return true;}
    if(url.pathname.startsWith('/api/v2/admin/')){
     if(user.email!==adminEmail){response(res,403,{error:'Admin access required.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/admin/orders'){await adminOrders(res);return true;}
