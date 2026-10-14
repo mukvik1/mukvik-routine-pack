@@ -15,7 +15,7 @@ const routine05DeliveryUrl = process.env.ROUTINE_05_DELIVERY_URL;
 const routine07DeliveryUrl = process.env.ROUTINE_07_DELIVERY_URL;
 const routine08DeliveryUrl = process.env.ROUTINE_08_DELIVERY_URL;
 const routine09DeliveryUrl = process.env.ROUTINE_09_DELIVERY_URL;
-const products = {  pack: { code: 'pack', name: 'ROUTINE PACK VOLUME 1', price: 49, description: 'MUKVIK Routine Pack Volume 1, MP3 + videos', deliveryUrl: () => deliveryUrl },  bundle4: { code: 'bundle4', name: '4 ROUTINES BUNDLE', price: 6, description: 'MUKVIK routines 01, 02, 04 and 06, eight audio files', deliveryUrl: () => bundle4DeliveryUrl },
+const products = {  pack: { code: 'pack', name: 'ROUTINE PACK 1', price: 49, description: 'MUKVIK ROUTINE PACK 1, MP3 + videos', deliveryUrl: () => deliveryUrl },  bundle4: { code: 'bundle4', name: '4 ROUTINES BUNDLE', price: 6, description: 'MUKVIK routines 01, 02, 04 and 06, eight audio files', deliveryUrl: () => bundle4DeliveryUrl },
   routine3: { code: 'routine3', name: 'YEAH X LA VIDA ES UN CARNAVAL', price: 6, description: 'MUKVIK routine 03, two audio files', deliveryUrl: () => routine03DeliveryUrl },
   routine5: { code: 'routine5', name: 'NOT LIKE US X CANDY SHOP', price: 5, description: 'MUKVIK routine 05, two audio files', deliveryUrl: () => routine05DeliveryUrl },
   routine7: { code: 'routine7', name: 'MACARENA X CANDY SHOP', price: 5, description: 'MUKVIK routine 07, two audio files', deliveryUrl: () => routine07DeliveryUrl },
