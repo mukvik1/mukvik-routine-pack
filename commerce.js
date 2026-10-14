@@ -411,6 +411,7 @@ function createCommerce(settings=process.env,overrides={}){
   response(res,200,{orders:r.rows});
  }
  async function approveResult(user,orderId){
+  if(monobank)return {http:409,error:'Monobank payments are confirmed automatically.'};
   const db=await pool.connect();
   try{
    await db.query('BEGIN');
@@ -447,7 +448,7 @@ function createCommerce(settings=process.env,overrides={}){
    const list=await db.query("SELECT n.id,o.id AS order_id,c.email FROM notification_outbox n JOIN orders o ON o.id=n.order_id JOIN customers c ON c.id=o.customer_id WHERE n.sent_at IS NULL AND n.attempts<20 ORDER BY n.id LIMIT 10 FOR UPDATE OF n SKIP LOCKED");
    for(const row of list.rows){
     try{
-     await send(row.email,'Routine Pack — your order is ready','Your order '+row.order_id+' is approved. Sign in to your account at '+webOrigin+'/account/ to download your purchases.\n\nВаше замовлення підтверджено. Увійдіть в особистий кабінет для завантаження.','order/'+row.order_id+'/approved');
+     await send(row.email,'Routine Pack — your order is ready','Your order '+row.order_id+' is approved. Sign in at https://routinepack.download/?account=1 to download your purchases.\n\nВаше замовлення підтверджено. Увійдіть в особистий кабінет для завантаження.','order/'+row.order_id+'/approved');
      await db.query("UPDATE notification_outbox SET sent_at=now(),attempts=attempts+1,last_attempt_at=now() WHERE id=$1",[row.id]);
     }catch{
      await db.query("UPDATE notification_outbox SET attempts=attempts+1,last_attempt_at=now() WHERE id=$1",[row.id]);
@@ -509,7 +510,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='PUT'&&url.pathname==='/api/v2/cart'){await putCart(req,res,user);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/orders'){await newOrder(req,res,user);return true;}
    const monoCheckout=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank$/.exec(url.pathname);
-   if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){await monobank.checkout(res,monoCheckout[1],user);return true;}
+   if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){const request=await body(req);await monobank.checkout(res,monoCheckout[1],user,request.acceptDigitalDelivery);return true;}
    const monoStatus=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank\/status$/.exec(url.pathname);
    if(req.method==='GET'&&monoStatus&&uuidPattern.test(monoStatus[1])&&monobank){await monobank.reconcile(res,monoStatus[1],user);return true;}
    if(url.pathname.startsWith('/api/v2/admin/')){

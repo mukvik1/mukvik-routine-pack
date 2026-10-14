@@ -46,7 +46,7 @@ function createMonobank(settings, deps) {
   if (!settings.MONOBANK_TOKEN || !settings.PUBLIC_ORIGIN || !deps?.pool) {
     throw new Error('Monobank config missing: MONOBANK_TOKEN, PUBLIC_ORIGIN or database');
   }
-  const siteOrigin = new URL(settings.WEB_ORIGIN || 'https://routinepack.download').origin;
+  const siteOrigin = 'https://routinepack.download';
   const callbackBase = new URL(settings.PUBLIC_ORIGIN);
   if (callbackBase.protocol !== 'https:') throw new Error('Monobank callback requires HTTPS');
   const webhookUrl = callbackBase.origin + '/api/v2/monobank/webhook';
@@ -90,7 +90,8 @@ function createMonobank(settings, deps) {
     return publicKey;
   }
 
-  async function checkout(res, orderId, customer) {
+  async function checkout(res, orderId, customer, consent) {
+    if (consent !== true) return reply(res, 400, {error: 'Confirm immediate digital delivery and review the terms before payment.'});
     if (!ORDER_ID.test(orderId)) return reply(res, 404, {error: 'Order not found.'});
     const db = await pool.connect();
     try {
@@ -104,6 +105,7 @@ function createMonobank(settings, deps) {
         await db.query('ROLLBACK');
         return reply(res, 409, {error: 'Order is not awaiting payment.'});
       }
+      await db.query('UPDATE orders SET digital_delivery_consent_at=COALESCE(digital_delivery_consent_at,now()) WHERE id=$1',[orderId]);
       const previous = await db.query(
         'SELECT page_url,amount_kop,rate_uah,expires_at,status FROM monobank_invoices WHERE order_id=$1 ORDER BY id DESC LIMIT 1',
         [orderId]
@@ -124,7 +126,7 @@ function createMonobank(settings, deps) {
             destination: 'MUKVIK Routine Pack digital products',
             customerEmails: [customer.email]
           },
-          redirectUrl: siteOrigin + '/account/?order=' + encodeURIComponent(orderId),
+          redirectUrl: siteOrigin + '/?monoOrder=' + encodeURIComponent(orderId),
           webHookUrl: webhookUrl,
           validity: VALIDITY_SECONDS,
           paymentType: 'debit'
@@ -184,9 +186,11 @@ function createMonobank(settings, deps) {
         );
         await db.query("INSERT INTO order_events(order_id,event_type) VALUES($1,'monobank_paid')",[row.order_id]);
         await db.query("INSERT INTO notification_outbox(order_id,kind) VALUES($1,'approved') ON CONFLICT(order_id,kind) DO NOTHING",[row.order_id]);
+        await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'monobank_paid') ON CONFLICT(order_id,kind) DO NOTHING",[row.order_id]);
       } else if (status === 'reversed' && row.status === 'success' && row.order_status === 'approved') {
         await db.query("UPDATE orders SET status='refunded' WHERE id=$1",[row.order_id]);
         await db.query("INSERT INTO order_events(order_id,event_type) VALUES($1,'monobank_reversed')",[row.order_id]);
+        await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'monobank_reversed') ON CONFLICT(order_id,kind) DO NOTHING",[row.order_id]);
       }
       await db.query('COMMIT');
       return true;

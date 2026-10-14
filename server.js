@@ -207,5 +207,9 @@ http.createServer(async (req, res) => {
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return json(res, 400, { error: 'Invalid path' }); }
   if (process.env.COMMERCE_ENABLED !== 'true' && (pathname === '/account' || pathname.startsWith('/account/'))) return json(res, 404, { error: 'Not found' });
+  if (process.env.MONOBANK_ENABLED === 'true' && (pathname === '/account' || pathname === '/account/')) {
+    res.writeHead(302, {Location:'https://routinepack.download/?account=1', 'Cache-Control':'no-store'});
+    return res.end();
+  }
   serveStatic(req, res, pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));

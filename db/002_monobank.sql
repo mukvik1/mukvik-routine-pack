@@ -15,3 +15,11 @@ CREATE TABLE IF NOT EXISTS monobank_invoices (
 );
 CREATE INDEX IF NOT EXISTS monobank_invoices_order_idx
   ON monobank_invoices(order_id,created_at DESC);
+
+-- Evidence that the buyer requested immediate supply of digital content.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS digital_delivery_consent_at TIMESTAMPTZ;
+
+-- Owner receives durable payment and refund notifications in Telegram.
+ALTER TABLE telegram_notifications DROP CONSTRAINT IF EXISTS telegram_notifications_kind_check;
+ALTER TABLE telegram_notifications ADD CONSTRAINT telegram_notifications_kind_check
+  CHECK(kind IN ('new_order','approved','monobank_paid','monobank_reversed'));
