@@ -105,10 +105,10 @@ function createMonobank(settings, deps) {
         return reply(res, 409, {error: 'Order is not awaiting payment.'});
       }
       const previous = await db.query(
-        'SELECT page_url,amount_kop,rate_uah,expires_at FROM monobank_invoices WHERE order_id=$1 ORDER BY id DESC LIMIT 1',
+        'SELECT page_url,amount_kop,rate_uah,expires_at,status FROM monobank_invoices WHERE order_id=$1 ORDER BY id DESC LIMIT 1',
         [orderId]
       );
-      if (previous.rowCount && new Date(previous.rows[0].expires_at).getTime() > Date.now()) {
+      if (previous.rowCount && ['created','processing'].includes(previous.rows[0].status) && new Date(previous.rows[0].expires_at).getTime() > Date.now()) {
         await db.query('COMMIT');
         const p = previous.rows[0];
         return reply(res, 200, {pageUrl: p.page_url, amountKop: p.amount_kop, currency: 'UAH', usdCents: result.rows[0].total_cents, rate: Number(p.rate_uah), expiresAt: p.expires_at});
@@ -196,6 +196,23 @@ function createMonobank(settings, deps) {
     } finally { db.release(); }
   }
 
+  async function reconcile(res, orderId, customer) {
+    if (!ORDER_ID.test(orderId)) return reply(res,404,{error:'Order not found.'});
+    const order = await pool.query('SELECT id,status FROM orders WHERE id=$1 AND customer_id=$2',[orderId,customer.id]);
+    if (!order.rowCount) return reply(res,404,{error:'Order not found.'});
+    const invoice = await pool.query(
+      'SELECT invoice_id FROM monobank_invoices WHERE order_id=$1 ORDER BY id DESC LIMIT 1',
+      [orderId]
+    );
+    if (!invoice.rowCount) return reply(res,200,{status:order.rows[0].status});
+    if (order.rows[0].status === 'awaiting_manual_review') {
+      const state = await api('/api/merchant/invoice/status?invoiceId='+encodeURIComponent(invoice.rows[0].invoice_id));
+      await applyPayment(state);
+    }
+    const refreshed = await pool.query('SELECT status FROM orders WHERE id=$1 AND customer_id=$2',[orderId,customer.id]);
+    return reply(res,200,{status:refreshed.rows[0].status});
+  }
+
   async function webhook(req,res) {
     let bytes = 0; const chunks = [];
     for await (const chunk of req) {
@@ -217,7 +234,7 @@ function createMonobank(settings, deps) {
     reply(res,accepted ? 200 : 409,{ok:accepted});
   }
 
-  return {checkout,webhook};
+  return {checkout,webhook,reconcile};
 }
 
 module.exports = {createMonobank,uahKopiykas,isTrustedCheckoutUrl,verifySignature};
