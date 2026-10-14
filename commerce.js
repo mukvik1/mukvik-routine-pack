@@ -5,7 +5,7 @@ const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
 const CATALOG=Object.freeze({
- pack:{name:'ROUTINE PACK VOLUME 1',cents:4900},
+ pack:{name:'',cents:4900},
  bundle4:{name:'4 ROUTINES BUNDLE',cents:600},
  routine3:{name:'YEAH X LA VIDA ES UN CARNAVAL',cents:600},
  routine5:{name:'NOT LIKE US X CANDY SHOP',cents:500},
