@@ -11,11 +11,23 @@ async function main(){
  const required=['DATABASE_URL','WEB_ORIGIN','ADMIN_EMAIL','SMTP_FROM','GOOGLE_SERVICE_ACCOUNT_JSON','COMMERCE_FILES_JSON',
   ...(provider==='resend'?['RESEND_API_KEY']:provider==='gmail_api'?['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN']:['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']),
   'TELEGRAM_BOT_TOKEN','TELEGRAM_ADMIN_CHAT_ID','TELEGRAM_WEBHOOK_URL','TELEGRAM_BOT_USERNAME'];
+ if(settings.MONOBANK_ENABLED==='true')required.push('MONOBANK_TOKEN','PUBLIC_ORIGIN');
  for(const name of required)if(!settings[name])fail(name+': missing');
  if(!['smtp','gmail_api','resend'].includes(provider))fail('MAIL_PROVIDER: unsupported');
  if(settings.WEB_ORIGIN){
   try{const url=new URL(settings.WEB_ORIGIN);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)fail('WEB_ORIGIN: HTTPS origin required');}
   catch{fail('WEB_ORIGIN: invalid');}
+ }
+ if(settings.MONOBANK_ENABLED==='true'&&settings.PUBLIC_ORIGIN){
+  try{const url=new URL(settings.PUBLIC_ORIGIN);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)fail('PUBLIC_ORIGIN: HTTPS origin required');}
+  catch{fail('PUBLIC_ORIGIN: invalid');}
+ }
+ if(settings.MONOBANK_ENABLED==='true'&&settings.MONOBANK_TOKEN){
+  try{
+   const result=await fetch('https://api.monobank.ua/api/merchant/pubkey',{headers:{'X-Token':settings.MONOBANK_TOKEN},signal:AbortSignal.timeout(10000)});
+   const data=result.ok?await result.json():null;
+   if(!data?.key||typeof data.key!=='string')fail('MONOBANK_TOKEN: merchant API validation failed');
+  }catch{fail('MONOBANK_TOKEN: merchant API validation failed');}
  }
  if(settings.ADMIN_EMAIL&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.ADMIN_EMAIL))fail('ADMIN_EMAIL: invalid');
  if(settings.GOOGLE_SERVICE_ACCOUNT_JSON){
@@ -39,7 +51,7 @@ async function main(){
  if(settings.DATABASE_URL){
   const pool=new Pool({connectionString:settings.DATABASE_URL,connectionTimeoutMillis:5000,query_timeout:5000,ssl:settings.DATABASE_SSL==='true'?{rejectUnauthorized:true}:undefined});
   try{
-   const tables=['customers','login_challenges','sessions','cart_items','orders','order_items','entitlements','download_tickets','order_events','notification_outbox','telegram_updates','telegram_notifications','customer_activity','password_auth_challenges','password_login_attempts','registration_email_outbox'];
+   const tables=['customers','login_challenges','sessions','cart_items','orders','order_items','entitlements','download_tickets','order_events','notification_outbox','telegram_updates','telegram_notifications','customer_activity','password_auth_challenges','password_login_attempts','registration_email_outbox','monobank_invoices'];
    const result=await pool.query('SELECT name,to_regclass(name) IS NOT NULL AS present FROM unnest($1::text[]) AS name',[tables]);
    for(const table of result.rows)if(!table.present)fail('Database schema: missing '+table.name);
   }catch{fail('Database connection/schema: check failed');}finally{await pool.end();}

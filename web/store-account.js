@@ -18,26 +18,40 @@ function show(d){for(const other of [auth,cartDialog,account])if(other!==d&&othe
 async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.'));}return body;}
 const status=el('p','','store-error');status.setAttribute('role','status');cartDialog.append(status);
 function renderAuth(){
- error.textContent='';authBody.replaceChildren();auth.querySelector('h2').textContent=T(challenge?'Confirm your email':mode==='register'?'SIGN UP':'SIGN IN');
- authTabs.hidden=Boolean(challenge);authTabs.querySelectorAll('button').forEach((b,i)=>b.setAttribute('aria-pressed',String((i===1)===(mode==='register'))));
+ error.textContent='';authBody.replaceChildren();
+ const registration=mode==='register',reset=mode==='reset';
+ auth.querySelector('h2').textContent=T(challenge?'Confirm your email':reset?'RESET PASSWORD':registration?'SIGN UP':'SIGN IN');
+ authTabs.hidden=Boolean(challenge)||reset;
+ authTabs.querySelectorAll('button').forEach((b,i)=>b.setAttribute('aria-pressed',String((i===1)===registration)));
  if(challenge){
-  const hint=el('p',T('Enter the code sent to your email.')+' '+challenge.email,'store-muted');
-  const form=el('form'),label=el('label',T('Confirmation code')),input=el('input');input.name='code';input.required=true;input.inputMode='numeric';input.autocomplete='one-time-code';input.pattern='[0-9]{8}';input.maxLength=8;input.minLength=8;label.append(input);
-  const submit=el('button',T('CONFIRM'),'store-button primary');submit.type='submit';form.append(label,submit);
-  form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;error.textContent='';try{const result=await api('/auth/code/verify','POST',{challengeId:challenge.id,code:input.value.trim()});await finishLogin(result.accessToken);auth.close();if(pendingCheckout){pendingCheckout=false;show(cartDialog);}else{show(account);renderAccount();}}catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
-  authBody.append(hint,form,button('Use another email',()=>{challenge=null;renderAuth();},'store-text-button'));return;
+  const form=el('form'),label=el('label',T('Confirmation code')),input=el('input');
+  input.required=true;input.pattern='[0-9]{8}';input.maxLength=8;input.inputMode='numeric';label.append(input);form.append(el('p',T('Enter the code sent to your email.')+' '+challenge.email,'store-muted'),label);
+  let newPassword;
+  if(challenge.kind==='reset'){const pass=el('label',T('New password'));newPassword=el('input');newPassword.type='password';newPassword.required=true;newPassword.minLength=8;pass.append(newPassword);form.append(pass);}
+  const submit=el('button',T('CONFIRM'),'store-button primary');submit.type='submit';form.append(submit);
+  form.addEventListener('submit',async event=>{event.preventDefault();submit.disabled=true;try{
+   const kind=challenge.kind;
+   const result=await api('/auth/password/'+kind+'/confirm','POST',{challengeId:challenge.id,code:input.value.trim(),...(newPassword?{password:newPassword.value}:{})});
+   challenge=null;
+   if(kind==='register'){await finishLogin(result.accessToken);auth.close();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}
+   else{mode='login';renderAuth();error.textContent=T('Password updated. Sign in with your new password.');}
+  }catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
+  authBody.append(form);return;
  }
- const social=el('div',undefined,'store-social');
- for(const [key,name] of [['google','Google'],['facebook','Facebook'],['apple','Apple']]){
-  const b=button('Continue with '+name,()=>socialLogin(key));b.dataset.provider=key;b.disabled=!providers[key];if(b.disabled)b.title=T('Social sign-in is not configured yet.');social.append(b);
- }
- authBody.append(social,el('p',T('or use email'),'store-divider'));
- const form=el('form'),emailLabel=el('label',T('Email')),email=el('input');email.type='email';email.autocomplete='email';email.name='email';email.required=true;emailLabel.append(email);
+ const form=el('form');
+ const emailLabel=el('label',T('Email')),email=el('input');email.type='email';email.required=true;email.autocomplete='email';emailLabel.append(email);form.append(emailLabel);
  let nickname;
- if(mode==='register'){const label=el('label',T('Nickname (optional)'));nickname=el('input');nickname.name='nickname';nickname.autocomplete='nickname';nickname.maxLength=40;label.append(nickname);form.append(label);}
- const submit=el('button',T('SEND CODE'),'store-button primary');submit.type='submit';form.append(emailLabel,submit);
- form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;error.textContent='';try{const result=await api('/auth/code/start','POST',{email:email.value,nickname:nickname?.value||''});challenge={id:result.challengeId,email:email.value};renderAuth();authBody.querySelector('input')?.focus();}catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
- authBody.append(form,el('p',T('We will email you a one-time code. No password needed.'),'store-muted'));
+ if(registration){const label=el('label',T('Nickname'));nickname=el('input');nickname.required=true;nickname.maxLength=40;label.append(nickname);form.append(label);}
+ const passLabel=el('label',T(reset?'New password':'Password')),password=el('input');password.type='password';password.required=!reset;password.minLength=8;password.autocomplete=registration?'new-password':'current-password';
+ if(!reset){passLabel.append(password);form.append(passLabel);}
+ const submit=el('button',T(reset?'SEND CODE':registration?'SIGN UP':'SIGN IN'),'store-button primary');submit.type='submit';form.append(submit);
+ form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;error.textContent='';try{
+  if(mode==='login'){const result=await api('/auth/password/login','POST',{email:email.value,password:password.value});await finishLogin(result.accessToken);auth.close();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}
+  else{const kind=reset?'reset':'register';const result=await api('/auth/password/'+kind+'/start','POST',{email:email.value,...(!reset?{password:password.value,nickname:nickname?.value||''}:{})});challenge={id:result.challengeId,email:email.value,kind};renderAuth();}
+ }catch(err){error.textContent=err.message;}finally{submit.disabled=false;}});
+ authBody.append(form);
+ if(!registration&&!reset)authBody.append(button('Forgot password?',()=>{mode='reset';renderAuth();},'store-text-button'));
+ if(reset)authBody.append(button('Back to sign in',()=>{mode='login';renderAuth();},'store-text-button'));
 }
 function openAuth(value='login'){mode=value;challenge=null;renderAuth();show(auth);}
 function renderHeader(){
@@ -58,8 +72,23 @@ function renderCart(){cartDialog.querySelector('h2').textContent=T('Your cart');
  if(!cart.length){cartBody.append(el('p',T('Your cart is empty.'),'store-muted'));return;}
  let total=0;
  for(const code of cart){const p=catalog.find(p=>p.code===code);if(!p)continue;total+=p.priceCents;const row=el('div',undefined,'store-cart-row'),copy=el('div');copy.append(el('strong',p.name),el('p',money(p.priceCents),'store-muted'));row.append(copy,button('Remove',()=>saveCart(cart.filter(x=>x!==code)),'store-text-button'));cartBody.append(row);}
- const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl,el('p',T('Payment is confirmed by MUKVIK after you place your order.'),'store-muted'));
- const checkout=button(user?'PLACE ORDER':'SIGN IN TO CHECK OUT',async()=>{if(!user){pendingCheckout=true;openAuth();return;}checkout.disabled=true;try{orderKey=orderKey||crypto.randomUUID();await api('/orders','POST',{idempotencyKey:orderKey});cart=[];orderKey=null;renderHeader();user=await api('/me');renderAccount();show(account);}catch(e){status.textContent=e.message;}finally{checkout.disabled=false;}},'store-button primary');cartBody.append(checkout);
+ const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl,el('p',T('Pay securely in UAH. The final exchange rate and amount are shown before payment.'),'store-muted'));
+ const checkout=button(user?'PAY WITH MONOBANK':'SIGN IN TO CHECK OUT',async()=>{
+  if(!user){pendingCheckout=true;openAuth();return;}
+  checkout.disabled=true;
+  try{
+   orderKey=orderKey||crypto.randomUUID();
+   const created=await api('/orders','POST',{idempotencyKey:orderKey});
+   const order=created.order;
+   const payment=await api('/orders/'+order.id+'/monobank','POST',{});
+   const amount=new Intl.NumberFormat(window.RP_I18N.language==='uk'?'uk-UA':'en-US',{style:'currency',currency:'UAH'}).format(payment.amountKop/100);
+   const confirmed=window.confirm(T('Pay')+' '+amount+' (≈ '+money(payment.usdCents)+')?');
+   if(!confirmed){status.textContent=T('Order saved. You can pay from your account.');user=await api('/me');renderAccount();show(account);return;}
+   if(!/^https:\/\/pay\.(?:mbnk\.biz|monobank\.ua|monobank\.com\.ua)\//i.test(payment.pageUrl))throw Error('Unexpected payment page');
+   cart=[];orderKey=null;write('mukvik_guest_cart',null);
+   window.location.assign(payment.pageUrl);
+  }catch(e){status.textContent=e.message;}finally{checkout.disabled=false;}
+ },'store-button primary');cartBody.append(checkout);
 }
 const accountBody=el('div'),accountStatus=el('p','','store-error');accountStatus.setAttribute('role','status');account.append(accountStatus,accountBody);
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'),el('h3',T('Your orders')));
@@ -67,9 +96,16 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
  for(const order of user.orders){const block=el('section',undefined,'store-order');block.append(el('strong',T('Order')+' '+order.id.slice(0,8)),el('p',T(order.status==='approved'?'Approved':order.status==='awaiting_manual_review'?'Awaiting payment confirmation':order.status==='cancelled'?'Cancelled':'Refunded'),'store-muted'));
   for(const item of order.items){block.append(el('p',item.name));for(const file of item.files||[]){const b=button('Download',async()=>{b.disabled=true;try{const r=await api('/orders/'+order.id+'/files/'+item.code+'/'+file.index+'/ticket','POST',{});const u=new URL(r.url,API);if(u.origin!==API)throw Error(T('Service temporarily unavailable.'));const a=el('a');a.href=u.href;a.download='';document.body.append(a);a.click();a.remove();}catch(e){accountStatus.textContent=e.message;}finally{b.disabled=false;}});b.textContent=T('Download')+' · '+file.name;block.append(b);}}
   block.append(el('strong',money(order.totalCents)));
-  if(order.status==='awaiting_manual_review'){const a=el('a',T('CONTACT MUKVIK'),'store-button');a.href='https://www.instagram.com/mukvik.ofc/';a.target='_blank';a.rel='noopener noreferrer';block.append(a,el('p',T('Send your order number to MUKVIK to arrange payment.'),'store-muted'));}accountBody.append(block);
+  if(order.status==='awaiting_manual_review'){
+   const pay=button('PAY WITH MONOBANK',async()=>{pay.disabled=true;accountStatus.textContent='';try{
+    const checkout=await api('/orders/'+order.id+'/monobank','POST',{});
+    const amount=new Intl.NumberFormat(window.RP_I18N.language==='uk'?'uk-UA':'en-US',{style:'currency',currency:'UAH'}).format(checkout.amountKop/100);
+    if(window.confirm(T('Pay')+' '+amount+'?'))window.location.assign(checkout.pageUrl);
+   }catch(e){accountStatus.textContent=e.message;}finally{pay.disabled=false;}});
+   block.append(pay);
+  }accountBody.append(block);
  }
- accountBody.append(button('Refresh',async()=>{try{user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
+ accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
 }
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);auth.close();renderAccount();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));

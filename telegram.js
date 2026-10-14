@@ -16,7 +16,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   const send = (text, options = {}) => call('sendMessage',{chat_id:ownerId,text,disable_web_page_preview:true,...options});
   const statusLabels=Object.freeze({awaiting_manual_review:'ожидает проверки оплаты',approved:'подтверждён',cancelled:'отменён',refunded:'возврат'});
-  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',download_started:'начата загрузка',registered:'подтверждена регистрация',cart_updated:'изменена корзина'});
+  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',monobank_paid:'Monobank подтвердил оплату, доступ открыт',monobank_reversed:'Monobank сообщил о возврате, доступ закрыт',download_started:'начата загрузка',registered:'подтверждена регистрация',cart_updated:'изменена корзина'});
   const statusLabel=value=>statusLabels[value]||'неизвестен';
   const eventLabel=value=>eventLabels[value]||'другое событие';
   const money=(cents,currency)=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:currency||'USD'}).format(cents/100);
@@ -48,11 +48,12 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     const db=await pool.connect();
     try {
       await db.query('BEGIN');
-      const pending=await db.query("SELECT n.id,n.order_id,n.kind,o.status,o.total_cents,o.currency,c.email FROM telegram_notifications n JOIN orders o ON o.id=n.order_id JOIN customers c ON c.id=o.customer_id WHERE n.sent_at IS NULL AND n.attempts<20 ORDER BY n.id LIMIT 10 FOR UPDATE OF n SKIP LOCKED");
+      const pending=await db.query("SELECT n.id,n.order_id,n.kind,o.status,o.total_cents,o.currency,c.email,paid.invoice_id,paid.amount_kop FROM telegram_notifications n JOIN orders o ON o.id=n.order_id JOIN customers c ON c.id=o.customer_id LEFT JOIN LATERAL (SELECT invoice_id,amount_kop FROM monobank_invoices WHERE order_id=o.id AND status IN ('success','reversed') ORDER BY id DESC LIMIT 1) paid ON true WHERE n.sent_at IS NULL AND n.attempts<20 ORDER BY n.id LIMIT 10 FOR UPDATE OF n SKIP LOCKED");
       for(const n of pending.rows) {
         try {
-          const label=n.kind==='new_order'?'Новый заказ':'Заказ подтверждён';
-          await send(label+'\nНомер: '+n.order_id+'\nПокупатель: '+n.email+'\nСумма: '+money(n.total_cents,n.currency)+'\nСтатус: '+statusLabel(n.status), n.kind==='new_order'?{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+n.order_id}]]}}:{});
+          const label=n.kind==='new_order'?'Новый заказ':n.kind==='monobank_paid'?'Monobank подтвердил оплату. Доступ открыт. Оформите чек.':n.kind==='monobank_reversed'?'Monobank сообщил о возврате. Доступ закрыт. Проверьте чек возврата.':'Заказ подтверждён';
+          const payment=n.invoice_id?'\nMonobank invoice: '+n.invoice_id+'\nОплачено: '+money(n.amount_kop,'UAH'):'';
+          await send(label+'\nНомер: '+n.order_id+'\nПокупатель: '+n.email+'\nКаталог: '+money(n.total_cents,n.currency)+payment+'\nСтатус: '+statusLabel(n.status), n.kind==='new_order'?{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+n.order_id}]]}}:{});
           await db.query('UPDATE telegram_notifications SET sent_at=now(),attempts=attempts+1 WHERE id=$1',[n.id]);
         } catch {
           await db.query('UPDATE telegram_notifications SET attempts=attempts+1 WHERE id=$1',[n.id]);
@@ -83,12 +84,12 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,json_agg(json_build_object('name',i.name,'price_cents',i.price_cents) ORDER BY i.product_code) AS items FROM orders o JOIN customers c ON c.id=o.customer_id JOIN order_items i ON i.order_id=o.id WHERE o.id=$1 GROUP BY o.id,c.email",[id]);
     if(!r.rowCount)return send('Заказ не найден.');
     const x=r.rows[0];
-    const reply_markup=x.status==='awaiting_manual_review'?{inline_keyboard:[[{text:'Я проверил оплату · подтвердить',callback_data:'confirm:'+id}]]}:undefined;
+    const reply_markup=x.status==='awaiting_manual_review'&&settings.MONOBANK_ENABLED!=='true'?{inline_keyboard:[[{text:'Я проверил оплату · подтвердить',callback_data:'confirm:'+id}]]}:undefined;
     await send('Заказ '+x.id+'\nПокупатель: '+x.email+'\nСтатус: '+statusLabel(x.status)+'\nСумма: '+money(x.total_cents,x.currency)+'\n'+x.items.map(item=>'• '+item.name+' — '+money(item.price_cents,x.currency)).join('\n')+'\nСоздан: '+date(x.created_at),reply_markup?{reply_markup}:{});
   }
   async function command(text) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы на проверке\n/order UUID — подробности заказа\n/stats — статистика и загрузки\n/status — состояние подключений\n/events — история событий\nОткрывайте доступ только после проверки оплаты.');
+    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n/stats — статистика заказов и загрузок\n/status — состояние подключений\n/events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
     if(name==='/status') {
       const emailReady=settings.MAIL_PROVIDER==='resend'?Boolean(settings.RESEND_API_KEY&&settings.SMTP_FROM):settings.MAIL_PROVIDER==='gmail_api'
         ? ['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'].every(key=>Boolean(settings[key]))
