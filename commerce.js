@@ -510,6 +510,8 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&url.pathname==='/api/v2/orders'){await newOrder(req,res,user);return true;}
    const monoCheckout=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank$/.exec(url.pathname);
    if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){await monobank.checkout(res,monoCheckout[1],user);return true;}
+   const monoStatus=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank\/status$/.exec(url.pathname);
+   if(req.method==='GET'&&monoStatus&&uuidPattern.test(monoStatus[1])&&monobank){await monobank.reconcile(res,monoStatus[1],user);return true;}
    if(url.pathname.startsWith('/api/v2/admin/')){
     if(user.email!==adminEmail){response(res,403,{error:'Admin access required.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/admin/orders'){await adminOrders(res);return true;}
