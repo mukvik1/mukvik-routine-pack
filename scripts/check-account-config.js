@@ -22,6 +22,13 @@ async function main(){
   try{const url=new URL(settings.PUBLIC_ORIGIN);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)fail('PUBLIC_ORIGIN: HTTPS origin required');}
   catch{fail('PUBLIC_ORIGIN: invalid');}
  }
+ if(settings.MONOBANK_ENABLED==='true'&&settings.MONOBANK_TOKEN){
+  try{
+   const result=await fetch('https://api.monobank.ua/api/merchant/pubkey',{headers:{'X-Token':settings.MONOBANK_TOKEN},signal:AbortSignal.timeout(10000)});
+   const data=result.ok?await result.json():null;
+   if(!data?.key||typeof data.key!=='string')fail('MONOBANK_TOKEN: merchant API validation failed');
+  }catch{fail('MONOBANK_TOKEN: merchant API validation failed');}
+ }
  if(settings.ADMIN_EMAIL&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.ADMIN_EMAIL))fail('ADMIN_EMAIL: invalid');
  if(settings.GOOGLE_SERVICE_ACCOUNT_JSON){
   try{const value=JSON.parse(settings.GOOGLE_SERVICE_ACCOUNT_JSON);if(!value?.client_email||!value?.private_key)fail('GOOGLE_SERVICE_ACCOUNT_JSON: incomplete');}
