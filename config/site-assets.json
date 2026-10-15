@@ -142,5 +142,6 @@
   "routines/yeah-la-vida-es-un-carnaval/index.html",
   "routines/yeah-one-dance/index.html",
   "store-account.js",
-  "styles.css"
+  "styles.css",
+  "traffic.js"
 ]

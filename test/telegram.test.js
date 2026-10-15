@@ -11,6 +11,7 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
  const pool={query:async(sql,args)=>{
   if(sql.includes('telegram_updates')){if(pool.seen.has(args[0]))return {rowCount:0};pool.seen.add(args[0]);return {rowCount:1};}
   if(sql.includes('count(*)::int'))return {rows:[{orders:1,pending:1,approved:0,downloads:0}]};
+  if(sql.includes('FROM site_traffic'))return {rows:[{today_people:2,today_views:4,yesterday_people:1,yesterday_views:3,week_people:3,week_views:7}]};
   if(sql.includes('json_agg'))return {rowCount:1,rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',created_at:'2026-10-01T12:00:00Z',email:'buyer@example.test',items:[{name:'ROUTINE 03',price_cents:600}]}]};
   if(sql.includes('FROM orders o JOIN customers c'))return {rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',email:'buyer@example.test'}]};
   if(sql.includes('FROM order_events e'))return {rows:[{order_id:order,event_type:'order_created',created_at:'2026-10-01T12:00:00Z'}]};
@@ -41,6 +42,7 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.deepEqual(granted,[order]);
   assert.equal(calls.filter(x=>x.method==='answerCallbackQuery').length,2);
   assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Заказов: 1/);
+  assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Сегодня: 2 человек · 4 просмотров/);
   async function textCommand(id,value){
    return send({update_id:id,message:{from:{id:owner},chat:{id:owner},text:value}});
   }

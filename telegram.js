@@ -34,7 +34,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         {command:'orders',description:'Последние заказы'},
         {command:'pending',description:'Заказы на проверке'},
         {command:'order',description:'Информация о заказе'},
-        {command:'stats',description:'Статистика заказов и загрузок'},
+        {command:'stats',description:'Посещения сайта, заказы и загрузки'},
         {command:'status',description:'Состояние подключений'},
         {command:'events',description:'Последние события'}
       ]});
@@ -89,7 +89,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   }
   async function command(text) {
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n/stats — статистика заказов и загрузок\n/status — состояние подключений\n/events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
+    if(name==='/start'||name==='/help')return send('Панель владельца Routine Pack\n/orders — последние заказы\n/pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n/stats — посещения сайта, заказы и загрузки\n/status — состояние подключений\n/events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
     if(name==='/status') {
       const emailReady=settings.MAIL_PROVIDER==='resend'?Boolean(settings.RESEND_API_KEY&&settings.SMTP_FROM):settings.MAIL_PROVIDER==='gmail_api'
         ? ['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'].every(key=>Boolean(settings[key]))
@@ -111,7 +111,15 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     if(name==='/stats') {
       const r=await pool.query("SELECT (SELECT count(*)::int FROM orders) AS orders,(SELECT count(*)::int FROM orders WHERE status='awaiting_manual_review') AS pending,(SELECT count(*)::int FROM orders WHERE status='approved') AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads");
       const x=r.rows[0];
-      return send('Заказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
+      let traffic='Посещения сайта: статистика временно недоступна.';
+      try{
+        const v=await require('./analytics').summary(pool);
+        traffic='Посещения сайта (по Киеву, приблизительно)\n'+
+          'Сегодня: '+v.today_people+' человек · '+v.today_views+' просмотров\n'+
+          'Вчера: '+v.yesterday_people+' человек · '+v.yesterday_views+' просмотров\n'+
+          'За 7 дней: '+v.week_people+' человек · '+v.week_views+' просмотров';
+      }catch(error){console.error('Traffic report unavailable:',error.code||error.name||'error');}
+      return send(traffic+'\n\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
     }
     if(name==='/pending'||name==='/orders') {
       const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,c.email FROM orders o JOIN customers c ON c.id=o.customer_id WHERE ($1::boolean=false OR o.status='awaiting_manual_review') ORDER BY o.created_at DESC LIMIT 20",[name==='/pending']);

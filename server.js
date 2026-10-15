@@ -23,6 +23,7 @@ const products = {  pack: { code: 'pack', name: 'ROUTINE PACK 1', price: 49, des
   routine9: { code: 'routine9', name: 'I KNOW YOU WANT ME X CHANDELIER', price: 5, description: 'MUKVIK routine 09, two audio files', deliveryUrl: () => routine09DeliveryUrl }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
+const analytics = require('./analytics').createAnalytics();
 const commerce = require('./commerce').createCommerce();
 const paymentRefs = new Map();
 const paymentLookups = new Map();
@@ -197,6 +198,7 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
+  if (req.method === 'POST' && url.pathname === '/api/v2/traffic') return analytics.handle(req, res);
   if (commerce && await commerce.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/checkout') return json(res, 410, { error: 'Online checkout is unavailable. Contact MUKVIK to purchase.' });
   if (req.method === 'GET' && url.pathname === '/api/payment-status') return paymentStatus(url, res);
