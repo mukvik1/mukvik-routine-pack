@@ -20,7 +20,7 @@ const products = {  pack: { code: 'pack', name: 'ROUTINE PACK 1', price: 49, des
   routine5: { code: 'routine5', name: 'NOT LIKE US X CANDY SHOP', price: 5, description: 'MUKVIK routine 05, two audio files', deliveryUrl: () => routine05DeliveryUrl },
   routine7: { code: 'routine7', name: 'MACARENA X CANDY SHOP', price: 5, description: 'MUKVIK routine 07, two audio files', deliveryUrl: () => routine07DeliveryUrl },
   routine8: { code: 'routine8', name: "LEVITATION TO CAN'T STOP X ROMPE", price: 5, description: 'MUKVIK routine 08, two audio files', deliveryUrl: () => routine08DeliveryUrl },
-  routine9: { code: 'routine9', name: 'I KHOW YOU WANT ME X CHANDELIER', price: 5, description: 'MUKVIK routine 09, two audio files', deliveryUrl: () => routine09DeliveryUrl }
+  routine9: { code: 'routine9', name: 'I KNOW YOU WANT ME X CHANDELIER', price: 5, description: 'MUKVIK routine 09, two audio files', deliveryUrl: () => routine09DeliveryUrl }
 };
 const productsByCode = Object.fromEntries(Object.values(products).map(product => [product.code, product]));
 const commerce = require('./commerce').createCommerce();
