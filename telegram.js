@@ -115,9 +115,9 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
       try{
         const v=await require('./analytics').summary(pool);
         traffic='Посещения сайта (по Киеву, приблизительно)\n'+
-          'Сегодня: '+v.today_people+' человек · '+v.today_views+' просмотров\n'+
-          'Вчера: '+v.yesterday_people+' человек · '+v.yesterday_views+' просмотров\n'+
-          'За 7 дней: '+v.week_people+' человек · '+v.week_views+' просмотров';
+          'Сегодня: уникальных посетителей — '+v.today_people+', просмотров — '+v.today_views+'\n'+
+          'Вчера: уникальных посетителей — '+v.yesterday_people+', просмотров — '+v.yesterday_views+'\n'+
+          'За 7 дней: уникальных посетителей — '+v.week_people+', просмотров — '+v.week_views;
       }catch(error){console.error('Traffic report unavailable:',error.code||error.name||'error');}
       return send(traffic+'\n\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
     }

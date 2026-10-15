@@ -42,7 +42,7 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.deepEqual(granted,[order]);
   assert.equal(calls.filter(x=>x.method==='answerCallbackQuery').length,2);
   assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Заказов: 1/);
-  assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Сегодня: 2 человек · 4 просмотров/);
+  assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Сегодня: уникальных посетителей — 2, просмотров — 4/);
   async function textCommand(id,value){
    return send({update_id:id,message:{from:{id:owner},chat:{id:owner},text:value}});
   }
