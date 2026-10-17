@@ -1,7 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 
-const origin = 'https://mukvik-routine-pack.mukvik1.chatgpt.site';
+const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
 const files = require('./config/site-assets.json').filter(file => file !== 'store-account.js');
 // Checkout and password-account logic is kept in GitHub; do not overwrite it from the Sites snapshot.
