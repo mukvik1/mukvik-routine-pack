@@ -4,6 +4,9 @@ const crypto=require('node:crypto');
 const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
+const freeFiles=require('node:fs');
+const freePath=require('node:path');
+const freeSlugs=new Set(['get-right-x-just-a-lil-bit','work-it-x-candy-shop','rihanna-routine',...require('./config/free-routines.json').map(r=>r.slug)]);
 const CATALOG=Object.freeze({
  pack:{name:'ROUTINE PACK 1',cents:4900},
  bundle4:{name:'4 ROUTINES BUNDLE',cents:600},
@@ -504,6 +507,16 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
    const user=await session(req);
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
+   const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
+   if(req.method==='POST'&&freeDownload){
+    const slug=freeDownload[1];
+    if(!freeSlugs.has(slug)){response(res,404,{error:'File unavailable.'});return true;}
+    const filename=freePath.join(overrides.freeDownloadsRoot||freePath.join(__dirname,'web','downloads'),slug+'.zip');
+    let stat;try{stat=await freeFiles.promises.stat(filename);}catch{response(res,503,{error:'File unavailable.'});return true;}
+    res.writeHead(200,{'Content-Type':'application/zip','Content-Length':stat.size,'Content-Disposition':'attachment; filename="'+slug+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+    try{await pipeline(freeFiles.createReadStream(filename),res);}catch{res.destroy();}
+    return true;
+   }
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/logout'){await logout(req,res);return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/me'){await me(res,user);return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/cart'){await cart(res,user);return true;}

@@ -58,5 +58,9 @@ async function importFreeRoutines(settings,{root=path.join(__dirname,'..','web')
   }finally{await fs.rm(temp,{recursive:true,force:true});}
  }
  const catalog=path.join(root,'free','index.html');await fs.writeFile(catalog,addFreeCards(await fs.readFile(catalog,'utf8'),routines));
+ const slugs=['get-right-x-just-a-lil-bit','work-it-x-candy-shop','rihanna-routine',...routines.map(r=>r.slug)];
+ for(const file of [catalog,...slugs.map(slug=>path.join(root,'free',slug,'index.html'))]){
+  const html=await fs.readFile(file,'utf8');await fs.writeFile(file,html.replace(/store-account\.js\?v=[^"']+/g,'store-account.js?v=free-auth-1'));
+ }
 }
 module.exports={importFreeRoutines,zipAudio,crc32,addFreeCards};

@@ -22,6 +22,8 @@ if(!testDatabase){test.skip('PostgreSQL integration tests require TEST_DATABASE_
 else test('email login, cart, manual approval and one-use private download',async()=>{
  const pool=new Pool({connectionString:testDatabase});
  const emails=[];
+ const freeDirectory=fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(),'free-download-test-'));
+ fs.writeFileSync(require('node:path').join(freeDirectory,'get-right-x-just-a-lil-bit.zip'),Buffer.from('PK-free-audio'));
  let commerce,server;
  try{
   await pool.query(fs.readFileSync(require.resolve('../db/001_commerce.sql'),'utf8'));
@@ -32,7 +34,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
    GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify({client_email:'service@example.test',private_key:'fake-key'}),
    COMMERCE_FILES_JSON:JSON.stringify({routine3:[{name:'Routine 03.zip',fileId:'privateFile12345'}],routine5:[{name:'Routine 05.zip',fileId:'privateFile56789'}]})
   };
-  commerce=createCommerce(options,{sendMail:async message=>emails.push(message),driveToken:async()=> 'test-drive-token',fetch:async()=>new Response(Buffer.from('private-original'),{headers:{'content-length':'16'}})});
+  commerce=createCommerce(options,{freeDownloadsRoot:freeDirectory,sendMail:async message=>emails.push(message),driveToken:async()=> 'test-drive-token',fetch:async()=>new Response(Buffer.from('private-original'),{headers:{'content-length':'16'}})});
   server=http.createServer(async(req,res)=>{await commerce.handle(req,res,new URL(req.url,'http://localhost'));});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base='http://127.0.0.1:'+server.address().port;
@@ -53,6 +55,11 @@ else test('email login, cart, manual approval and one-use private download',asyn
   const admin=await addSession('owner@example.test');
   assert.equal((await api('/api/v2/catalog')).data.products.length,7);
   assert.equal((await api('/api/v2/me')).status,401);
+  const freePath='/api/v2/free/get-right-x-just-a-lil-bit/download';
+  assert.equal((await api(freePath,'POST')).status,401);
+  const freeDownload=await api(freePath,'POST',buyer.secret);
+  assert.equal(freeDownload.status,200);assert.equal(freeDownload.data,'PK-free-audio');
+  assert.equal((await api('/api/v2/free/not-a-free-product/download','POST',buyer.secret)).status,404);
   assert.equal((await api('/api/v2/admin/orders','GET',buyer.secret)).status,403);
   assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','nonexistent']})).status,400);
   assert.equal((await api('/api/v2/cart','PUT',buyer.secret,{productCodes:['routine3','routine5','routine3'],priceCents:1})).status,200);
@@ -265,7 +272,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
     const attempts=resendCalls.filter(call=>call.headers['Idempotency-Key']==='order/'+row.order_id+'/approved');
     assert.equal(attempts.length,2);
     assert.deepEqual(attempts[0].body,attempts[1].body);
-    assert.ok(attempts[1].body.text.includes('/account/'));
+    assert.ok(attempts[1].body.text.includes('https://routinepack.download/?account=1'));
    }
    const count=resendCalls.length;
    await resendCommerce.flushNotifications();
@@ -302,6 +309,7 @@ else test('email login, cart, manual approval and one-use private download',asyn
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));
   if(commerce)await commerce.close();
+  fs.rmSync(freeDirectory,{recursive:true,force:true});
   await pool.end();
  }
 });

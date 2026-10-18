@@ -163,6 +163,7 @@ function serveStatic(req, res, pathname) {
   const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, '')+(pathname.endsWith('/')?'index.html':''));
   const filePath = path.resolve(root, relativePath);
   if (!filePath.startsWith(`${root}${path.sep}`)) return json(res, 403, { error: 'Forbidden' });
+  if (filePath.startsWith(path.join(root, 'downloads') + path.sep)) return json(res, 403, { error: 'Sign in to download free routines.' });
   fs.stat(filePath, (error, stat) => {
     if (error || !stat.isFile()) return json(res, 404, { error: 'Not found' });
     const size = stat.size;

@@ -5,7 +5,7 @@ const API='https://mukvik-routine-pack-production.up.railway.app';
 const T=k=>window.RP_I18N.t(k),money=n=>new Intl.NumberFormat(window.RP_I18N.language==='uk'?'uk-UA':'en-US',{style:'currency',currency:'USD'}).format(n/100);
 const read=k=>{try{return localStorage.getItem(k);}catch{return null;}},write=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}};
 let token=read('mukvik_store_session'),user=null,catalog=[],cart=[],pendingCheckout=false,challenge=null,mode='login',providers={};
-let orderKey=null,cartBusy=false;
+let orderKey=null,cartBusy=false,pendingFree=null;
 try{cart=JSON.parse(read('mukvik_guest_cart')||'[]');if(!Array.isArray(cart))cart=[];}catch{}
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
@@ -33,7 +33,7 @@ function renderAuth(){
    const kind=challenge.kind;
    const result=await api('/auth/password/'+kind+'/confirm','POST',{challengeId:challenge.id,code:input.value.trim(),...(newPassword?{password:newPassword.value}:{})});
    challenge=null;
-   if(kind==='register'){await finishLogin(result.accessToken);auth.close();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}
+   if(kind==='register'){await finishLogin(result.accessToken);await afterLogin();}
    else{mode='login';renderAuth();error.textContent=T('Password updated. Sign in with your new password.');}
   }catch(e){error.textContent=e.message;}finally{submit.disabled=false;}});
   authBody.append(form);return;
@@ -46,13 +46,36 @@ function renderAuth(){
  if(!reset){passLabel.append(password);form.append(passLabel);}
  const submit=el('button',T(reset?'SEND CODE':registration?'SIGN UP':'SIGN IN'),'store-button primary');submit.type='submit';form.append(submit);
  form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;error.textContent='';try{
-  if(mode==='login'){const result=await api('/auth/password/login','POST',{email:email.value,password:password.value});await finishLogin(result.accessToken);auth.close();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}
+  if(mode==='login'){const result=await api('/auth/password/login','POST',{email:email.value,password:password.value});await finishLogin(result.accessToken);await afterLogin();}
   else{const kind=reset?'reset':'register';const result=await api('/auth/password/'+kind+'/start','POST',{email:email.value,...(!reset?{password:password.value,nickname:nickname?.value||''}:{})});challenge={id:result.challengeId,email:email.value,kind};renderAuth();}
  }catch(err){error.textContent=err.message;}finally{submit.disabled=false;}});
  authBody.append(form);
  if(!registration&&!reset)authBody.append(button('Forgot password?',()=>{mode='reset';renderAuth();},'store-text-button'));
  if(reset)authBody.append(button('Back to sign in',()=>{mode='login';renderAuth();},'store-text-button'));
 }
+const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');document.querySelector('.free-catalog')?.append(freeStatus);
+async function afterLogin(){
+ auth.close();
+ if(pendingFree){const slug=pendingFree;pendingFree=null;pendingCheckout=false;await downloadFree(slug);return;}
+ show(pendingCheckout?cartDialog:account);pendingCheckout=false;
+}
+async function downloadFree(slug){
+ if(!user){pendingFree=slug;openAuth('register');return;}
+ freeStatus.textContent=T('Please wait…');
+ try{
+  const response=await fetch(API+'/api/v2/free/'+encodeURIComponent(slug)+'/download',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  if(response.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
+  if(!response.ok||!String(response.headers.get('content-type')).startsWith('application/zip'))throw Error(T('Service temporarily unavailable.'));
+  const blob=await response.blob(),href=URL.createObjectURL(blob),a=el('a');a.href=href;a.download=slug+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
+  freeStatus.textContent=T('Download started. Save the ZIP file.');
+ }catch(e){freeStatus.textContent=e.message;}
+}
+document.addEventListener('click',event=>{
+ const link=event.target.closest?.('a[data-direct-download]');if(!link)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const url=new URL(link.href),match=/^\/downloads\/([a-z0-9-]+)\.zip$/.exec(url.pathname);
+ if(match)downloadFree(match[1]);
+},true);
 function openAuth(value='login'){mode=value;challenge=null;renderAuth();show(auth);}
 function renderHeader(){
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
@@ -107,7 +130,7 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
  }
  accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
 }
-function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);auth.close();renderAccount();show(pendingCheckout?cartDialog:account);pendingCheckout=false;}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
+function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));
 document.querySelectorAll('[data-cart]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();status.textContent='';renderCart();show(cartDialog);}));
 document.querySelectorAll('[data-buy]').forEach(b=>b.addEventListener('click',async e=>{e.preventDefault();const code=b.dataset.productId;if(!catalog.some(p=>p.code===code)){status.textContent=T('Service temporarily unavailable.');show(cartDialog);return;}b.setAttribute('aria-busy','true');await saveCart([...new Set([...cart,code])]);b.removeAttribute('aria-busy');show(cartDialog);}));
