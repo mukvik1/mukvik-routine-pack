@@ -9,12 +9,12 @@ const freePath=require('node:path');
 const freeSlugs=new Set(['get-right-x-just-a-lil-bit','work-it-x-candy-shop','rihanna-routine',...require('./config/free-routines.json').map(r=>r.slug)]);
 const CATALOG=Object.freeze({
  pack:{name:'ROUTINE PACK 1',cents:4900},
- bundle4:{name:'4 ROUTINES BUNDLE',cents:600},
- routine3:{name:'YEAH X LA VIDA ES UN CARNAVAL',cents:600},
- routine5:{name:'NOT LIKE US X CANDY SHOP',cents:500},
- routine7:{name:'MACARENA X CANDY SHOP',cents:500},
- routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:500},
- routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:500}
+ bundle4:{name:'4 ROUTINES BUNDLE',cents:400},
+ routine3:{name:'YEAH X LA VIDA ES UN CARNAVAL',cents:400},
+ routine5:{name:'NOT LIKE US X CANDY SHOP',cents:200},
+ routine7:{name:'MACARENA X CANDY SHOP',cents:300},
+ routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:300},
+ routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:200}
 });
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validEmail=email=>email.length>=5&&email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

@@ -5,7 +5,7 @@ const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
 const files = require('./config/site-assets.json').filter(file => file !== 'store-account.js');
 // Checkout and password-account logic is kept in GitHub; do not overwrite it from the Sites snapshot.
-const storefrontRevision = `sites-v67-mobile-${Date.now()}`;
+const storefrontRevision = `sites-v69-prices-${Date.now()}`;
 
 if (!token) throw new Error('SITES_BYPASS_TOKEN is required during the Railway build');
 
