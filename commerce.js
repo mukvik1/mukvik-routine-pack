@@ -1,6 +1,7 @@
 (function commerceModule(require,module,exports){
 'use strict';
 const crypto=require('node:crypto');
+const {welcomeEligible,priceProducts,WELCOME_PACK_CENTS,WELCOME_DISCOUNT_PERCENT}=require('./welcome-pricing');
 const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
@@ -371,7 +372,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function cart(res,user){
   const r=await pool.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY created_at,product_code',[user.id]);
-  response(res,200,{items:r.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]}))});
+  response(res,200,{items:priceProducts(r.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(pool,user.id))});
  }
  async function newOrder(req,res,user){
   const payload=await body(req),key=payload.idempotencyKey;
@@ -384,7 +385,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(prior.rowCount){await db.query('COMMIT');return response(res,200,{order:prior.rows[0]});}
    const c=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code FOR UPDATE',[user.id]);
    if(!c.rowCount){await db.query('ROLLBACK');return response(res,400,{error:'Cart is empty.'});}
-   const products=c.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]}));
+   const products=priceProducts(c.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(db,user.id));
    if(products.some(x=>!Number.isInteger(x.cents))){await db.query('ROLLBACK');return response(res,400,{error:'Invalid product.'});}
    const total=products.reduce((sum,x)=>sum+x.cents,0),orderId=crypto.randomUUID();
    const created=await db.query("INSERT INTO orders(id,customer_id,idempotency_key,currency,total_cents) VALUES($1,$2,$3,'USD',$4) ON CONFLICT(customer_id,idempotency_key) DO NOTHING RETURNING id,status,total_cents",[orderId,user.id,key,total]);
@@ -407,7 +408,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
   }
-  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,orders:[...orders.values()]});
+  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,welcomePackEligible:await welcomeEligible(pool,user.id),orders:[...orders.values()]});
  }
  async function adminOrders(res){
   const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,coalesce(json_agg(json_build_object('code',i.product_code,'name',i.name,'priceCents',i.price_cents) ORDER BY i.product_code) FILTER(WHERE i.product_code IS NOT NULL),'[]') AS items FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN order_items i ON i.order_id=o.id GROUP BY o.id,c.email ORDER BY o.created_at DESC LIMIT 100");
@@ -496,7 +497,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&url.pathname==='/api/v2/monobank/webhook'&&monobank){await monobank.webhook(req,res);return true;}
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}

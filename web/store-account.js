@@ -78,7 +78,16 @@ document.addEventListener('click',event=>{
  if(match)downloadFree(match[1]);
 },true);
 function openAuth(value='login'){mode=value;challenge=null;renderAuth();show(auth);}
+function renderPackOffer(){
+ const eligible=user?.welcomePackEligible===true;
+ document.querySelectorAll('[data-pack-current-price]').forEach(n=>n.textContent=money(eligible?3920:4900));
+ document.querySelectorAll('[data-pack-list-price]').forEach(n=>{n.hidden=!eligible;n.textContent=money(4900);});
+ document.querySelectorAll('[data-pack-welcome-offer]').forEach(n=>n.hidden=Boolean(user));
+ document.querySelectorAll('[data-pack-discount-applied]').forEach(n=>n.hidden=!eligible);
+ document.querySelectorAll('[data-pack-price-label]').forEach(n=>n.textContent=T(eligible?'Welcome price':'Regular price'));
+}
 function renderHeader(){
+ renderPackOffer();
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
   box.replaceChildren();
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
@@ -92,27 +101,36 @@ async function saveCart(next){
 }
 async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
+function paymentConsent(){
+ const label=el('label',undefined,'store-consent'),input=el('input');input.type='checkbox';input.required=true;
+ label.append(input,document.createTextNode(' '+T('I request immediate digital delivery after payment and have read the ') ));
+ for(const [title,path] of [['Terms','/legal/terms/'],['Refund policy','/legal/refunds/'],['Privacy policy','/legal/privacy/']]){const link=el('a',T(title));link.href=path;link.target='_blank';link.rel='noopener noreferrer';label.append(link,document.createTextNode('. '));}
+ return {label,input};
+}
+async function showMonobankInvoice(orderId){
+ status.textContent='';cartBody.replaceChildren();
+ cartBody.append(el('p',T('Your order')+' '+orderId.slice(0,8),'store-muted'));
+ const order=user?.orders.find(order=>order.id===orderId);
+ if(order){for(const item of order.items)cartBody.append(el('p',item.name));const total=el('div',undefined,'store-total');total.append(el('span',T('Total')),el('strong',money(order.totalCents)));cartBody.append(total);}
+ const consent=paymentConsent();cartBody.append(consent.label);
+ const pay=button('PAY WITH MONOBANK',async()=>{if(!consent.input.checked){status.textContent=T('Please confirm digital delivery before payment.');return;}pay.disabled=true;status.textContent='';try{await requestMonobankInvoice(orderId);}catch(e){status.textContent=e.message;pay.disabled=false;}},'store-button primary');
+ cartBody.append(pay);show(cartDialog);
+}
+async function requestMonobankInvoice(orderId){
+ const quote=await api('/orders/'+orderId+'/monobank','POST',{acceptDigitalDelivery:true});
+ const destination=new URL(quote.pageUrl);
+ if(destination.protocol!=='https:'||destination.username||destination.password||destination.port||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(destination.hostname))throw Error(T('Service temporarily unavailable.'));
+ location.assign(destination.href);
+}
+function productPrice(p){return p.code==='pack'&&user?.welcomePackEligible?3920:p.priceCents;}
 function renderCart(){cartDialog.querySelector('h2').textContent=T('Your cart');cartBody.replaceChildren();
  if(!cart.length){cartBody.append(el('p',T('Your cart is empty.'),'store-muted'));return;}
  let total=0;
- for(const code of cart){const p=catalog.find(p=>p.code===code);if(!p)continue;total+=p.priceCents;const row=el('div',undefined,'store-cart-row'),copy=el('div');copy.append(el('strong',p.name),el('p',money(p.priceCents),'store-muted'));row.append(copy,button('Remove',()=>saveCart(cart.filter(x=>x!==code)),'store-text-button'));cartBody.append(row);}
- const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl,el('p',T('Pay securely in UAH. The final exchange rate and amount are shown before payment.'),'store-muted'));
- const checkout=button(user?'PAY WITH MONOBANK':'SIGN IN TO CHECK OUT',async()=>{
-  if(!user){pendingCheckout=true;openAuth();return;}
-  checkout.disabled=true;
-  try{
-   orderKey=orderKey||crypto.randomUUID();
-   const created=await api('/orders','POST',{idempotencyKey:orderKey});
-   const order=created.order;
-   const payment=await api('/orders/'+order.id+'/monobank','POST',{});
-   const amount=new Intl.NumberFormat(window.RP_I18N.language==='uk'?'uk-UA':'en-US',{style:'currency',currency:'UAH'}).format(payment.amountKop/100);
-   const confirmed=window.confirm(T('Pay')+' '+amount+' (≈ '+money(payment.usdCents)+')?');
-   if(!confirmed){status.textContent=T('Order saved. You can pay from your account.');user=await api('/me');renderAccount();show(account);return;}
-   if(!/^https:\/\/pay\.(?:mbnk\.biz|monobank\.ua|monobank\.com\.ua)\//i.test(payment.pageUrl))throw Error('Unexpected payment page');
-   cart=[];orderKey=null;write('mukvik_guest_cart',null);
-   window.location.assign(payment.pageUrl);
-  }catch(e){status.textContent=e.message;}finally{checkout.disabled=false;}
- },'store-button primary');cartBody.append(checkout);
+ for(const code of cart){const p=catalog.find(p=>p.code===code);if(!p)continue;const price=productPrice(p);total+=price;const row=el('div',undefined,'store-cart-row'),copy=el('div');copy.append(el('strong',p.name),el('p',money(price),'store-muted'));row.append(copy,button('Remove',()=>saveCart(cart.filter(x=>x!==code)),'store-text-button'));cartBody.append(row);}
+ if(cart.includes('pack')){if(user?.welcomePackEligible)cartBody.append(el('p',T('Welcome discount applied')+' · −20%','store-welcome-note'));else if(!user)cartBody.append(el('p',T('New accounts get 20% off their first full pack.')+' '+T('Welcome price')+': '+money(3920),'store-welcome-note'));}
+ const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl);
+ const consent=user?paymentConsent():null;if(consent)cartBody.append(consent.label);
+ const checkout=button(user?'PAY WITH MONOBANK':'SIGN IN TO CHECK OUT',async()=>{if(!user){pendingCheckout=true;openAuth(cart.includes('pack')?'register':'login');return;}if(!consent.input.checked){status.textContent=T('Please confirm digital delivery before payment.');return;}checkout.disabled=true;status.textContent='';try{orderKey=orderKey||crypto.randomUUID();const created=await api('/orders','POST',{idempotencyKey:orderKey});cart=[];orderKey=null;user=await api('/me');renderHeader();renderAccount();await requestMonobankInvoice(created.order.id);}catch(e){status.textContent=e.message;renderAccount();show(account);accountStatus.textContent=e.message;}finally{checkout.disabled=false;}},'store-button primary');cartBody.append(checkout);
 }
 const accountBody=el('div'),accountStatus=el('p','','store-error');accountStatus.setAttribute('role','status');account.append(accountStatus,accountBody);
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'),el('h3',T('Your orders')));
@@ -121,11 +139,7 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
   for(const item of order.items){block.append(el('p',item.name));for(const file of item.files||[]){const b=button('Download',async()=>{b.disabled=true;try{const r=await api('/orders/'+order.id+'/files/'+item.code+'/'+file.index+'/ticket','POST',{});const u=new URL(r.url,API);if(u.origin!==API)throw Error(T('Service temporarily unavailable.'));const a=el('a');a.href=u.href;a.download='';document.body.append(a);a.click();a.remove();}catch(e){accountStatus.textContent=e.message;}finally{b.disabled=false;}});b.textContent=T('Download')+' · '+file.name;block.append(b);}}
   block.append(el('strong',money(order.totalCents)));
   if(order.status==='awaiting_manual_review'){
-   const pay=button('PAY WITH MONOBANK',async()=>{pay.disabled=true;accountStatus.textContent='';try{
-    const checkout=await api('/orders/'+order.id+'/monobank','POST',{});
-    const amount=new Intl.NumberFormat(window.RP_I18N.language==='uk'?'uk-UA':'en-US',{style:'currency',currency:'UAH'}).format(checkout.amountKop/100);
-    if(window.confirm(T('Pay')+' '+amount+'?'))window.location.assign(checkout.pageUrl);
-   }catch(e){accountStatus.textContent=e.message;}finally{pay.disabled=false;}});
+   const pay=button('PAY WITH MONOBANK',()=>showMonobankInvoice(order.id));
    block.append(pay);
   }accountBody.append(block);
  }

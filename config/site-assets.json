@@ -143,5 +143,8 @@
   "routines/yeah-one-dance/index.html",
   "store-account.js",
   "styles.css",
-  "traffic.js"
+  "traffic.js",
+  "pack-preview.js",
+  "pack-preview-data.json",
+  "packs/get-the-pack/index.html"
 ]
