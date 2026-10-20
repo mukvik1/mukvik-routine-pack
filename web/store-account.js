@@ -82,7 +82,7 @@ function renderPackOffer(){
  const eligible=user?.welcomePackEligible===true;
  document.querySelectorAll('[data-pack-current-price]').forEach(n=>n.textContent=money(eligible?3920:4900));
  document.querySelectorAll('[data-pack-list-price]').forEach(n=>{n.hidden=!eligible;n.textContent=money(4900);});
- document.querySelectorAll('[data-pack-welcome-offer]').forEach(n=>n.hidden=Boolean(user));
+ document.querySelectorAll('[data-pack-welcome-offer]').forEach(n=>n.hidden=false);
  document.querySelectorAll('[data-pack-discount-applied]').forEach(n=>n.hidden=!eligible);
  document.querySelectorAll('[data-pack-price-label]').forEach(n=>n.textContent=T(eligible?'Welcome price':'Regular price'));
 }
@@ -127,7 +127,7 @@ function renderCart(){cartDialog.querySelector('h2').textContent=T('Your cart');
  if(!cart.length){cartBody.append(el('p',T('Your cart is empty.'),'store-muted'));return;}
  let total=0;
  for(const code of cart){const p=catalog.find(p=>p.code===code);if(!p)continue;const price=productPrice(p);total+=price;const row=el('div',undefined,'store-cart-row'),copy=el('div');copy.append(el('strong',p.name),el('p',money(price),'store-muted'));row.append(copy,button('Remove',()=>saveCart(cart.filter(x=>x!==code)),'store-text-button'));cartBody.append(row);}
- if(cart.includes('pack')){if(user?.welcomePackEligible)cartBody.append(el('p',T('Welcome discount applied')+' · −20%','store-welcome-note'));else if(!user)cartBody.append(el('p',T('New accounts get 20% off their first full pack.')+' '+T('Welcome price')+': '+money(3920),'store-welcome-note'));}
+ if(cart.includes('pack')){if(user?.welcomePackEligible)cartBody.append(el('p',T('Welcome discount applied')+' · −20%','store-welcome-note'));else cartBody.append(el('p',T('New accounts get 20% off their first full pack.')+' '+T('Welcome price')+': '+money(3920),'store-welcome-note'));}
  const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl);
  const consent=user?paymentConsent():null;if(consent)cartBody.append(consent.label);
  const checkout=button(user?'PAY WITH MONOBANK':'SIGN IN TO CHECK OUT',async()=>{if(!user){pendingCheckout=true;openAuth(cart.includes('pack')?'register':'login');return;}if(!consent.input.checked){status.textContent=T('Please confirm digital delivery before payment.');return;}checkout.disabled=true;status.textContent='';try{orderKey=orderKey||crypto.randomUUID();const created=await api('/orders','POST',{idempotencyKey:orderKey});cart=[];orderKey=null;user=await api('/me');renderHeader();renderAccount();await requestMonobankInvoice(created.order.id);}catch(e){status.textContent=e.message;renderAccount();show(account);accountStatus.textContent=e.message;}finally{checkout.disabled=false;}},'store-button primary');cartBody.append(checkout);
