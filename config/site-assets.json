@@ -146,5 +146,10 @@
   "traffic.js",
   "pack-preview.js",
   "pack-preview-data.json",
-  "packs/get-the-pack/index.html"
+  "packs/get-the-pack/index.html",
+  "depth.css",
+  "depth.js",
+  "video-background.css",
+  "video-background.js",
+  "assets/videos/hero-background.mp4"
 ]
