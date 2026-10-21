@@ -94,8 +94,8 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
     text=shortcuts[text]||text;
     const [name,arg]=(text||'').trim().split(/\s+/,2);
     if(name==='/visits'){
-      const days=['1','7','30'].includes(arg)?Number(arg):7;
-      return send(await require('./analytics').report(pool,days),{reply_markup:{inline_keyboard:[[{text:'Сегодня',callback_data:'visits:1'},{text:'7 дней',callback_data:'visits:7'},{text:'30 дней',callback_data:'visits:30'}]]}});
+      const days=['0','1','7','30'].includes(arg)?Number(arg):0;
+      return send(await require('./analytics').report(pool,days),{reply_markup:{inline_keyboard:[[{text:'Сегодня',callback_data:'visits:1'},{text:'7 дней',callback_data:'visits:7'},{text:'30 дней',callback_data:'visits:30'}],[{text:'За всё время',callback_data:'visits:0'}]]}});
     }
     if(name==='/start'||name==='/help')return send('🎛 Панель владельца Routine Pack\n\n📊 /visits — посещаемость сайта\n🛍 /orders — последние заказы\n⏳ /pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n💰 /stats — посещения сайта, заказы и загрузки\n🟢 /status — состояние подключений\n🧾 /events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
     if(name==='/status') {
@@ -126,7 +126,8 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
           'Сегодня: уникальных посетителей — '+v.today_people+', просмотров — '+v.today_views+'\n'+
           'Вчера: уникальных посетителей — '+v.yesterday_people+', просмотров — '+v.yesterday_views+'\n'+
           'За 7 дней: уникальных посетителей — '+v.week_people+', просмотров — '+v.week_views+'\n'+
-          'За 30 дней: уникальных посетителей — '+(v.month_people||0)+', просмотров — '+(v.month_views||0);
+          'За 30 дней: уникальных посетителей — '+(v.month_people||0)+', просмотров — '+(v.month_views||0)+'\n'+
+          'За всё время: уникальных посетителей — '+(v.all_people||0)+', просмотров — '+(v.all_views||0);
       }catch(error){console.error('Traffic report unavailable:',error.code||error.name||'error');}
       return send(traffic+'\n\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
     }
@@ -161,7 +162,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         await call('answerCallbackQuery',{callback_query_id:callback.id});
         const data=String(callback.data||'');
         const [action,id]=data.split(':');
-        if(action==='visits'&&['1','7','30'].includes(id))await command('/visits '+id);
+        if(action==='visits'&&['0','1','7','30'].includes(id))await command('/visits '+id);
         if(orderIdPattern.test(id||'')&&action==='view')await showOrder(id);
         if(orderIdPattern.test(id||'')&&action==='confirm') {
           await send('Вы лично проверили оплату заказа '+id+'? После подтверждения покупатель получит доступ.',{reply_markup:{inline_keyboard:[[{text:'Да · открыть доступ',callback_data:'approve:'+id},{text:'Отмена',callback_data:'cancel:'+id}]]}});

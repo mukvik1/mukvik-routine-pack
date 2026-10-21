@@ -24,5 +24,6 @@ test('traffic records valid site visits without saving IP or user agent',async()
  assert.equal(await request('/unknown/'),204);
  assert.equal(queries.filter(x=>x.sql.startsWith('INSERT INTO site_traffic')).length,count);
  assert.equal(sectionFor('/packs/routine-01/'),'packs');
+ assert.equal(queries.some(x=>/DELETE FROM site_traffic/.test(x.sql)),false);
  await analytics.close();
 });
