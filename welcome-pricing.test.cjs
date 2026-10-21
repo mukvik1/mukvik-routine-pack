@@ -40,3 +40,5 @@ test('cancelled orders release the offer; refunded purchases do not reset it',as
  for(const [status,total] of [['cancelled',3920],['refunded',4900],['approved',4900]]){const f=fixture({existing:[{id:'prior',status,total_cents:3920}]});assert.equal((await f.order()).data.order.total_cents,total,status);}
 });
 test('a routine-only order never receives the full-pack welcome discount',async()=>{const f=fixture({codes:['routine3','routine5','routine7','routine8','routine9']});assert.equal((await f.order()).data.order.total_cents,1400);});
+
+test('Calm Down individual order costs exactly $1 and has two delivery files',async()=>{const f=fixture({codes:['routine10']});assert.equal((await f.order()).data.order.total_cents,100);assert.equal(f.state.items[0].code,'routine10');assert.equal(require('./config/additional-product-files.json').routine10.length,2);});

@@ -36,7 +36,7 @@ async function main(){
  }
  if(settings.COMMERCE_FILES_JSON){
   try{
-   const value=JSON.parse(settings.COMMERCE_FILES_JSON);
+   const value={...require('../config/additional-product-files.json'),...JSON.parse(settings.COMMERCE_FILES_JSON)};
    for(const code of Object.keys(CATALOG)){
     const files=value?.[code];
     if(!Array.isArray(files)||!files.length||files.some(file=>!file||!/^[-\w]{10,128}$/.test(file.fileId)||typeof file.name!=='string'||!file.name.length||file.name.length>160))fail('COMMERCE_FILES_JSON: missing or invalid product '+code);

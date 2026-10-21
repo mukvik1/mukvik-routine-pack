@@ -15,7 +15,8 @@ const CATALOG=Object.freeze({
  routine5:{name:'NOT LIKE US X CANDY SHOP',cents:200},
  routine7:{name:'MACARENA X CANDY SHOP',cents:300},
  routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:300},
- routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:200}
+ routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:200},
+ routine10:{name:'CALM DOWN X CRAZY IN LOVE',cents:100}
 });
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validEmail=email=>email.length>=5&&email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -67,7 +68,7 @@ function createCommerce(settings=process.env,overrides={}){
  for(const key of required)if(!settings[key])throw new Error('Commerce config missing: '+key);
  const webOrigin=new URL(settings.WEB_ORIGIN).origin;
  const adminEmail=settings.ADMIN_EMAIL.trim().toLowerCase();
- const files=JSON.parse(settings.COMMERCE_FILES_JSON);
+ const files={...require('./config/additional-product-files.json'),...JSON.parse(settings.COMMERCE_FILES_JSON)};
  const credentials=JSON.parse(settings.GOOGLE_SERVICE_ACCOUNT_JSON);
  const {Pool}=require('pg');
  const {GoogleAuth,OAuth2Client}=require('google-auth-library');

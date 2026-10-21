@@ -43,7 +43,7 @@ async function checkDriveFiles(settings,{fetchImpl=fetch,getToken,log=console.lo
  let credentials,files;
  try{
   credentials=JSON.parse(settings.GOOGLE_SERVICE_ACCOUNT_JSON||'');
-  files=JSON.parse(settings.COMMERCE_FILES_JSON||'');
+  files=({...require('../config/additional-product-files.json'),...JSON.parse(settings.COMMERCE_FILES_JSON||'')});
   if(!credentials?.client_email||!credentials?.private_key)throw Error();
  }catch{log('FAIL: Drive configuration is missing or invalid.');return false;}
  if(expectedReader)log('READER: '+(credentials.client_email===expectedReader?'matches the expected service account.':'does not match the expected service account.'));
