@@ -25,6 +25,17 @@ async function download(relativePath) {
   if (relativePath === 'video-background.css') {
     bytes = Buffer.concat([bytes, Buffer.from('\n.rp-main .rp-hero>.rp-background-toggle{display:none!important}\n')]);
   }
+
+  if (relativePath === 'routines/index.html') {
+    const html = bytes.toString('utf8').replace(
+      /(<p class="routine-includes"[^>]*>4 routines · Audio files<\/p>)(<div class="bundle-offer">)/,
+      '$2$1'
+    );
+    bytes = Buffer.from(html);
+  }
+  if (relativePath === 'catalog.css') {
+    bytes = Buffer.concat([bytes, Buffer.from('\nbody[data-page="routines"] .bundle-offer{align-items:center;justify-content:center;text-align:center}\n')]);
+  }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
