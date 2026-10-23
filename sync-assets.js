@@ -5,7 +5,7 @@ const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
 const files = require('./config/site-assets.json').filter(file => file !== 'store-account.js');
 // Checkout and password-account logic is kept in GitHub; do not overwrite it from the Sites snapshot.
-const storefrontRevision = `sites-v81-static-tell-me-why-${Date.now()}`;
+const storefrontRevision = `sites-v81-video-only-hero-${Date.now()}`;
 
 if (!token) throw new Error('SITES_BYPASS_TOKEN is required during the Railway build');
 
@@ -16,7 +16,16 @@ async function download(relativePath) {
   if (!response.ok) throw new Error(`Failed to download ${relativePath}: HTTP ${response.status}`);
   const destination = path.join(__dirname, 'web', relativePath);
   await fs.mkdir(path.dirname(destination), { recursive: true });
-  await fs.writeFile(destination, Buffer.from(await response.arrayBuffer()));
+  let bytes = Buffer.from(await response.arrayBuffer());
+  // Keep the hero video, with no package illustration or visible pause control.
+  // Retain the hidden button node because the video playback script uses it.
+  if (relativePath === 'depth.css') {
+    bytes = Buffer.concat([bytes, Buffer.from('\n.rp-main .rp-hero-product,.rp-main .rp-depth-scene{display:none!important}\n')]);
+  }
+  if (relativePath === 'video-background.css') {
+    bytes = Buffer.concat([bytes, Buffer.from('\n.rp-main .rp-hero>.rp-background-toggle{display:none!important}\n')]);
+  }
+  await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
 
