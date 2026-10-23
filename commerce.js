@@ -5,12 +5,12 @@ const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
 const CATALOG=Object.freeze({
  pack:{name:'ROUTINE PACK VOLUME 1',cents:4900},
- bundle4:{name:'4 ROUTINES BUNDLE',cents:600},
- routine3:{name:'YEAH X LA VIDA ES UN CARNAVAL',cents:600},
- routine5:{name:'NOT LIKE US X CANDY SHOP',cents:500},
- routine7:{name:'MACARENA X CANDY SHOP',cents:500},
- routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:500},
- routine9:{name:'I KHOW YOU WANT ME X CHANDELIER',cents:500}
+ bundle4:{name:'AUDIO BUNDLE',cents:400},
+ routine3:{name:'YEAH X LA VIDA ES UN CARNAVAL',cents:400},
+ routine5:{name:'NOT LIKE US X CANDY SHOP',cents:200},
+ routine7:{name:'MACARENA X CANDY SHOP',cents:300},
+ routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:300},
+ routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:200}
 });
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
