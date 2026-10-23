@@ -36,6 +36,16 @@ async function download(relativePath) {
   if (relativePath === 'catalog.css') {
     bytes = Buffer.concat([bytes, Buffer.from('\nbody[data-page="routines"] .bundle-offer{align-items:center;justify-content:center;text-align:center}\n')]);
   }
+
+  if (relativePath === 'catalog.css') {
+    bytes = Buffer.concat([bytes, Buffer.from('\nbody .rp-main .rp-pack-hero{grid-template-columns:minmax(0,1fr);text-align:center}body .rp-main .rp-pack-hero>div:not(.rp-depth-scene){width:100%;align-items:center;justify-self:center}body .rp-main .rp-pack-hero h1,body .rp-main .rp-pack-hero .rp-lead{margin-inline:auto}body .rp-main .rp-pack-hero .rp-actions{justify-content:center}body .rp-main .rp-hero-product,body .rp-main .rp-depth-scene,body .rp-main .rp-pack-hero>img{display:none!important}\n')]);
+  }
+  if (relativePath.endsWith('.html')) {
+    bytes = Buffer.from(bytes.toString('utf8').replace(
+      /href="\/(catalog|depth)\.css(?:\?[^"]*)?"/g,
+      'href="/$1.css?v=20261023-centered-no-package"'
+    ));
+  }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
