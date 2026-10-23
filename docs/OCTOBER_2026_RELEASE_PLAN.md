@@ -16,14 +16,14 @@ Source: user instructions from 18–23 October 2026. This branch is separate fro
 - In Packs remove 'Watch the routines' copy.
 
 ## Product & pricing
-- Pack Volume 1 $49; first purchase for newly registered users 20% off = $39.20, correctly applied both in UI and actual payment provider.
+- ROUTINE PACK VOLUME 1 is the only existing pack, priced at $49. Apply a 20% new-registration welcome discount to this product only: $39.20. Eligibility is based on a newly registered customer account and single-use welcome entitlement, not on adding other products to a cart. Enforce server-side and in the payment provider's final amount; prevent repeat use or account-based abuse. No discount applies to individual routines, Audio Bundle, or any future Volume 2.
 - Audio Bundle $4.
 - YEAH × LA VIDA ES UN CARNAVAL $4.
 - MACARENA × CANDY SHOP $3.
 - I KNOW YOU WANT ME × CHANDELIER $2.
 - LEVITATION × CAN'T STOP × ROMPE $3.
 - NOT LIKE US × CANDY SHOP $2.
-- CALM DOWN × CRAZY IN LOVE individual $1, with its own video preview and downloadable files (only after real assets are supplied and access verified).
+- CALM DOWN × CRAZY IN LOVE is one standalone routine product for $1 (not $1 per track), with its own video preview and downloadable files (only after real assets are supplied and access verified).
 - Show previews before prices; after Preview All 6 show composition / price; Previous and Next change video in same player.
 - 'Get the Pack' without price opens a dedicated product details page, not a pop-up cart.
 - Checkout amount and currency must match displayed prices. Merchant charge in UAH if required, with transparent conversion.
@@ -52,7 +52,7 @@ Source: user instructions from 18–23 October 2026. This branch is separate fro
 1. All approved wording and media actually appear on routinepack.download on desktop and mobile.
 2. Media renders, all previews are legitimate uploaded files, no fake placeholders.
 3. Prices match server-side canonical catalog and provider invoices.
-4. A new buyer gets precisely one 20% welcome discount; repeat buyers do not.
+4. A newly registered account receives one 20% welcome discount exclusively for Routine Pack Volume 1: $49 -> $39.20; Audio Bundle and single routines remain full price. Enforce it atomically server-side and verify the resulting payment-provider total.
 5. No file access pre-registration or pre-payment; refunds/failed/partial transactions do not unlock paid content.
 6. All bots/webhooks send once with valid signatures; stats all-time & 7d match stored data.
 7. Backups and rollback are tested prior to production deploy.
