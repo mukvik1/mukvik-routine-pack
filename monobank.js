@@ -1,8 +1,8 @@
 'use strict';
 const crypto = require('node:crypto');
 
+const USD_UAH_RATE = 46;
 const API = 'https://api.monobank.ua';
-const NBU = 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchangenew?valcode=USD&json';
 const ORDER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALIDITY_SECONDS = 3600;
 const CHECKOUT_HOSTS = new Set(['pay.mbnk.biz', 'pay.monobank.ua', 'pay.monobank.com.ua']);
@@ -53,7 +53,6 @@ function createMonobank(settings, deps) {
   const {pool} = deps;
   const fetchImpl = deps.fetch || fetch;
   let publicKey = null;
-  let rateCache = null;
 
   async function api(path, options = {}) {
     const result = await fetchImpl(API + path, {
@@ -66,32 +65,8 @@ function createMonobank(settings, deps) {
   }
 
   async function rateUsdUah() {
-    if (rateCache && Date.now() < rateCache.until) return rateCache.rate;
-    const sources = [
-      NBU,
-      'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json',
-      'https://bank.gov.ua/NBU_Exchange/exchange?json'
-    ];
-    let lastError;
-    for (const source of sources) {
-      try {
-        const response = await fetchImpl(source, {signal: AbortSignal.timeout(8000)});
-        if (!response.ok) throw Object.assign(new Error('NBU rate unavailable'), {code:'NBU_HTTP_'+response.status});
-        const rows = await response.json();
-        const item = Array.isArray(rows) ? rows.find(x => x.cc === 'USD' || x.CurrencyCodeL === 'USD') : null;
-        if (!item) throw Object.assign(new Error('NBU USD rate missing'), {code:'NBU_USD_RATE_MISSING'});
-        const rate = item.cc === 'USD' ? Number(item.rate) : Number(item.Amount) / Number(item.Units);
-        const parts = String(item.exchangedate || item.StartDate || '').split('.');
-        const recorded = parts.length === 3 ? Date.parse(parts[2]+'-'+parts[1]+'-'+parts[0]+'T00:00:00Z') : NaN;
-        if (!Number.isFinite(recorded) || Date.now()-recorded > 7*86400000 || recorded-Date.now() > 86400000) {
-          throw Object.assign(new Error('NBU currency rate date invalid'), {code:'NBU_RATE_DATE_INVALID'});
-        }
-        uahKopiykas(100,rate);
-        rateCache = {rate, until:Date.now()+10*60000};
-        return rate;
-      } catch (error) { lastError = error; }
-    }
-    throw lastError;
+    // Owner-approved selling rate. Market monitoring never changes live prices.
+    return USD_UAH_RATE;
   }
 
   async function publicKeyForWebhooks(refresh = false) {
@@ -130,7 +105,7 @@ function createMonobank(settings, deps) {
         'SELECT page_url,amount_kop,rate_uah,expires_at,status FROM monobank_invoices WHERE order_id=$1 ORDER BY id DESC LIMIT 1',
         [orderId]
       );
-      if (previous.rowCount && ['created','processing'].includes(previous.rows[0].status) && new Date(previous.rows[0].expires_at).getTime() > Date.now()) {
+      if (previous.rowCount && Number(previous.rows[0].rate_uah) === USD_UAH_RATE && ['created','processing'].includes(previous.rows[0].status) && new Date(previous.rows[0].expires_at).getTime() > Date.now()) {
         await db.query('COMMIT');
         const p = previous.rows[0];
         return reply(res, 200, {pageUrl: p.page_url, amountKop: p.amount_kop, currency: 'UAH', usdCents: result.rows[0].total_cents, rate: Number(p.rate_uah), expiresAt: p.expires_at});
@@ -267,5 +242,5 @@ function createMonobank(settings, deps) {
   return {checkout,webhook,reconcile};
 }
 
-module.exports = {createMonobank,uahKopiykas,isTrustedCheckoutUrl,verifySignature};
+module.exports = {USD_UAH_RATE,createMonobank,uahKopiykas,isTrustedCheckoutUrl,verifySignature};
 

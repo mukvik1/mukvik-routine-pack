@@ -39,3 +39,10 @@ CREATE TABLE IF NOT EXISTS payment_alerts (
  sent_at TIMESTAMPTZ,
  UNIQUE(order_id,stage,error_code,period)
 );
+
+-- Once-daily owner FX reminder with a retry lease for Telegram delivery failures.
+CREATE TABLE IF NOT EXISTS fx_rate_reminders (
+ day DATE PRIMARY KEY,
+ claimed_at TIMESTAMPTZ NOT NULL,
+ sent_at TIMESTAMPTZ
+);

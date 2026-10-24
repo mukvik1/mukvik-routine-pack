@@ -89,6 +89,7 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
         }
       }
       await db.query('COMMIT');
+      await require('./fx-watch').checkFxReminder({db,fetchImpl,send}).catch(()=>console.error('FX reminder unavailable'));
     } catch(error) {await db.query('ROLLBACK');throw error;} finally {db.release();}
   }
   const orderIdPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
