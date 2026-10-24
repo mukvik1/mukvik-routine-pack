@@ -48,14 +48,14 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-mobile-layout"'
+      'href="/$1.css?v=20261024-routines-grid"'
     ));
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-mobile-layout"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routines-grid"'));
   }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
@@ -86,6 +86,28 @@ async function download(relativePath) {
   body[data-page="home"] .rp-main .rp-hero-copy .rp-lead{font-size:14px!important;line-height:1.5;max-width:310px;margin-top:0;margin-bottom:20px}
 }
 body[data-page="packs"] .rp-pack-layout{scroll-margin-top:24px}
+`)]);
+  }
+
+
+  if (relativePath === 'routines/index.html') {
+    let html = bytes.toString('utf8').replace(/<section class="page-intro">[\s\S]*?<\/section>/, '');
+    const bundle = html.match(/<section class="bundle-card">[\s\S]*?<\/section>/);
+    if (bundle) {
+      const card = bundle[0].replace('<section class="bundle-card">', '<article class="bundle-card">').replace(/<\/section>$/, '</article>');
+      html = html.replace(bundle[0], '').replace('<div class="coming-grid individual-grid">', '<div class="coming-grid individual-grid">' + card);
+    }
+    bytes = Buffer.from(html);
+  }
+  if (relativePath === 'catalog.css') {
+    bytes = Buffer.concat([bytes, Buffer.from(`
+/* The audio bundle shares the same catalogue columns as individual routines. */
+body[data-page="routines"] .individual-grid>.bundle-card{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:18px;min-width:0;max-width:100%;margin:0;padding:clamp(20px,3vw,36px);border:0;border-radius:0;grid-column:auto}
+body[data-page="routines"] .individual-grid>.bundle-card h2{font-size:clamp(24px,2.5vw,34px)!important;line-height:1.25;margin:0 0 16px}
+body[data-page="routines"] .individual-grid>.bundle-card ul{margin:0;padding:0;list-style:none}
+body[data-page="routines"] .individual-grid>.bundle-card li{font-size:14px;line-height:1.4;padding:9px 0}
+body[data-page="routines"] .individual-grid>.bundle-card .bundle-offer{display:flex;flex-direction:column;gap:12px;margin-top:auto}
+body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margin:0;font-size:13px}
 `)]);
   }
 
