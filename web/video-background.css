@@ -19,3 +19,6 @@ body.rp-video-pages>footer{position:relative;z-index:1}
 body.rp-video-pages .rp-wide-background:after{background:linear-gradient(180deg,#080c16b8,#0c0f18ad 60%,#0c0f18df)}
 body.rp-video-pages .individual-grid{background:transparent!important}
 body.rp-video-pages .individual-grid>.standalone-routine,body.rp-video-pages .download-grid>article{background:#111722c9!important;backdrop-filter:blur(3px)}
+
+/* Let the moving backdrop show through the outer Free catalogue panel. */
+body.rp-video-pages[data-page="free"] .free-catalog{background:rgba(15,18,25,.25)!important;border-color:rgba(112,132,170,.28);box-shadow:none}
