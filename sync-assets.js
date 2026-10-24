@@ -48,14 +48,14 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-routines-grid"'
+      'href="/$1.css?v=20261024-seamless-routines"'
     ));
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routines-grid"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-seamless-routines"'));
   }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
@@ -144,6 +144,23 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-all-pages');
     bytes=Buffer.from(html);
+  }
+
+
+  if (relativePath === 'routines/index.html') {
+    bytes=Buffer.from(bytes.toString('utf8').replace(
+      /(<article class="bundle-card">[\s\S]*?<h2>)[\s\S]*?<\/h2>/,
+      '$1<span data-i18n="FOUR ROUTINES.">4 routines</span><br><span class="bundle-price-heading">only $4</span></h2>'
+    ));
+  }
+  if (relativePath === 'catalog.css') {
+    bytes=Buffer.concat([bytes,Buffer.from(`
+/* One continuous translucent catalogue surface without grid seams. */
+body[data-page="routines"] .coming-grid.individual-grid{gap:0!important;background:transparent!important;border:0;box-shadow:none}
+body[data-page="routines"] .coming-grid.individual-grid>.bundle-card,
+body[data-page="routines"] .coming-grid.individual-grid>.standalone-routine{background:rgba(17,23,34,.65)!important;background-image:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;backdrop-filter:none!important}
+body[data-page="routines"] .individual-grid>.bundle-card .bundle-price-heading{font-size:.65em;line-height:1.5;font-weight:500}
+`)]);
   }
 
   await fs.writeFile(destination, bytes);
