@@ -48,14 +48,14 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-language-flags"'
+      'href="/$1.css?v=20261024-routine-cards"'
     ));
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-language-flags"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
   }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
@@ -169,6 +169,41 @@ body[data-page="routines"] .individual-grid>.bundle-card .bundle-price-heading{f
     bytes=Buffer.from(bytes.toString('utf8').replace(/(<option\b[^>]*value="([^"]+)"[^>]*>)[^<]*(<\/option>)/g,(all,open,language,close)=>labels[language]?open+labels[language]+close:all));
   }
   if (relativePath==='catalog.css') bytes=Buffer.concat([bytes,Buffer.from('\nhtml body .site-header .language-switch select{font-size:12px!important;min-width:92px;letter-spacing:.01em}html body .site-header .language-switch option{font-size:12px}\n')]);
+
+
+  if (relativePath === 'routines/index.html') {
+    bytes=Buffer.from(bytes.toString('utf8').replace(
+      /(<a class="routine-detail-link"[^>]*?)data-i18n="SHOW PREVIEW">Show preview<\/a>/g,
+      '$1data-i18n="OPEN ROUTINE">OPEN ROUTINE</a>'
+    ));
+  }
+  if (relativePath === 'catalog.css') bytes=Buffer.concat([bytes,Buffer.from(`
+/* Match the Free catalogue: separate cards, video above the title and purchase below. */
+body[data-page="routines"] .coming-grid.individual-grid{gap:14px!important;background:transparent!important;align-items:stretch}
+body[data-page="routines"] .coming-grid.individual-grid>.bundle-card,
+body[data-page="routines"] .coming-grid.individual-grid>.standalone-routine{background:rgba(17,23,34,.79)!important;border:1px solid #303543!important;border-radius:10px!important;padding:24px!important;box-shadow:none!important;gap:18px;min-width:0}
+body[data-page="routines"] .individual-grid .individual-card-layout{display:flex!important;flex-direction:column!important;align-items:center;justify-content:flex-start;gap:18px;text-align:center}
+body[data-page="routines"] .individual-grid .individual-performance-video{display:block;width:min(100%,190px)!important;height:auto!important;aspect-ratio:9/16;object-fit:contain;margin:0 auto;order:0}
+body[data-page="routines"] .individual-grid .individual-card-layout>div{width:100%;order:1}
+body[data-page="routines"] .individual-grid h2,
+body[data-page="routines"] .individual-grid>.bundle-card h2{font-size:20px!important;line-height:1.4!important;margin:0 0 10px}
+body[data-page="routines"] .individual-grid .routine-includes{font-size:13px;margin:0 auto}
+body[data-page="routines"] .individual-grid .routine-offer,
+body[data-page="routines"] .individual-grid .bundle-offer{margin-top:auto;justify-content:center!important}
+@media(max-width:600px){
+ body[data-page="routines"] .coming-grid.individual-grid{grid-template-columns:minmax(0,1fr)!important}
+ body[data-page="routines"] .individual-grid h2,body[data-page="routines"] .individual-grid>.bundle-card h2{font-size:16px!important}
+}
+`)]);
+
+
+  if (relativePath === 'routines/index.html') {
+    bytes=Buffer.from(bytes.toString('utf8').replace(/<article class="available-routine[^"]*"[^>]*>[\s\S]*?<\/article>/g,card=>{
+      if(card.includes('class="routine-detail-link"'))return card;
+      const href=card.match(/data-detail-href="([^"]+)"/)?.[1];
+      return href?card.replace('</h2>','</h2><a class="routine-detail-link" href="'+href+'" data-i18n="OPEN ROUTINE">OPEN ROUTINE</a>'):card;
+    }));
+  }
 
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
