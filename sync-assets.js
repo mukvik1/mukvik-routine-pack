@@ -10,6 +10,11 @@ const storefrontRevision = `sites-v81-video-only-hero-${Date.now()}`;
 if (!token) throw new Error('SITES_BYPASS_TOKEN is required during the Railway build');
 
 async function download(relativePath) {
+  if (relativePath === 'assets/mukvik-logo.png') {
+    // Preserve legacy URLs used by footers, scripts and older cached pages.
+    await fs.copyFile(path.join(__dirname,'web','assets','mukvik-logo-transparent.png'),path.join(__dirname,'web',relativePath));
+    return;
+  }
   const response = await fetch(`${origin}/${relativePath}?storefront_revision=${storefrontRevision}`, {
     headers: { 'OAI-Sites-Authorization': `Bearer ${token}` }
   });
@@ -53,7 +58,7 @@ async function download(relativePath) {
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-wide-video"'));
   }
   if(relativePath.endsWith('.html')) {
-    bytes=Buffer.from(bytes.toString('utf8').replace('<img src="/assets/mukvik-logo.png"', '<img src="/assets/mukvik-logo-transparent.png"'));
+    bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
   }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
