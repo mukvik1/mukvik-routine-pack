@@ -111,6 +111,30 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
 `)]);
   }
 
+
+  if (relativePath === 'free/index.html') {
+    bytes = Buffer.from(bytes.toString('utf8').replace(/<section class="page-intro free-intro">[\s\S]*?<\/section>/, ''));
+  }
+  if (relativePath.startsWith('free/') && relativePath !== 'free/index.html' && relativePath.endsWith('.html')) {
+    bytes = Buffer.from(bytes.toString('utf8').replace(
+      '<p data-i18n="Open Instagram, follow MUKVIK, then return here and confirm.">Open Instagram, follow MUKVIK, then return here and confirm.</p>',
+      '<p data-follow-question>Follow @mukvik.ofc on Instagram before downloading. Are you already following?</p>'
+    ));
+  }
+  if (relativePath === 'app.js') {
+    let js = bytes.toString('utf8');
+    // Ask on every routine page, including returning visitors.
+    js = js.replace("if (followWall && safeRead(FOLLOW_KEY) === 'confirmed') revealFree();\nelse if (followWall && safeSessionRead(FOLLOW_OPEN_KEY) === 'opened') enableConfirmFollow();",
+      "if (followWall) enableConfirmFollow();");
+    // Open Instagram only when the visitor explicitly chooses the follow link.
+    js = js.replace('    beginFreeFollow();\n    window.location.href = link.href;', '    window.location.href = link.href;');
+    js += "\n(() => { const q=document.querySelector('[data-follow-question]');if(!q)return;const update=()=>{q.textContent=document.documentElement.lang==='uk'?'Перед завантаженням підпишіться на @mukvik.ofc в Instagram. Ви вже підписані?':'Follow @mukvik.ofc on Instagram before downloading. Are you already following?';};update();new MutationObserver(update).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});})();\n";
+    bytes = Buffer.from(js);
+  }
+  if (relativePath.endsWith('.html')) {
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/app\.js(?:\?[^"]*)?"/g, 'src="/app.js?v=20261024-follow-confirm"'));
+  }
+
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
