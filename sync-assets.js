@@ -3,7 +3,7 @@ const path = require('path');
 
 const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
-const files = require('./config/site-assets.json').filter(file => file !== 'store-account.js');
+const files = require('./config/site-assets.json').filter(file => !['store-account.js','video-background.js','video-background.css'].includes(file));
 // Checkout and password-account logic is kept in GitHub; do not overwrite it from the Sites snapshot.
 const storefrontRevision = `sites-v81-video-only-hero-${Date.now()}`;
 
@@ -42,12 +42,15 @@ async function download(relativePath) {
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
-      /href="\/(catalog|depth)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261023-centered-no-package"'
+      /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
+      'href="/$1.css?v=20261024-wide-video"'
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=payment-alerts-20261024"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
+  }
+  if(relativePath.endsWith('.html')){
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-wide-video"'));
   }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
@@ -57,4 +60,5 @@ async function download(relativePath) {
   console.error(error.message);
   process.exit(1);
 });
+
 

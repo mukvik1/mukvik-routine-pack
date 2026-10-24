@@ -505,7 +505,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&url.pathname==='/api/v2/monobank/webhook'&&monobank){await monobank.webhook(req,res);return true;}
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}
@@ -566,4 +566,5 @@ function createCommerce(settings=process.env,overrides={}){
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);
+
 

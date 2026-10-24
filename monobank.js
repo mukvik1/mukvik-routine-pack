@@ -120,7 +120,8 @@ function createMonobank(settings, deps) {
           amount: amountKop, ccy: 980,
           merchantPaymInfo: {
             reference: orderId,
-            destination: 'MUKVIK Routine Pack digital products',
+            destination: 'MUKVIK Routine Pack — $'+(result.rows[0].total_cents/100).toFixed(2)+' USD / '+(amountKop/100).toFixed(2)+' UAH',
+            comment: 'Price in USD. Payment processed in UAH (Ukraine) at '+rate+' UAH/USD. Your bank converts to your card currency; fees may apply.',
             customerEmails: [customer.email]
           },
           redirectUrl: siteOrigin + '/?monoOrder=' + encodeURIComponent(orderId),
@@ -243,4 +244,5 @@ function createMonobank(settings, deps) {
 }
 
 module.exports = {USD_UAH_RATE,createMonobank,uahKopiykas,isTrustedCheckoutUrl,verifySignature};
+
 

@@ -1,0 +1,13 @@
+/* One continuous moving backdrop: navigation, hero and preview heading. */
+body.rp-video-wide{position:relative;isolation:isolate;background:#0c0f18}
+.rp-wide-background{position:absolute;top:0;inset-inline:0;width:100%;overflow:hidden;pointer-events:none;z-index:0;background:#0c0f18 url('/assets/videos/poster-1.jpg') center 35%/cover no-repeat}
+.rp-wide-background>.rp-hero-background{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 35%;pointer-events:none}
+.rp-wide-background:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#080c16a8 0%,#0a0e1880 35%,#0c0f1899 78%,#0e1118 100%)}
+body.rp-video-wide>.site-header{position:relative;z-index:5;background:#0c0f1838!important;backdrop-filter:blur(5px)}
+body.rp-video-wide main.rp-main{position:relative;z-index:1;background:transparent!important}
+body.rp-video-wide .rp-main .rp-hero{background:transparent!important;isolation:auto}
+body.rp-video-wide .rp-main .rp-hero:before,body.rp-video-wide .rp-main .rp-hero:after{display:none}
+body.rp-video-wide .rp-main .rp-showcase{background:transparent!important}
+body.rp-video-wide .rp-main .rp-showcase>.rp-routines{position:relative;z-index:1}
+.rp-background-toggle{display:none!important}
+@media(max-width:760px){.rp-wide-background>.rp-hero-background{object-position:center 35%}.rp-wide-background:after{background:linear-gradient(180deg,#080c16b8,#0c0f1880 65%,#0e1118 100%)}}

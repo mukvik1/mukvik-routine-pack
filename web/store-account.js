@@ -5,10 +5,12 @@ const API='https://mukvik-routine-pack-production.up.railway.app';
 const accountMessages={"ar":{"Please wait…":"يرجى الانتظار…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"ادفع بأمان بالهريفنيا. يظهر سعر الصرف والمبلغ النهائي قبل الدفع.","Pay":"ادفع","Order saved. You can pay from your account.":"تم حفظ الطلب. يمكنك الدفع من حسابك."},"hi":{"Please wait…":"कृपया प्रतीक्षा करें…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"UAH में सुरक्षित भुगतान करें। अंतिम विनिमय दर और राशि भुगतान से पहले दिखाई जाती हैं।","Pay":"भुगतान करें","Order saved. You can pay from your account.":"ऑर्डर सहेज लिया गया। आप अपने अकाउंट से भुगतान कर सकते हैं।"},"it":{"Please wait…":"Attendi…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Paga in sicurezza in UAH. Il cambio e l'importo finale sono indicati prima del pagamento.","Pay":"Paga","Order saved. You can pay from your account.":"Ordine salvato. Puoi pagare dal tuo account."},"pt-BR":{"Please wait…":"Aguarde…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Pague com segurança em UAH. A taxa de câmbio e o valor final são exibidos antes do pagamento.","Pay":"Pagar","Order saved. You can pay from your account.":"Pedido salvo. Você pode pagar pela sua conta."}};
 const removeLabels={en:'Remove unpaid order',uk:'Видалити неоплачене замовлення',de:'Unbezahlte Bestellung entfernen',es:'Eliminar pedido sin pagar',th:'ลบคำสั่งซื้อที่ยังไม่ได้ชำระเงิน',id:'Hapus pesanan belum dibayar',ar:'إزالة الطلب غير المدفوع',hi:'अवैतनिक ऑर्डर हटाएँ',it:'Rimuovi ordine non pagato','pt-BR':'Remover pedido não pago'};
 for(const [language,label] of Object.entries(removeLabels)){accountMessages[language]??={};accountMessages[language]['Remove unpaid order']=label;}
+const currencyKey='Prices are in USD. Payment is processed in UAH, the store currency (Ukraine). Your bank converts this amount to your card currency at its own rate; fees may apply.';
+accountMessages.uk??={};accountMessages.uk[currencyKey]='Ціни вказані в USD. Оплата здійснюється у гривні — валюті магазину (Україна). Ваш банк конвертує цю суму у валюту картки за власним курсом; можливі комісії.';
 const T=k=>accountMessages[window.RP_I18N.language]?.[k]||window.RP_I18N.t(k),money=n=>new Intl.NumberFormat(window.RP_I18N.language,{style:'currency',currency:'USD'}).format(n/100);
 const read=k=>{try{return localStorage.getItem(k);}catch{return null;}},write=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}};
 let token=read('mukvik_store_session'),user=null,catalog=[],cart=[],pendingCheckout=false,challenge=null,mode='login',providers={};
-let orderKey=null,cartBusy=false,pendingFree=null;
+let orderKey=null,cartBusy=false,pendingFree=null,usdUahRate=46;
 try{cart=JSON.parse(read('mukvik_guest_cart')||'[]');if(!Array.isArray(cart))cart=[];}catch{}
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
@@ -103,6 +105,11 @@ async function saveCart(next){
 }
 async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
+function currencyNote(cents){
+ const note=el('p',undefined,'store-muted');note.style.fontSize='12px';note.style.lineHeight='1.5';
+ const uah=new Intl.NumberFormat(window.RP_I18N.language,{style:'currency',currency:'UAH'}).format(Math.round(cents*usdUahRate)/100);
+ note.textContent=money(cents)+' USD → '+uah+'. '+T('Prices are in USD. Payment is processed in UAH, the store currency (Ukraine). Your bank converts this amount to your card currency at its own rate; fees may apply.');return note;
+}
 function paymentConsent(){
  const label=el('label',undefined,'store-consent'),input=el('input');input.type='checkbox';input.required=true;
  label.append(input,document.createTextNode(' '+T('I request immediate digital delivery after payment and have read the ') ));
@@ -114,6 +121,7 @@ async function showMonobankInvoice(orderId){
  cartBody.append(el('p',T('Your order')+' '+orderId.slice(0,8),'store-muted'));
  const order=user?.orders.find(order=>order.id===orderId);
  if(order){for(const item of order.items)cartBody.append(el('p',item.name));const total=el('div',undefined,'store-total');total.append(el('span',T('Total')),el('strong',money(order.totalCents)));cartBody.append(total);}
+ if(order)cartBody.append(currencyNote(order.totalCents));
  const consent=paymentConsent();cartBody.append(consent.label);
  const pay=button('PAY WITH MONOBANK',async()=>{if(!consent.input.checked){status.textContent=T('Please confirm digital delivery before payment.');return;}pay.disabled=true;status.textContent='';try{await requestMonobankInvoice(orderId);}catch(e){status.textContent=e.message;pay.disabled=false;}},'store-button primary');
  cartBody.append(pay);show(cartDialog);
@@ -130,7 +138,7 @@ function renderCart(){cartDialog.querySelector('h2').textContent=T('Your cart');
  let total=0;
  for(const code of cart){const p=catalog.find(p=>p.code===code);if(!p)continue;const price=productPrice(p);total+=price;const row=el('div',undefined,'store-cart-row'),copy=el('div');copy.append(el('strong',p.name),el('p',money(price),'store-muted'));row.append(copy,button('Remove',()=>saveCart(cart.filter(x=>x!==code)),'store-text-button'));cartBody.append(row);}
  if(cart.includes('pack')){if(user?.welcomePackEligible)cartBody.append(el('p',T('Welcome discount applied')+' · −20%','store-welcome-note'));else cartBody.append(el('p',T('New accounts get 20% off their first full pack.')+' '+T('Welcome price')+': '+money(3920),'store-welcome-note'));}
- const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl);
+ const totalEl=el('div',undefined,'store-total');totalEl.append(el('span',T('Total')),el('strong',money(total)));cartBody.append(totalEl);cartBody.append(currencyNote(total));
  const consent=user?paymentConsent():null;if(consent)cartBody.append(consent.label);
  const checkout=button(user?'PAY WITH MONOBANK':'SIGN IN TO CHECK OUT',async()=>{if(!user){pendingCheckout=true;openAuth(cart.includes('pack')?'register':'login');return;}if(!consent.input.checked){status.textContent=T('Please confirm digital delivery before payment.');return;}checkout.disabled=true;status.textContent='';try{orderKey=orderKey||crypto.randomUUID();const created=await api('/orders','POST',{idempotencyKey:orderKey});cart=[];orderKey=null;user=await api('/me');renderHeader();renderAccount();await requestMonobankInvoice(created.order.id);}catch(e){status.textContent=e.message;renderAccount();show(account);accountStatus.textContent=e.message;}finally{checkout.disabled=false;}},'store-button primary');cartBody.append(checkout);
 }
@@ -157,7 +165,8 @@ document.querySelectorAll('[data-cart]').forEach(b=>b.addEventListener('click',e
 document.querySelectorAll('[data-buy]').forEach(b=>b.addEventListener('click',async e=>{e.preventDefault();const code=b.dataset.productId;if(!catalog.some(p=>p.code===code)){status.textContent=T('Service temporarily unavailable.');show(cartDialog);return;}b.setAttribute('aria-busy','true');await saveCart([...new Set([...cart,code])]);b.removeAttribute('aria-busy');show(cartDialog);}));
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderCart();renderAccount();});
 renderHeader();renderAuth();renderCart();
-try{const data=await api('/catalog');catalog=data.products;cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');cart=(await api('/cart')).items.map(x=>x.code);}catch{user=null;}}renderHeader();renderCart();}catch(e){status.textContent=e.message;}
+try{const data=await api('/catalog');catalog=data.products;usdUahRate=Number(data.usdUahRate)||46;cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');cart=(await api('/cart')).items.map(x=>x.code);}catch{user=null;}}renderHeader();renderCart();}catch(e){status.textContent=e.message;}
 try{providers=await api('/auth/providers');auth.querySelectorAll('[data-provider]').forEach(b=>{b.disabled=!providers[b.dataset.provider];});}catch{}
 })();
+
 
