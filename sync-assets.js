@@ -135,6 +135,17 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/app\.js(?:\?[^"]*)?"/g, 'src="/app.js?v=20261024-follow-confirm"'));
   }
 
+
+  if (relativePath.endsWith('.html')) {
+    let html=bytes.toString('utf8');
+    if (/^(packs|routines|free|about)\//.test(relativePath)) {
+      if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-all-pages"></head>');
+      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261024-all-pages" defer></script></body>');
+    }
+    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-all-pages');
+    bytes=Buffer.from(html);
+  }
+
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }

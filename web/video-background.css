@@ -11,3 +11,11 @@ body.rp-video-wide .rp-main .rp-showcase{background:transparent!important}
 body.rp-video-wide .rp-main .rp-showcase>.rp-routines{position:relative;z-index:1}
 .rp-background-toggle{display:none!important}
 @media(max-width:760px){.rp-wide-background>.rp-hero-background{object-position:center 35%}.rp-wide-background:after{background:linear-gradient(180deg,#080c16b8,#0c0f1880 65%,#0e1118 100%)}}
+
+/* Other catalogue pages share a viewport-sized moving backdrop. */
+body.rp-video-pages .rp-wide-background{position:fixed;height:100vh;height:100dvh}
+body.rp-video-pages>main{position:relative;z-index:1;background:transparent!important}
+body.rp-video-pages>footer{position:relative;z-index:1}
+body.rp-video-pages .rp-wide-background:after{background:linear-gradient(180deg,#080c16b8,#0c0f18ad 60%,#0c0f18df)}
+body.rp-video-pages .individual-grid{background:transparent!important}
+body.rp-video-pages .individual-grid>.standalone-routine,body.rp-video-pages .download-grid>article{background:#111722c9!important;backdrop-filter:blur(3px)}
