@@ -52,6 +52,9 @@ async function download(relativePath) {
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-wide-video"'));
   }
+  if(relativePath.endsWith('.html')) {
+    bytes=Buffer.from(bytes.toString('utf8').replace('<img src="/assets/mukvik-logo.png"', '<img src="/assets/mukvik-logo-transparent.png"'));
+  }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
