@@ -48,18 +48,47 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-wide-video"'
+      'href="/$1.css?v=20261024-mobile-layout"'
     ));
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-wide-video"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-mobile-layout"'));
   }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
   }
+
+  // Keep the storefront concise and the mobile hero close to the navigation.
+  if (relativePath === 'index.html') {
+    let html = bytes.toString('utf8');
+    html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
+    html = html.replace(/<a class="rp-button rp-button-lime" href="#lessons">[\s\S]*?<\/a>/, '<a class="rp-button rp-button-lime" href="/packs/#previews">Watch Packs</a>');
+    html = html.replace(/<a class="rp-button rp-button-outline" href="\/packs\/">[\s\S]*?<\/a>/, '<a class="rp-button rp-button-outline" href="/routines/">Explore Routines</a>');
+    bytes = Buffer.from(html);
+  }
+  if (relativePath === 'packs/index.html') {
+    bytes = Buffer.from(bytes.toString('utf8')
+      .replace(/<section class="rp-pack-hero">[\s\S]*?<\/section>/, '')
+      .replace('<section class="rp-pack-layout">', '<section class="rp-pack-layout" id="previews">'));
+  }
+  if (relativePath === 'catalog.css') {
+    bytes = Buffer.concat([bytes, Buffer.from(`
+/* Compact mobile introduction and left-aligned brand. */
+@media(max-width:760px){
+  html body .site-header .logo-wrap{grid-column:1;grid-row:1;justify-self:start!important;margin-inline:0}
+  body[data-page="home"] .rp-main .rp-hero{padding:20px 18px 36px!important;min-height:0!important}
+  body[data-page="home"] .rp-main .rp-hero-copy{padding-top:0!important;margin-top:0!important}
+  body[data-page="home"] .rp-main .rp-hero-copy .rp-kicker{margin-top:0;margin-bottom:12px}
+  body[data-page="home"] .rp-main .rp-hero-copy h1{margin-bottom:16px}
+  body[data-page="home"] .rp-main .rp-hero-copy .rp-lead{font-size:14px!important;line-height:1.5;max-width:310px;margin-top:0;margin-bottom:20px}
+}
+body[data-page="packs"] .rp-pack-layout{scroll-margin-top:24px}
+`)]);
+  }
+
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
