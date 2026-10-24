@@ -3,6 +3,8 @@
 await window.RP_I18N.ready;
 const API='https://mukvik-routine-pack-production.up.railway.app';
 const accountMessages={"ar":{"Please wait…":"يرجى الانتظار…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"ادفع بأمان بالهريفنيا. يظهر سعر الصرف والمبلغ النهائي قبل الدفع.","Pay":"ادفع","Order saved. You can pay from your account.":"تم حفظ الطلب. يمكنك الدفع من حسابك."},"hi":{"Please wait…":"कृपया प्रतीक्षा करें…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"UAH में सुरक्षित भुगतान करें। अंतिम विनिमय दर और राशि भुगतान से पहले दिखाई जाती हैं।","Pay":"भुगतान करें","Order saved. You can pay from your account.":"ऑर्डर सहेज लिया गया। आप अपने अकाउंट से भुगतान कर सकते हैं।"},"it":{"Please wait…":"Attendi…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Paga in sicurezza in UAH. Il cambio e l'importo finale sono indicati prima del pagamento.","Pay":"Paga","Order saved. You can pay from your account.":"Ordine salvato. Puoi pagare dal tuo account."},"pt-BR":{"Please wait…":"Aguarde…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Pague com segurança em UAH. A taxa de câmbio e o valor final são exibidos antes do pagamento.","Pay":"Pagar","Order saved. You can pay from your account.":"Pedido salvo. Você pode pagar pela sua conta."}};
+const removeLabels={en:'Remove unpaid order',uk:'Видалити неоплачене замовлення',de:'Unbezahlte Bestellung entfernen',es:'Eliminar pedido sin pagar',th:'ลบคำสั่งซื้อที่ยังไม่ได้ชำระเงิน',id:'Hapus pesanan belum dibayar',ar:'إزالة الطلب غير المدفوع',hi:'अवैतनिक ऑर्डर हटाएँ',it:'Rimuovi ordine non pagato','pt-BR':'Remover pedido não pago'};
+for(const [language,label] of Object.entries(removeLabels)){accountMessages[language]??={};accountMessages[language]['Remove unpaid order']=label;}
 const T=k=>accountMessages[window.RP_I18N.language]?.[k]||window.RP_I18N.t(k),money=n=>new Intl.NumberFormat(window.RP_I18N.language,{style:'currency',currency:'USD'}).format(n/100);
 const read=k=>{try{return localStorage.getItem(k);}catch{return null;}},write=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}};
 let token=read('mukvik_store_session'),user=null,catalog=[],cart=[],pendingCheckout=false,challenge=null,mode='login',providers={};
@@ -16,7 +18,7 @@ const error=el('p','','store-error');error.setAttribute('role','alert');
 const authTabs=el('div',undefined,'store-tabs');authTabs.append(button('SIGN IN',()=>{mode='login';challenge=null;renderAuth();}),button('SIGN UP',()=>{mode='register';challenge=null;renderAuth();}));
 const authBody=el('div');auth.append(authTabs,authBody,error);
 function show(d){for(const other of [auth,cartDialog,account])if(other!==d&&other.open)other.close();if(!d.open)d.showModal();}
-async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.'));}return body;}
+async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
 const status=el('p','','store-error');status.setAttribute('role','status');cartDialog.append(status);
 function renderAuth(){
  error.textContent='';authBody.replaceChildren();
@@ -141,6 +143,10 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
   if(order.status==='awaiting_manual_review'){
    const pay=button('PAY WITH MONOBANK',()=>showMonobankInvoice(order.id));
    block.append(pay);
+  }
+  if(order.status==='awaiting_manual_review'||order.status==='cancelled'){
+   const remove=button('Remove unpaid order',async()=>{remove.disabled=true;accountStatus.textContent='';try{await api('/orders/'+order.id+'/hide','POST',{});user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;remove.disabled=false;}});
+   block.append(remove);
   }accountBody.append(block);
  }
  accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
@@ -154,3 +160,4 @@ renderHeader();renderAuth();renderCart();
 try{const data=await api('/catalog');catalog=data.products;cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');cart=(await api('/cart')).items.map(x=>x.code);}catch{user=null;}}renderHeader();renderCart();}catch(e){status.textContent=e.message;}
 try{providers=await api('/auth/providers');auth.querySelectorAll('[data-provider]').forEach(b=>{b.disabled=!providers[b.dataset.provider];});}catch{}
 })();
+

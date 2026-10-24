@@ -404,13 +404,19 @@ function createCommerce(settings=process.env,overrides={}){
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }
  async function me(res,user){
-  const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,i.product_code,i.name,i.price_cents,(e.order_id IS NOT NULL AND o.status='approved') AS accessible FROM orders o JOIN order_items i ON i.order_id=o.id LEFT JOIN entitlements e ON e.order_id=i.order_id AND e.product_code=i.product_code AND e.customer_id=$1 WHERE o.customer_id=$1 ORDER BY o.created_at DESC,i.product_code",[user.id]);
+  const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,i.product_code,i.name,i.price_cents,(e.order_id IS NOT NULL AND o.status='approved') AS accessible FROM orders o JOIN order_items i ON i.order_id=o.id LEFT JOIN entitlements e ON e.order_id=i.order_id AND e.product_code=i.product_code AND e.customer_id=$1 WHERE o.customer_id=$1 AND (o.hidden_by_customer_at IS NULL OR o.status IN ('approved','refunded')) ORDER BY o.created_at DESC,i.product_code",[user.id]);
   const orders=new Map();
   for(const row of r.rows){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
   }
   response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,welcomePackEligible:await welcomeEligible(pool,user.id),orders:[...orders.values()]});
+ }
+ async function hideUnpaidOrder(res,user,orderId){
+  const result=await pool.query(`UPDATE orders SET hidden_by_customer_at=COALESCE(hidden_by_customer_at,now())
+   WHERE id=$1 AND customer_id=$2 AND status IN ('awaiting_manual_review','cancelled') RETURNING id`,[orderId,user.id]);
+  if(!result.rowCount)return response(res,409,{error:'Only your unpaid orders can be removed.'});
+  response(res,200,{ok:true});
  }
  async function adminOrders(res){
   const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,c.email,coalesce(json_agg(json_build_object('code',i.product_code,'name',i.name,'priceCents',i.price_cents) ORDER BY i.product_code) FILTER(WHERE i.product_code IS NOT NULL),'[]') AS items FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN order_items i ON i.order_id=o.id GROUP BY o.id,c.email ORDER BY o.created_at DESC LIMIT 100");
@@ -525,6 +531,8 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&url.pathname==='/api/v2/cart'){await cart(res,user);return true;}
    if(req.method==='PUT'&&url.pathname==='/api/v2/cart'){await putCart(req,res,user);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/orders'){await newOrder(req,res,user);return true;}
+   const removeOrder=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/hide$/.exec(url.pathname);
+   if(req.method==='POST'&&removeOrder&&uuidPattern.test(removeOrder[1])){await hideUnpaidOrder(res,user,removeOrder[1]);return true;}
    const monoCheckout=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank$/.exec(url.pathname);
    if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){const request=await body(req);await monobank.checkout(res,monoCheckout[1],user,request.acceptDigitalDelivery);return true;}
    const monoStatus=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank\/status$/.exec(url.pathname);
@@ -541,7 +549,7 @@ function createCommerce(settings=process.env,overrides={}){
   }catch(error){
    if(error.status){response(res,error.status,{error:error.message});return true;}
    console.error('Commerce request failed:',error.code||error.message||error.name||'error');
-   if(!res.headersSent)response(res,503,{error:'Service temporarily unavailable.'});else res.destroy();
+   if(!res.headersSent)response(res,503,{error:'Service temporarily unavailable.',...(error.paymentCode?{paymentCode:error.paymentCode}:{})});else res.destroy();
    return true;
   }
  }
@@ -558,3 +566,4 @@ function createCommerce(settings=process.env,overrides={}){
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);
+

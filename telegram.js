@@ -61,6 +61,17 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
           await db.query('UPDATE telegram_notifications SET attempts=attempts+1 WHERE id=$1',[n.id]);
         }
       }
+      const alerts=await db.query(`SELECT a.id,a.order_id,a.stage,a.error_code,a.created_at,c.email,o.total_cents,o.currency,
+        (SELECT string_agg(i.name,', ' ORDER BY i.product_code) FROM order_items i WHERE i.order_id=o.id) AS products
+        FROM payment_alerts a JOIN orders o ON o.id=a.order_id JOIN customers c ON c.id=o.customer_id
+        WHERE a.sent_at IS NULL AND a.attempts<20 ORDER BY a.id LIMIT 10 FOR UPDATE OF a SKIP LOCKED`);
+      for(const a of alerts.rows){
+        try{
+          const reason=a.error_code==='MONOBANK_HTTP_401'||a.error_code==='MONOBANK_HTTP_403'?'Monobank отклонил авторизацию: проверьте ключ эквайринга.':a.stage==='exchange_rate'?'Не удалось получить актуальный курс USD/UAH.':a.error_code==='PAYMENT_DECLINED'?'Банк отклонил оплату.':a.error_code==='INVOICE_EXPIRED'?'Истёк срок платёжной ссылки.':'Ошибка платёжного сервиса. Проверьте журнал сервера по коду.';
+          await send(['🚨 Ошибка оплаты','Покупатель: '+a.email,'Заказ: '+a.order_id,'Товары: '+(a.products||'—'),'Сумма: '+money(a.total_cents,a.currency),'Этап: '+a.stage,'Код: '+a.error_code,'Причина: '+reason,'Время: '+new Date(a.created_at).toISOString()].join('\n'),{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+a.order_id}]]}});
+          await db.query('UPDATE payment_alerts SET sent_at=now(),attempts=attempts+1 WHERE id=$1',[a.id]);
+        }catch{await db.query('UPDATE payment_alerts SET attempts=attempts+1 WHERE id=$1',[a.id]);}
+      }
       const activity=await db.query("SELECT a.id,a.kind,a.payload,c.email FROM customer_activity a JOIN customers c ON c.id=a.customer_id WHERE a.sent_at IS NULL AND a.attempts<20 ORDER BY a.id LIMIT 10 FOR UPDATE OF a SKIP LOCKED");
       for(const a of activity.rows){
         try {
@@ -183,3 +194,4 @@ function createTelegramBot(settings, {pool, approveOrder, fetchImpl = fetch}) {
   return {handle,installWebhook,notify,flushNotifications};
 }
 module.exports={createTelegramBot};
+

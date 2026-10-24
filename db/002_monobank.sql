@@ -23,3 +23,19 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS digital_delivery_consent_at TIMESTAM
 ALTER TABLE telegram_notifications DROP CONSTRAINT IF EXISTS telegram_notifications_kind_check;
 ALTER TABLE telegram_notifications ADD CONSTRAINT telegram_notifications_kind_check
   CHECK(kind IN ('new_order','approved','monobank_paid','monobank_reversed'));
+
+
+-- Hide unpaid cards without deleting payment/audit records. Late paid orders remain visible.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS hidden_by_customer_at TIMESTAMPTZ;
+-- Durable, hourly deduplicated owner alerts, separate from order-created notices.
+CREATE TABLE IF NOT EXISTS payment_alerts (
+ id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ order_id UUID NOT NULL REFERENCES orders(id),
+ stage TEXT NOT NULL,
+ error_code TEXT NOT NULL,
+ period TIMESTAMPTZ NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+ attempts INTEGER NOT NULL DEFAULT 0,
+ sent_at TIMESTAMPTZ,
+ UNIQUE(order_id,stage,error_code,period)
+);

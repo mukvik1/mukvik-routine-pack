@@ -92,7 +92,7 @@ test('New-order notifications are in Russian and keep private file IDs out of me
  const sent=[];
  const order='d482b8f8-8d36-49d9-ac09-4077a802d77b';
  const db={query:async sql=>{
-  if(sql.includes('FROM customer_activity'))return {rows:[]};
+  if(sql.includes('FROM customer_activity')||sql.includes('FROM payment_alerts'))return {rows:[]};
   if(sql.includes('FROM telegram_notifications'))return {rows:[{id:1,order_id:order,kind:'new_order',status:'awaiting_manual_review',total_cents:4900,currency:'USD',email:'buyer@example.test'}]};
   return {rowCount:1};
  },release:()=>{}};
@@ -115,7 +115,7 @@ test('New-order notifications are in Russian and keep private file IDs out of me
 
 test('owner receives Monobank confirmation with UAH amount and manual receipt reminder',async()=>{
  const sent=[];
- const db={query:async sql=>sql.includes('FROM telegram_notifications')?{rows:[{id:1,order_id:'d482b8f8-8d36-49d9-ac09-4077a802d77b',kind:'monobank_paid',status:'approved',total_cents:4900,currency:'USD',email:'buyer@example.test',invoice_id:'p2_paid',amount_kop:202125}]}:sql.includes('FROM customer_activity')?{rows:[]}:{rowCount:1},release(){}};
+ const db={query:async sql=>sql.includes('FROM telegram_notifications')?{rows:[{id:1,order_id:'d482b8f8-8d36-49d9-ac09-4077a802d77b',kind:'monobank_paid',status:'approved',total_cents:4900,currency:'USD',email:'buyer@example.test',invoice_id:'p2_paid',amount_kop:202125}]}:(sql.includes('FROM customer_activity')||sql.includes('FROM payment_alerts'))?{rows:[]}:{rowCount:1},release(){}};
  const bot=createTelegramBot({TELEGRAM_ENABLED:'true',TELEGRAM_BOT_TOKEN:'123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef',TELEGRAM_ADMIN_CHAT_ID:'123456789',TELEGRAM_WEBHOOK_URL:'https://example.test/api/v2/telegram/webhook'},
   {pool:{connect:async()=>db},approveOrder:async()=>{throw Error('Manual approval must not run');},fetchImpl:async(url,options)=>{sent.push(JSON.parse(options.body));return new Response(JSON.stringify({ok:true,result:true}),{status:200});}});
  await bot.flushNotifications();
@@ -125,3 +125,4 @@ test('owner receives Monobank confirmation with UAH amount and manual receipt re
  assert.match(notice.text,/p2_paid/);
  assert.match(notice.text,/2\s?021,25\s?₴|2\s?021,25\s?грн/u);
 });
+

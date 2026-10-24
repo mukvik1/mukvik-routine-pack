@@ -61,15 +61,26 @@ function createMonobank(settings, deps) {
       headers: {'X-Token': settings.MONOBANK_TOKEN, 'Content-Type': 'application/json', ...(options.headers || {})},
       signal: AbortSignal.timeout(12000)
     });
-    if (!result.ok) throw new Error('Monobank API returned HTTP ' + result.status);
+    if (!result.ok) { const error=new Error('Monobank API returned HTTP '+result.status); error.code='MONOBANK_HTTP_'+result.status; throw error; }
     return result.json();
   }
 
   async function rateUsdUah() {
     if (rateCache && Date.now() < rateCache.until) return rateCache.rate;
-    const response = await fetchImpl(NBU, {signal: AbortSignal.timeout(8000)});
-    if (!response.ok) throw new Error('NBU rate unavailable');
-    const data = await response.json();
+    let data;
+    try {
+      const response = await fetchImpl(NBU, {signal: AbortSignal.timeout(8000)});
+      if (!response.ok) {const error=new Error('NBU rate unavailable');error.code='NBU_HTTP_'+response.status;throw error;}
+      data = await response.json();
+    } catch(primaryError) {
+      // Same official NBU rate, via the alternate published endpoint. No invented FX rate.
+      try {
+        const response=await fetchImpl('https://bank.gov.ua/NBU_Exchange/exchange?json',{signal:AbortSignal.timeout(8000)});
+        if(!response.ok)throw primaryError;
+        const rows=await response.json();
+        data=Array.isArray(rows)?rows.filter(x=>x.CurrencyCodeL==='USD').map(x=>({cc:'USD',rate:Number(x.Amount)/Number(x.Units),exchangedate:x.StartDate})):[];
+      }catch{throw primaryError;}
+    }
     const item = Array.isArray(data) ? data.find(x => x.cc === 'USD') : null;
     const rate = Number(item?.rate);
     const parts = String(item?.exchangedate || '').split('.');
@@ -90,9 +101,17 @@ function createMonobank(settings, deps) {
     return publicKey;
   }
 
+  async function recordFailure(orderId,stage,code,customerId=null,db=pool) {
+    await db.query(`INSERT INTO payment_alerts(order_id,stage,error_code,period)
+      SELECT id,$2,$3,date_trunc('hour',now()) FROM orders
+      WHERE id=$1 AND ($4::uuid IS NULL OR customer_id=$4)
+      ON CONFLICT(order_id,stage,error_code,period) DO NOTHING`,[orderId,stage,code,customerId]);
+  }
+
   async function checkout(res, orderId, customer, consent) {
     if (consent !== true) return reply(res, 400, {error: 'Confirm immediate digital delivery and review the terms before payment.'});
     if (!ORDER_ID.test(orderId)) return reply(res, 404, {error: 'Order not found.'});
+    let stage='database';
     const db = await pool.connect();
     try {
       await db.query('BEGIN');
@@ -115,8 +134,10 @@ function createMonobank(settings, deps) {
         const p = previous.rows[0];
         return reply(res, 200, {pageUrl: p.page_url, amountKop: p.amount_kop, currency: 'UAH', usdCents: result.rows[0].total_cents, rate: Number(p.rate_uah), expiresAt: p.expires_at});
       }
+      stage='exchange_rate';
       const rate = await rateUsdUah();
       const amountKop = uahKopiykas(result.rows[0].total_cents, rate);
+      stage='invoice_create';
       const invoice = await api('/api/merchant/invoice/create', {
         method: 'POST',
         body: JSON.stringify({
@@ -135,6 +156,7 @@ function createMonobank(settings, deps) {
       if (typeof invoice.invoiceId !== 'string' || !/^[a-zA-Z0-9_-]{5,128}$/.test(invoice.invoiceId) || !isTrustedCheckoutUrl(invoice.pageUrl)) {
         throw new Error('Monobank returned invalid invoice details');
       }
+      stage='invoice_save';
       const expiresAt = new Date(Date.now() + VALIDITY_SECONDS * 1000);
       await db.query(
         'INSERT INTO monobank_invoices(order_id,invoice_id,page_url,amount_kop,rate_uah,status,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7)',
@@ -144,6 +166,8 @@ function createMonobank(settings, deps) {
       return reply(res, 200, {pageUrl: invoice.pageUrl, amountKop, currency: 'UAH', usdCents: result.rows[0].total_cents, rate, expiresAt});
     } catch (error) {
       await db.query('ROLLBACK').catch(() => {});
+      error.paymentCode=String(error.code||((error.name==='TimeoutError'||error.name==='AbortError')?'TIMEOUT':'UNAVAILABLE')).replace(/[^A-Z0-9_]/g,'').slice(0,48)||'UNAVAILABLE';
+      await recordFailure(orderId,stage,error.paymentCode,customer.id).catch(()=>console.error('Payment alert persistence failed'));
       throw error;
     } finally { db.release(); }
   }
@@ -192,6 +216,7 @@ function createMonobank(settings, deps) {
         await db.query("INSERT INTO order_events(order_id,event_type) VALUES($1,'monobank_reversed')",[row.order_id]);
         await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'monobank_reversed') ON CONFLICT(order_id,kind) DO NOTHING",[row.order_id]);
       }
+      if(status==='failure'||status==='expired')await recordFailure(row.order_id,'payment_status',status==='failure'?'PAYMENT_DECLINED':'INVOICE_EXPIRED',null,db);
       await db.query('COMMIT');
       return true;
     } catch(error) {
@@ -242,3 +267,4 @@ function createMonobank(settings, deps) {
 }
 
 module.exports = {createMonobank,uahKopiykas,isTrustedCheckoutUrl,verifySignature};
+

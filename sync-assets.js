@@ -46,6 +46,9 @@ async function download(relativePath) {
       'href="/$1.css?v=20261023-centered-no-package"'
     ));
   }
+  if (relativePath.endsWith('.html')) {
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=payment-alerts-20261024"'));
+  }
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);
 }
@@ -54,3 +57,4 @@ async function download(relativePath) {
   console.error(error.message);
   process.exit(1);
 });
+
