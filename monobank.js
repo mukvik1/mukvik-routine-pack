@@ -67,30 +67,31 @@ function createMonobank(settings, deps) {
 
   async function rateUsdUah() {
     if (rateCache && Date.now() < rateCache.until) return rateCache.rate;
-    let data;
-    try {
-      const response = await fetchImpl(NBU, {signal: AbortSignal.timeout(8000)});
-      if (!response.ok) {const error=new Error('NBU rate unavailable');error.code='NBU_HTTP_'+response.status;throw error;}
-      data = await response.json();
-    } catch(primaryError) {
-      // Same official NBU rate, via the alternate published endpoint. No invented FX rate.
+    const sources = [
+      NBU,
+      'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json',
+      'https://bank.gov.ua/NBU_Exchange/exchange?json'
+    ];
+    let lastError;
+    for (const source of sources) {
       try {
-        const response=await fetchImpl('https://bank.gov.ua/NBU_Exchange/exchange?json',{signal:AbortSignal.timeout(8000)});
-        if(!response.ok)throw primaryError;
-        const rows=await response.json();
-        data=Array.isArray(rows)?rows.filter(x=>x.CurrencyCodeL==='USD').map(x=>({cc:'USD',rate:Number(x.Amount)/Number(x.Units),exchangedate:x.StartDate})):[];
-      }catch{throw primaryError;}
+        const response = await fetchImpl(source, {signal: AbortSignal.timeout(8000)});
+        if (!response.ok) throw Object.assign(new Error('NBU rate unavailable'), {code:'NBU_HTTP_'+response.status});
+        const rows = await response.json();
+        const item = Array.isArray(rows) ? rows.find(x => x.cc === 'USD' || x.CurrencyCodeL === 'USD') : null;
+        if (!item) throw Object.assign(new Error('NBU USD rate missing'), {code:'NBU_USD_RATE_MISSING'});
+        const rate = item.cc === 'USD' ? Number(item.rate) : Number(item.Amount) / Number(item.Units);
+        const parts = String(item.exchangedate || item.StartDate || '').split('.');
+        const recorded = parts.length === 3 ? Date.parse(parts[2]+'-'+parts[1]+'-'+parts[0]+'T00:00:00Z') : NaN;
+        if (!Number.isFinite(recorded) || Date.now()-recorded > 7*86400000 || recorded-Date.now() > 86400000) {
+          throw Object.assign(new Error('NBU currency rate date invalid'), {code:'NBU_RATE_DATE_INVALID'});
+        }
+        uahKopiykas(100,rate);
+        rateCache = {rate, until:Date.now()+10*60000};
+        return rate;
+      } catch (error) { lastError = error; }
     }
-    const item = Array.isArray(data) ? data.find(x => x.cc === 'USD') : null;
-    const rate = Number(item?.rate);
-    const parts = String(item?.exchangedate || '').split('.');
-    const recorded = parts.length === 3 ? Date.parse(parts[2] + '-' + parts[1] + '-' + parts[0] + 'T00:00:00Z') : NaN;
-    if (!Number.isFinite(recorded) || Date.now() - recorded > 7 * 86400000 || recorded - Date.now() > 86400000) {
-      throw Object.assign(new Error('NBU currency rate date invalid'),{code:item?'NBU_RATE_DATE_INVALID':'NBU_USD_RATE_MISSING'});
-    }
-    uahKopiykas(100, rate);
-    rateCache = {rate, until: Date.now() + 10 * 60000};
-    return rate;
+    throw lastError;
   }
 
   async function publicKeyForWebhooks(refresh = false) {
