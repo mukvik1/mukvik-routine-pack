@@ -19,10 +19,10 @@ function reply(res, status, data) {
 
 function uahKopiykas(usdCents, rate) {
   if (!Number.isSafeInteger(usdCents) || usdCents <= 0 || !Number.isFinite(rate) || rate < 1 || rate > 1000) {
-    throw new Error('Invalid FX quote');
+    throw Object.assign(new Error('Invalid FX quote'),{code:'FX_RATE_INVALID'});
   }
   const amount = Math.round(usdCents * rate);
-  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid UAH amount');
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw Object.assign(new Error('Invalid UAH amount'),{code:'UAH_AMOUNT_INVALID'});
   return amount;
 }
 
@@ -86,7 +86,7 @@ function createMonobank(settings, deps) {
     const parts = String(item?.exchangedate || '').split('.');
     const recorded = parts.length === 3 ? Date.parse(parts[2] + '-' + parts[1] + '-' + parts[0] + 'T00:00:00Z') : NaN;
     if (!Number.isFinite(recorded) || Date.now() - recorded > 7 * 86400000 || recorded - Date.now() > 86400000) {
-      throw new Error('NBU currency rate date invalid');
+      throw Object.assign(new Error('NBU currency rate date invalid'),{code:item?'NBU_RATE_DATE_INVALID':'NBU_USD_RATE_MISSING'});
     }
     uahKopiykas(100, rate);
     rateCache = {rate, until: Date.now() + 10 * 60000};
@@ -154,7 +154,7 @@ function createMonobank(settings, deps) {
         })
       });
       if (typeof invoice.invoiceId !== 'string' || !/^[a-zA-Z0-9_-]{5,128}$/.test(invoice.invoiceId) || !isTrustedCheckoutUrl(invoice.pageUrl)) {
-        throw new Error('Monobank returned invalid invoice details');
+        throw Object.assign(new Error('Monobank returned invalid invoice details'),{code:typeof invoice?.invoiceId!=='string'?'MONOBANK_INVOICE_ID_MISSING':!isTrustedCheckoutUrl(invoice.pageUrl)?'MONOBANK_CHECKOUT_URL_INVALID':'MONOBANK_INVOICE_ID_INVALID'});
       }
       stage='invoice_save';
       const expiresAt = new Date(Date.now() + VALIDITY_SECONDS * 1000);
@@ -166,7 +166,7 @@ function createMonobank(settings, deps) {
       return reply(res, 200, {pageUrl: invoice.pageUrl, amountKop, currency: 'UAH', usdCents: result.rows[0].total_cents, rate, expiresAt});
     } catch (error) {
       await db.query('ROLLBACK').catch(() => {});
-      error.paymentCode=String(error.code||((error.name==='TimeoutError'||error.name==='AbortError')?'TIMEOUT':'UNAVAILABLE')).replace(/[^A-Z0-9_]/g,'').slice(0,48)||'UNAVAILABLE';
+      error.paymentCode=String(error.code||error.cause?.code||(error.name==='SyntaxError'?'INVALID_JSON':(error.name==='TimeoutError'||error.name==='AbortError')?'TIMEOUT':stage.toUpperCase()+'_UNAVAILABLE')).replace(/[^A-Z0-9_]/g,'').slice(0,48)||'UNAVAILABLE';
       await recordFailure(orderId,stage,error.paymentCode,customer.id).catch(()=>console.error('Payment alert persistence failed'));
       throw error;
     } finally { db.release(); }
