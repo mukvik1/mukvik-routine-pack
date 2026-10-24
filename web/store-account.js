@@ -130,7 +130,7 @@ async function requestMonobankInvoice(orderId){
  const quote=await api('/orders/'+orderId+'/monobank','POST',{acceptDigitalDelivery:true});
  const destination=new URL(quote.pageUrl);
  if(destination.protocol!=='https:'||destination.username||destination.password||destination.port||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(destination.hostname))throw Error(T('Service temporarily unavailable.'));
- location.assign(destination.href);
+ window.top.location.assign(destination.href);
 }
 function productPrice(p){return p.code==='pack'&&user?.welcomePackEligible?3920:p.priceCents;}
 function renderCart(){cartDialog.querySelector('h2').textContent=T('Your cart');cartBody.replaceChildren();

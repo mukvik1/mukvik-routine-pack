@@ -48,14 +48,14 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-seamless-routines"'
+      'href="/$1.css?v=20261024-language-flags"'
     ));
   }
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-seamless-routines"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-language-flags"'));
   }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
@@ -139,10 +139,10 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
   if (relativePath.endsWith('.html')) {
     let html=bytes.toString('utf8');
     if (/^(packs|routines|free|about)\//.test(relativePath)) {
-      if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-all-pages"></head>');
-      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261024-all-pages" defer></script></body>');
+      if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-persistent-background"></head>');
+      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261024-persistent-background" defer></script></body>');
     }
-    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-all-pages');
+    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-persistent-background');
     bytes=Buffer.from(html);
   }
 
@@ -162,6 +162,13 @@ body[data-page="routines"] .coming-grid.individual-grid>.standalone-routine{back
 body[data-page="routines"] .individual-grid>.bundle-card .bundle-price-heading{font-size:.65em;line-height:1.5;font-weight:500}
 `)]);
   }
+
+
+  if (relativePath.endsWith('.html')) {
+    const labels={en:'🇺🇸 ENG',uk:'🇺🇦 УКР',de:'🇩🇪 DEU',es:'🇪🇸 ESP',th:'🇹🇭 THA',id:'🇮🇩 IDN',ar:'🇸🇦 ARA',hi:'🇮🇳 HIN',it:'🇮🇹 ITA','pt-BR':'🇧🇷 POR'};
+    bytes=Buffer.from(bytes.toString('utf8').replace(/(<option\b[^>]*value="([^"]+)"[^>]*>)[^<]*(<\/option>)/g,(all,open,language,close)=>labels[language]?open+labels[language]+close:all));
+  }
+  if (relativePath==='catalog.css') bytes=Buffer.concat([bytes,Buffer.from('\nhtml body .site-header .language-switch select{font-size:12px!important;min-width:92px;letter-spacing:.01em}html body .site-header .language-switch option{font-size:12px}\n')]);
 
   await fs.writeFile(destination, bytes);
   console.log(`Downloaded ${relativePath}`);

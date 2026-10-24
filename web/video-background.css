@@ -22,3 +22,11 @@ body.rp-video-pages .individual-grid>.standalone-routine,body.rp-video-pages .do
 
 /* Let the moving backdrop show through the outer Free catalogue panel. */
 body.rp-video-pages[data-page="free"] .free-catalog{background:rgba(15,18,25,.25)!important;border-color:rgba(112,132,170,.28);box-shadow:none}
+
+/* The persistent parent owns the video; the child owns page UI and its scripts. */
+body.rp-navigation-shell{overflow:hidden!important;height:100dvh}
+body.rp-navigation-shell>.rp-wide-background{position:fixed!important;height:100vh!important;height:100dvh!important}
+body.rp-navigation-shell>:not(.rp-wide-background):not(.rp-content-frame){display:none!important}
+.rp-content-frame{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;border:0;z-index:2;background:transparent;color-scheme:normal}
+html.rp-embedded-page,html.rp-embedded-page body{background:transparent!important}
+html.rp-embedded-page .rp-wide-background,html.rp-embedded-page .rp-hero-background{display:none!important}
