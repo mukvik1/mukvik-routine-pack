@@ -13,5 +13,20 @@
         "name": "TURN DOWN RUT.mp3"
       }
     ]
+  },
+  {
+    "slug": "slick-love-me-again",
+    "title": "SLICK × LOVE ME AGAIN",
+    "videoFileId": "1SUURngvoLSFr9GWeDvqdmWoON868A3id",
+    "audio": [
+      {
+        "fileId": "1VPiPE-mzSkWpQvWTfqsNHetRP0ImS7X3",
+        "name": "SLICK(MUKVIK EDIT).mp3"
+      },
+      {
+        "fileId": "1eX6bSDxju49y3j0MsYjFBNm_YW-57W0e",
+        "name": "John Newman - Love Me Again.mp3"
+      }
+    ]
   }
 ]
