@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const geoAccess = require('./geo-access').createGeoAccess();
 
 const root = path.join(__dirname, 'web');
 const port = process.env.PORT || 3000;
@@ -199,6 +200,7 @@ http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, origin); }
   catch { return json(res, 400, { error: 'Invalid request' }); }
+  if (geoAccess(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/v2/traffic') return analytics.handle(req, res);
   if (commerce && await commerce.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/checkout') return json(res, 410, { error: 'Online checkout is unavailable. Contact MUKVIK to purchase.' });
