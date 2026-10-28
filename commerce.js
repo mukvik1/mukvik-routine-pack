@@ -17,7 +17,8 @@ const CATALOG=Object.freeze({
  routine8:{name:"LEVITATION TO CAN'T STOP X ROMPE",cents:300},
  routine9:{name:'I KNOW YOU WANT ME X CHANDELIER',cents:200},
  routine10:{name:'CALM DOWN X CRAZY IN LOVE',cents:100},
- routine11:{name:'TELL ME WHY X TRUST ME',cents:200}
+ routine11:{name:'TELL ME WHY X TRUST ME',cents:200},
+ routine12:{name:'CALL ME MAYBE X POKER FACE',cents:200}
 });
 const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validEmail=email=>email.length>=5&&email.length<=254&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
