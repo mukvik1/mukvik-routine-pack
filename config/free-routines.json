@@ -28,5 +28,20 @@
         "name": "John Newman - Love Me Again.mp3"
       }
     ]
+  },
+  {
+    "slug": "one-more-time",
+    "title": "ONE MORE TIME",
+    "videoFileId": "1gFP_LcAepKrNeMjxTtybI_9HMTDFIds_",
+    "audio": [
+      {
+        "fileId": "13RHBJRNgUPg0o7W7p1Sus6YHXKCakV_c",
+        "name": "Eddie Johns - More Spell On You.mp3"
+      },
+      {
+        "fileId": "1Yl-3KLRhjvUTsWJkm28msV5b68G7Higc",
+        "name": "Daft Punk - One More Time.mp3"
+      }
+    ]
   }
 ]
