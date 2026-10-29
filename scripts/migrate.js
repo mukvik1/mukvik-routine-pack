@@ -11,6 +11,7 @@ async function main(){
   await client.query(fs.readFileSync(path.join(__dirname,'..','db','001_commerce.sql'),'utf8'));
   await client.query(fs.readFileSync(path.join(__dirname,'..','db','002_monobank.sql'),'utf8'));
   await client.query(fs.readFileSync(path.join(__dirname,'..','db','003_site_traffic.sql'),'utf8'));
+  await client.query(fs.readFileSync(path.join(__dirname,'..','db','004_free_downloads.sql'),'utf8'));
   await client.query('COMMIT');
   process.stdout.write('Commerce schema ready.\n');
  }catch(error){

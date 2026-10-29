@@ -7,7 +7,12 @@ const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
 const freeFiles=require('node:fs');
 const freePath=require('node:path');
-const freeSlugs=new Set(['get-right-x-just-a-lil-bit','work-it-x-candy-shop','rihanna-routine',...require('./config/free-routines.json').map(r=>r.slug)]);
+const freeRoutines=new Map([
+ ['get-right-x-just-a-lil-bit','GET RIGHT × JUST A LIL BIT'],
+ ['work-it-x-candy-shop','WORK IT × CANDY SHOP'],
+ ['rihanna-routine','RIHANNA ROUTINE'],
+ ...require('./config/free-routines.json').map(r=>[r.slug,r.title])
+]);
 const CATALOG=Object.freeze({
  pack:{name:'ROUTINE PACK 1',cents:4900},
  bundle4:{name:'4 ROUTINES BUNDLE',cents:400},
@@ -90,7 +95,7 @@ function createCommerce(settings=process.env,overrides={}){
  async function session(req){
   const match=/^Bearer ([a-zA-Z0-9_-]{40,100})$/.exec(String(req.headers.authorization||''));
   if(!match)return null;
-  const r=await pool.query("SELECT c.id,c.email,c.nickname FROM sessions s JOIN customers c ON c.id=s.customer_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()",[sha(match[1])]);
+  const r=await pool.query("SELECT c.id,c.email,c.nickname,c.email_verified_at FROM sessions s JOIN customers c ON c.id=s.customer_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()",[sha(match[1])]);
   return r.rows[0]||null;
  }
  async function send(to,subject,text,idempotencyKey){
@@ -519,12 +524,18 @@ function createCommerce(settings=process.env,overrides={}){
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
    const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
    if(req.method==='POST'&&freeDownload){
+    if(!user.email_verified_at){response(res,403,{error:'Confirm your email before downloading. Register or reset your password to confirm it.',code:'EMAIL_VERIFICATION_REQUIRED'});return true;}
     const slug=freeDownload[1];
-    if(!freeSlugs.has(slug)){response(res,404,{error:'File unavailable.'});return true;}
+    if(!freeRoutines.has(slug)){response(res,404,{error:'File unavailable.'});return true;}
     const filename=freePath.join(overrides.freeDownloadsRoot||freePath.join(__dirname,'web','downloads'),slug+'.zip');
     let stat;try{stat=await freeFiles.promises.stat(filename);}catch{response(res,503,{error:'File unavailable.'});return true;}
+    if(!stat.isFile()){response(res,503,{error:'File unavailable.'});return true;}
+    // Record delivery before sending bytes; a journal failure must fail closed.
+    const logged=await pool.query('INSERT INTO free_downloads(customer_id,email,routine_slug,routine_name) VALUES($1,$2,$3,$4) RETURNING id',[user.id,user.email,slug,freeRoutines.get(slug)]);
     res.writeHead(200,{'Content-Type':'application/zip','Content-Length':stat.size,'Content-Disposition':'attachment; filename="'+slug+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
-    try{await pipeline(freeFiles.createReadStream(filename),res);}catch{res.destroy();}
+    let deliveryStatus='completed';
+    try{await pipeline(freeFiles.createReadStream(filename),res);}catch{deliveryStatus='interrupted';res.destroy();}
+    await pool.query('UPDATE free_downloads SET status=$2,finished_at=now() WHERE id=$1',[logged.rows[0].id,deliveryStatus]);
     return true;
    }
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/logout'){await logout(req,res);return true;}
@@ -540,6 +551,11 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&monoStatus&&uuidPattern.test(monoStatus[1])&&monobank){await monobank.reconcile(res,monoStatus[1],user);return true;}
    if(url.pathname.startsWith('/api/v2/admin/')){
     if(user.email!==adminEmail){response(res,403,{error:'Admin access required.'});return true;}
+    if(req.method==='GET'&&url.pathname==='/api/v2/admin/free-downloads'){
+     const totals=await pool.query("SELECT email,routine_slug,routine_name,count(*)::int AS downloads,count(*) FILTER(WHERE status='completed')::int AS completed_downloads,max(started_at) AS last_download_at FROM free_downloads GROUP BY email,routine_slug,routine_name ORDER BY last_download_at DESC LIMIT 100");
+     const events=await pool.query('SELECT email,routine_slug,routine_name,started_at,finished_at,status FROM free_downloads ORDER BY id DESC LIMIT 100');
+     response(res,200,{totals:totals.rows,events:events.rows});return true;
+    }
     if(req.method==='GET'&&url.pathname==='/api/v2/admin/orders'){await adminOrders(res);return true;}
     const approveMatch=/^\/api\/v2\/admin\/orders\/([0-9a-f-]{36})\/approve$/.exec(url.pathname);
     if(req.method==='POST'&&approveMatch&&uuidPattern.test(approveMatch[1])){await approve(res,user,approveMatch[1]);return true;}

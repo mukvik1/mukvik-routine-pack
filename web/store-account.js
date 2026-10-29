@@ -4,6 +4,7 @@ await window.RP_I18N.ready;
 const API='https://mukvik-routine-pack-production.up.railway.app';
 const accountMessages={"ar":{"Please wait…":"يرجى الانتظار…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"ادفع بأمان بالهريفنيا. يظهر سعر الصرف والمبلغ النهائي قبل الدفع.","Pay":"ادفع","Order saved. You can pay from your account.":"تم حفظ الطلب. يمكنك الدفع من حسابك."},"hi":{"Please wait…":"कृपया प्रतीक्षा करें…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"UAH में सुरक्षित भुगतान करें। अंतिम विनिमय दर और राशि भुगतान से पहले दिखाई जाती हैं।","Pay":"भुगतान करें","Order saved. You can pay from your account.":"ऑर्डर सहेज लिया गया। आप अपने अकाउंट से भुगतान कर सकते हैं।"},"it":{"Please wait…":"Attendi…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Paga in sicurezza in UAH. Il cambio e l'importo finale sono indicati prima del pagamento.","Pay":"Paga","Order saved. You can pay from your account.":"Ordine salvato. Puoi pagare dal tuo account."},"pt-BR":{"Please wait…":"Aguarde…","Pay securely in UAH. The final exchange rate and amount are shown before payment.":"Pague com segurança em UAH. A taxa de câmbio e o valor final são exibidos antes do pagamento.","Pay":"Pagar","Order saved. You can pay from your account.":"Pedido salvo. Você pode pagar pela sua conta."}};
 const removeLabels={en:'Remove unpaid order',uk:'Видалити неоплачене замовлення',de:'Unbezahlte Bestellung entfernen',es:'Eliminar pedido sin pagar',th:'ลบคำสั่งซื้อที่ยังไม่ได้ชำระเงิน',id:'Hapus pesanan belum dibayar',ar:'إزالة الطلب غير المدفوع',hi:'अवैतनिक ऑर्डर हटाएँ',it:'Rimuovi ordine non pagato','pt-BR':'Remover pedido não pago'};
+accountMessages.uk={...accountMessages.uk,'Free downloads':'Завантаження Free','No downloads yet.':'Завантажень поки немає.','Completed downloads':'Завершені завантаження','Delivery attempts':'Спроби завантаження','Last download':'Останнє завантаження','Latest 100 customer/routine totals':'Останні 100 підсумків за користувачами та рутинами','Confirm your email before downloading. Register or reset your password to confirm it.':'Підтвердіть email перед завантаженням. Зареєструйтеся або відновіть пароль для підтвердження.'};
 for(const [language,label] of Object.entries(removeLabels)){accountMessages[language]??={};accountMessages[language]['Remove unpaid order']=label;}
 const currencyKey='Prices are in USD. Payment is processed in UAH, the store currency (Ukraine). Your bank converts this amount to your card currency at its own rate; fees may apply.';
 accountMessages.uk??={};accountMessages.uk[currencyKey]='Ціни вказані в USD. Оплата здійснюється у гривні — валюті магазину (Україна). Ваш банк конвертує цю суму у валюту картки за власним курсом; можливі комісії.';
@@ -70,6 +71,7 @@ async function downloadFree(slug){
  try{
   const response=await fetch(API+'/api/v2/free/'+encodeURIComponent(slug)+'/download',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
   if(response.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
+  if(response.status===403){const result=await response.json();if(result.code==='EMAIL_VERIFICATION_REQUIRED'){pendingFree=slug;openAuth('register');error.textContent=T(result.error);freeStatus.textContent='';return;}}
   if(!response.ok||!String(response.headers.get('content-type')).startsWith('application/zip'))throw Error(T('Service temporarily unavailable.'));
   const blob=await response.blob(),href=URL.createObjectURL(blob),a=el('a');a.href=href;a.download=slug+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
   freeStatus.textContent=T('Download started. Save the ZIP file.');
@@ -158,6 +160,22 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
   }accountBody.append(block);
  }
  accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
+ if(user.admin){
+  const report=el('div');
+  const load=button('Free downloads',async()=>{
+   load.disabled=true;accountStatus.textContent='';
+   try{
+    const result=await api('/admin/free-downloads');report.replaceChildren(el('h3',T('Free downloads')),el('p',T('Latest 100 customer/routine totals'),'store-muted'));
+    if(!result.totals.length)report.append(el('p',T('No downloads yet.')));
+    for(const row of result.totals){
+     const block=el('section',undefined,'store-order');
+     block.append(el('strong',row.routine_name),el('p',row.email),el('p',T('Completed downloads')+': '+row.completed_downloads+' · '+T('Delivery attempts')+': '+row.downloads),el('p',T('Last download')+': '+new Date(row.last_download_at).toLocaleString(window.RP_I18N.language)));
+     report.append(block);
+    }
+   }catch(e){accountStatus.textContent=e.message;}finally{load.disabled=false;}
+  });
+  accountBody.append(load,report);
+ }
 }
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));

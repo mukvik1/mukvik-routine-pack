@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=currency-note-20261024"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=free-security-20261029"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
