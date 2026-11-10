@@ -19,6 +19,16 @@
       '<div class="rp-plan-offer"><p class="rp-plan-name">STANDARD <span>COMING SOON</span></p><p class="rp-plan-price">$15 <small>/ month</small></p><p>Built for DJs who want more than one routine.</p><ul class="rp-plan-features"><li>Individual routine library</li><li>Video previews for every routine</li><li>MP3 downloads while your membership is active</li></ul>' +
       (home ? '<a href="/routines/#standard-plan">Explore the plan →</a>' : '<span class="rp-plan-pending">Subscription checkout is not open yet.</span>') + '</div></section>';
   }
+  const nav = document.querySelector('.site-header nav');
+  if (nav) {
+    const price = document.createElement('a');
+    price.className = 'rp-price-link';
+    price.href = '/#standard-plan';
+    price.textContent = 'Price';
+    nav.append(price);
+    price.addEventListener('click', () => nav.closest('.site-header')?.classList.remove('menu-open'));
+  }
+
   const hero = document.querySelector('.rp-home .rp-hero');
   if (hero) {
     const actions = hero.querySelector('.rp-actions');
@@ -43,5 +53,13 @@
     } else {
       document.querySelector('main')?.insertAdjacentHTML('beforeend', plan(false));
     }
+  }
+
+  // The plan is inserted by this script, so restore a direct link even when
+  // the browser looked for the fragment before the section existed.
+  if (location.hash === '#standard-plan') {
+    requestAnimationFrame(() => {
+      if (location.hash === '#standard-plan') document.getElementById('standard-plan')?.scrollIntoView();
+    });
   }
 })();
