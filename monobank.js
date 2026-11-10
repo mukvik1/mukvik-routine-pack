@@ -124,7 +124,7 @@ function createMonobank(settings, deps) {
             comment: 'Price in USD. Payment processed in UAH (Ukraine) at '+rate+' UAH/USD. Your bank converts to your card currency; fees may apply.',
             customerEmails: [customer.email]
           },
-          redirectUrl: siteOrigin + '/?monoOrder=' + encodeURIComponent(orderId),
+          redirectUrl: siteOrigin + '/?account=1&orderId=' + encodeURIComponent(orderId),
           webHookUrl: webhookUrl,
           validity: VALIDITY_SECONDS,
           paymentType: 'debit'

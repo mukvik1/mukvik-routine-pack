@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=free-security-20261029"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=account-return-20261110"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -143,6 +143,8 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
       if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261024-persistent-background" defer></script></body>');
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-persistent-background');
+    if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=1"><script defer src="/storefront-refresh.js?v=1"></script></head>');
     bytes=Buffer.from(html);
   }
 

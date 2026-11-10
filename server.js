@@ -216,5 +216,10 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location:'https://routinepack.download/?account=1', 'Cache-Control':'no-store'});
     return res.end();
   }
+  const oldOrder = url.searchParams.get('monoOrder');
+  if (pathname === '/' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(oldOrder || '')) {
+    res.writeHead(302, {Location:'/?account=1&orderId='+encodeURIComponent(oldOrder), 'Cache-Control':'no-store'});
+    return res.end();
+  }
   serveStatic(req, res, pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));
