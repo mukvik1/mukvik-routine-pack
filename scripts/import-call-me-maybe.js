@@ -7,7 +7,7 @@ const exec=promisify(require('node:child_process').execFile);
 const {GoogleAuth}=require('google-auth-library');
 const slug='call-me-maybe-poker-face';
 function prependCard(html,card){
- if(html.includes('data-product-id="routine12"'))return html;
+ if(html.includes('data-detail-href="/routines/call-me-maybe-poker-face/"'))return html;
  const anchor='<div class="coming-grid individual-grid">';
  if(!html.includes(anchor))throw Error('Routine catalogue structure changed.');
  return html.replace(anchor,anchor+card.trim());

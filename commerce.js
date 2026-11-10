@@ -358,7 +358,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function putCart(req,res,user){
   const payload=await body(req);
-  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>Object.keys(CATALOG).length||payload.productCodes.some(code=>typeof code!=='string'||!CATALOG[code]))return response(res,400,{error:'Invalid cart.'});
+  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>code!=='pack'))return response(res,400,{error:'Individual routines are moving to a subscription. Only Routine Pack 1 is available for one-time purchase.'});
   const codes=[...new Set(payload.productCodes)];
   const db=await pool.connect();
   try{
@@ -380,7 +380,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function cart(res,user){
   const r=await pool.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY created_at,product_code',[user.id]);
-  response(res,200,{items:priceProducts(r.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(pool,user.id))});
+  response(res,200,{items:priceProducts(r.rows.filter(x=>x.product_code==='pack').map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(pool,user.id))});
  }
  async function newOrder(req,res,user){
   const payload=await body(req),key=payload.idempotencyKey;
@@ -393,6 +393,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(prior.rowCount){await db.query('COMMIT');return response(res,200,{order:prior.rows[0]});}
    const c=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code FOR UPDATE',[user.id]);
    if(!c.rowCount){await db.query('ROLLBACK');return response(res,400,{error:'Cart is empty.'});}
+   if(c.rows.some(x=>x.product_code!=='pack')){await db.query('ROLLBACK');return response(res,409,{error:'Individual routines are moving to a subscription. Remove them from your cart and try again.'});}
    const products=priceProducts(c.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(db,user.id));
    if(products.some(x=>!Number.isInteger(x.cents))){await db.query('ROLLBACK');return response(res,400,{error:'Invalid product.'});}
    const total=products.reduce((sum,x)=>sum+x.cents,0),orderId=crypto.randomUUID();
@@ -514,7 +515,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&url.pathname==='/api/v2/monobank/webhook'&&monobank){await monobank.webhook(req,res);return true;}
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,packPromotion:packPromotion(),welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:Object.entries(CATALOG).map(([code,p])=>({code,name:p.name,priceCents:p.cents}))});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,packPromotion:packPromotion(),welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}

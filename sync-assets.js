@@ -57,6 +57,14 @@ async function download(relativePath) {
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
   }
+  if (relativePath.startsWith('routines/') && relativePath.endsWith('.html')) {
+    let html = bytes.toString('utf8');
+    html = html.replace(/<(?:article|section) class="bundle-card">[\s\S]*?<\/(?:article|section)>/g, '');
+    html = html.replace(/<section class="cross-sell">[\s\S]*?<\/section>/g, '');
+    html = html.replace(/<div class="(?:routine-offer|bundle-offer|routine-detail-actions)">[\s\S]*?<\/div>/g, '');
+    html = html.replace(/<div class="store-heading">[\s\S]*?<\/div>/g, '');
+    bytes = Buffer.from(html);
+  }
   if(relativePath.endsWith('.html')) {
     bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
   }
@@ -65,8 +73,7 @@ async function download(relativePath) {
   if (relativePath === 'index.html') {
     let html = bytes.toString('utf8');
     html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
-    html = html.replace(/<a class="rp-button rp-button-lime" href="#lessons">[\s\S]*?<\/a>/, '<a class="rp-button rp-button-lime" href="/packs/#previews">Watch Packs</a>');
-    html = html.replace(/<a class="rp-button rp-button-outline" href="\/packs\/">[\s\S]*?<\/a>/, '<a class="rp-button rp-button-outline" href="/routines/">Explore Routines</a>');
+    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#lessons">Get Started →</a></div>');
     bytes = Buffer.from(html);
   }
   if (relativePath === 'packs/index.html') {
@@ -144,7 +151,7 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-persistent-background');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=1"><script defer src="/storefront-refresh.js?v=1"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=2"><script defer src="/storefront-refresh.js?v=2"></script></head>');
     bytes=Buffer.from(html);
   }
 

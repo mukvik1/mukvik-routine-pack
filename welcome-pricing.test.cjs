@@ -29,8 +29,8 @@ function fixture({createdAt='2026-10-20T08:00:00Z',codes=['pack'],existing=[]}={
  const handler=vm.runInNewContext('('+newOrderSource+')',{crypto,pool,CATALOG,uuidPattern:/^[0-9a-f-]{36}$/,body:async req=>req.payload,response:(res,status,data)=>Object.assign(res,{status,data}),welcomeEligible:pricing.welcomeEligible,priceProducts:pricing.priceProducts,telegram:null,monobank:true});
  return {state,async order(key=crypto.randomUUID()){const res={};await handler({payload:{idempotencyKey:key}},res,{id:'customer'});return res;}};
 }
-test('new account gets $39.20 in both order total and pack item; other items stay full price',async()=>{
- const f=fixture({codes:['pack','bundle4']});const result=await f.order();assert.equal(result.status,201);assert.equal(result.data.order.total_cents,4320);assert.equal(f.state.items.find(i=>i.code==='pack').price,3920);assert.equal(f.state.items.find(i=>i.code==='bundle4').price,400);
+test('new account gets $39.20 in both order total and pack item',async()=>{
+ const f=fixture({codes:['pack']});const result=await f.order();assert.equal(result.status,201);assert.equal(result.data.order.total_cents,3920);assert.equal(f.state.items.find(i=>i.code==='pack').price,3920);
 });
 test('existing accounts keep the regular $49 pack price',async()=>{const f=fixture({createdAt:'2026-10-19T00:00:00Z'});assert.equal((await f.order()).data.order.total_cents,4900);});
 test('retrying an idempotency key returns the original discounted order',async()=>{const f=fixture();const key=crypto.randomUUID();await f.order(key);assert.equal((await f.order(key)).data.order.total_cents,3920);assert.equal(f.state.orders.length,1);});
@@ -39,6 +39,11 @@ test('concurrent order requests cannot spend the welcome offer twice',async()=>{
 test('cancelled orders release the offer; refunded purchases do not reset it',async()=>{
  for(const [status,total] of [['cancelled',3920],['refunded',4900],['approved',4900]]){const f=fixture({existing:[{id:'prior',status,total_cents:3920}]});assert.equal((await f.order()).data.order.total_cents,total,status);}
 });
-test('a routine-only order never receives the full-pack welcome discount',async()=>{const f=fixture({codes:['routine3','routine5','routine7','routine8','routine9']});assert.equal((await f.order()).data.order.total_cents,1400);});
-
-test('Calm Down individual order costs exactly $1 and has two delivery files',async()=>{const f=fixture({codes:['routine10']});assert.equal((await f.order()).data.order.total_cents,100);assert.equal(f.state.items[0].code,'routine10');assert.equal(require('./config/additional-product-files.json').routine10.length,2);});
+test('legacy carts with routine items cannot create new one-time orders',async()=>{
+ for(const codes of [['routine10'],['pack','bundle4']]){
+  const f=fixture({codes});const result=await f.order();
+  assert.equal(result.status,409);assert.match(result.data.error,/subscription/);
+  assert.equal(f.state.orders.length,0);
+ }
+ assert.equal(require('./config/additional-product-files.json').routine10.length,2);
+});
