@@ -1,4 +1,5 @@
 .rp-snow{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:1000}
+body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 .rp-snow i{position:absolute;top:-5px;left:var(--x);width:var(--size);height:var(--size);border-radius:50%;background:#fff;opacity:.46;animation:rp-snow-fall var(--time) linear var(--delay) infinite}
 @keyframes rp-snow-fall{to{transform:translate(30px,calc(100vh + 10px))}}
 .rp-software,.rp-start,.rp-author{width:min(1120px,calc(100% - 36px));margin:32px auto;color:#f5f6ff}
@@ -24,4 +25,4 @@
 .rp-get-started{display:inline-flex;align-items:center;padding:12px 20px;border-radius:999px;background:#2657ec;color:white;text-decoration:none;font-weight:700}
 .rp-start-grid a:focus-visible,.rp-get-started:focus-visible,.rp-ticker-toggle:focus-visible{outline:2px solid #adc2ff;outline-offset:3px}
 @media(max-width:600px){.rp-start-grid,.rp-author{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-software{gap:8px;padding:10px}.rp-snow i:nth-child(n+23){display:none}}
-@media(prefers-reduced-motion:reduce){.rp-snow,.rp-ticker-toggle{display:none}.rp-ticker div{animation:none;width:auto}.rp-ticker b{white-space:normal}.rp-ticker b+b{display:none}}
+@media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow,.rp-ticker-toggle{display:none!important}.rp-ticker div{animation:none;width:auto}.rp-ticker b{white-space:normal}.rp-ticker b+b{display:none}}
