@@ -73,7 +73,7 @@ async function download(relativePath) {
   if (relativePath === 'index.html') {
     let html = bytes.toString('utf8');
     html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
-    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#lessons">Get Started →</a></div>');
+    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#lessons">Get Started</a></div>');
     bytes = Buffer.from(html);
   }
   if (relativePath === 'packs/index.html') {
@@ -151,7 +151,7 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-persistent-background');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=2"><script defer src="/storefront-refresh.js?v=3"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=3"><script defer src="/storefront-refresh.js?v=4"></script></head>');
     bytes=Buffer.from(html);
   }
 

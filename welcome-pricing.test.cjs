@@ -26,7 +26,7 @@ function fixture({createdAt='2026-10-20T08:00:00Z',codes=['pack'],existing=[]}={
    throw Error('Unexpected SQL: '+sql);
   }};
  }};
- const handler=vm.runInNewContext('('+newOrderSource+')',{crypto,pool,CATALOG,uuidPattern:/^[0-9a-f-]{36}$/,body:async req=>req.payload,response:(res,status,data)=>Object.assign(res,{status,data}),welcomeEligible:pricing.welcomeEligible,priceProducts:pricing.priceProducts,telegram:null,monobank:true});
+ const handler=vm.runInNewContext('('+newOrderSource+')',{crypto,pool,CATALOG,uuidPattern:/^[0-9a-f-]{36}$/,body:async req=>req.payload,response:(res,status,data)=>Object.assign(res,{status,data}),welcomeEligible:pricing.welcomeEligible,priceProducts:(products,eligible)=>pricing.priceProducts(products,eligible,Date.parse('2026-11-09T12:00:00Z')),telegram:null,monobank:true});
  return {state,async order(key=crypto.randomUUID()){const res={};await handler({payload:{idempotencyKey:key}},res,{id:'customer'});return res;}};
 }
 test('new account gets $39.20 in both order total and pack item',async()=>{
@@ -46,4 +46,11 @@ test('legacy carts with routine items cannot create new one-time orders',async()
   assert.equal(f.state.orders.length,0);
  }
  assert.equal(require('./config/additional-product-files.json').routine10.length,2);
+});
+test('Black Friday pack price starts now, stays $29.99 without a fixed deadline, and never stacks with welcome price',()=>{
+ const pack={code:'pack',cents:4900};
+ assert.equal(pricing.packPromotion(Date.parse('2026-11-09T23:59:59Z')),null);
+ assert.equal(pricing.packPromotion(Date.parse('2026-11-10T00:00:00Z')).priceCents,2999);
+ assert.equal(pricing.packPromotion(Date.parse('2026-12-01T00:00:00Z')).priceCents,2999);
+ assert.equal(pricing.priceProducts([pack],true,Date.parse('2026-11-10T12:00:00Z'))[0].cents,2999);
 });

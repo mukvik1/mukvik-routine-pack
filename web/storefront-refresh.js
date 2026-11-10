@@ -16,16 +16,16 @@
   function plan(home) {
     return '<section class="rp-plan' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
       '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">One plan. Every routine.</h2><p>Explore the individual routines now. Standard membership is being prepared for launch.</p></div>' +
-      '<div class="rp-plan-offer"><p class="rp-plan-name">STANDARD <span>COMING SOON</span></p><p class="rp-plan-price">$15 <small>/ month</small></p><p>Planned access to the individual routine library and audio downloads while your membership is active.</p>' +
+      '<div class="rp-plan-offer"><p class="rp-plan-name">STANDARD <span>COMING SOON</span></p><p class="rp-plan-price">$15 <small>/ month</small></p><p>Built for DJs who want more than one routine.</p><ul class="rp-plan-features"><li>Individual routine library</li><li>Video previews for every routine</li><li>MP3 downloads while your membership is active</li></ul>' +
       (home ? '<a href="/routines/#standard-plan">Explore the plan →</a>' : '<span class="rp-plan-pending">Subscription checkout is not open yet.</span>') + '</div></section>';
   }
   const hero = document.querySelector('.rp-home .rp-hero');
   if (hero) {
     const actions = hero.querySelector('.rp-actions');
-    if (actions) actions.innerHTML = '<a class="rp-get-started" href="#lessons">Get Started →</a>';
+    if (actions) actions.innerHTML = '<a class="rp-get-started" href="#lessons">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
-      ['VirtualDJ', 'virtualdj.svg'], ['TRAKTOR', 'traktor.png'],
+      ['VirtualDJ', 'virtualdj.svg'], ['TRAKTOR', 'traktor.svg'],
       ['djay by Algoriddim', 'djay.png']
     ];
     const logos = () => brands.map(([name, file]) => '<img src="/assets/software/' + file + '" alt="' + name + '" loading="eager" decoding="async">').join('');

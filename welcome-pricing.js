@@ -9,10 +9,9 @@ async function welcomeEligible(db,customerId){
  )) AS welcome_eligible FROM customers c WHERE c.id=$1`,[customerId,WELCOME_START]);
  return result.rows[0]?.welcome_eligible===true;
 }
-const BLACK_FRIDAY_START=Date.parse('2026-11-26T22:00:00Z');
-const BLACK_FRIDAY_END=Date.parse('2026-11-30T22:00:00Z');
+const BLACK_FRIDAY_START=Date.parse('2026-11-10T00:00:00Z');
 function packPromotion(now=Date.now()){
- return now>=BLACK_FRIDAY_START&&now<BLACK_FRIDAY_END?{productCode:'pack',priceCents:2999,label:'Black Friday Special'}:null;
+ return now>=BLACK_FRIDAY_START?{productCode:'pack',priceCents:2999,label:'Black Friday Special'}:null;
 }
 function priceProducts(products,eligible,now=Date.now()){
  const promotion=packPromotion(now);
