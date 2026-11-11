@@ -59,7 +59,7 @@
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
       ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],
-      ['djay by Algoriddim', 'djay-white.svg']
+      ['djay by Algoriddim', 'djay-official.png']
     ];
     const logos = () => brands.map(([name, file]) => '<img src="/assets/software/' + file + '" alt="' + name + '" loading="eager" decoding="async">').join('');
     hero.insertAdjacentHTML('afterend', '<section class="rp-software" aria-label="DJ software: rekordbox, Serato, VirtualDJ, Traktor and djay by Algoriddim"><div class="rp-ticker"><div class="rp-logo-group">' + logos() + '</div><div class="rp-logo-group" aria-hidden="true">' + logos() + '</div></div></section>');

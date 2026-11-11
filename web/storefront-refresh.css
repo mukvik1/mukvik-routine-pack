@@ -7,7 +7,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 .rp-ticker{display:flex;width:100%}
 .rp-logo-group{display:flex;align-items:center;gap:clamp(40px,5vw,64px);padding-right:clamp(40px,5vw,64px);box-sizing:border-box;flex:0 0 auto;min-width:100%;justify-content:space-between;animation:rp-ticker 25s linear infinite}
 .rp-logo-group img{display:block;max-width:170px;width:auto;height:39px;object-fit:contain;flex:none;filter:brightness(0) invert(1)}
-.rp-logo-group img[src$="djay-white.svg"]{height:44px}
+.rp-logo-group img[src$="djay-official.png"]{height:44px;filter:grayscale(1)}
 .rp-logo-group img[src$="traktor.svg"]{height:32px;max-width:180px}
 .rp-logo-group img[src$="virtualdj-white.svg"]{height:38px}
 @keyframes rp-ticker{from{transform:translate3d(0,0,0)}to{transform:translate3d(-100%,0,0)}}
@@ -41,7 +41,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-get-started:focus-visible,.rp-plan a:focus-visible{outline:2px solid #adc2ff;outline-offset:4px}
 
-@media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay-white.svg"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
+@media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay-official.png"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
 @media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow{display:none!important}.rp-ticker{animation:none;width:auto;overflow-x:auto}.rp-logo-group{animation:none}.rp-logo-group:nth-child(2){display:none}}
 .rp-standard-actions,.rp-standard-download{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
 .rp-standard-cta{display:grid;gap:10px;margin-top:12px}
