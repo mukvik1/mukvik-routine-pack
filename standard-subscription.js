@@ -197,19 +197,23 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     });
     return reply(res, 200, { ok: true });
   }
-  async function ticket(res, user, slug) {
-    if (!entries.has(slug)) return reply(res, 404, { error: 'Routine not found.' });
+  function fullVideo(slug) {
+    if (!/^routine-0[1-6]$/.test(slug)) return null;
+    return entries.get(slug)?.find(file=>/\.mp4$/i.test(file.name))||null;
+  }
+  async function ticket(res, user, slug, media = false) {
+    if (!entries.has(slug) || (media&&!fullVideo(slug))) return reply(res, 404, { error: 'Routine not found.' });
     const secret = random();
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
-      SELECT $1,$2,$3,now()+interval '60 seconds'
+      SELECT $1,$2,$3,now()+($6::integer*interval '1 second')
       WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[]))) RETURNING token_hash`,
-    [sha(secret), user.id, slug, allowedTiers(slug), Boolean(adminEmail && user.email===adminEmail && user.email_verified_at)]);
+    [sha(secret), user.id, media?'video:'+slug:slug, allowedTiers(slug), Boolean(adminEmail && user.email===adminEmail && user.email_verified_at), media?1800:60]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
-    return reply(res, 200, { url: '/api/v2/standard/download/' + secret });
+    return reply(res, 200, { url: '/api/v2/standard/'+(media?'video/':'download/')+secret });
   }
   async function download(res, secret) {
     if (!secretPattern.test(secret)) return reply(res, 404, { error: 'Not found.' });
-    const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now()
+    const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now() AND t.routine_slug NOT LIKE 'video:%'
       AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND c.email=$3 AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
         AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
@@ -242,10 +246,51 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     zip.end();
     try { await pipeline(zip.outputStream, res); } catch { res.destroy(); }
   }
+  async function video(req, res, secret) {
+    if (!secretPattern.test(secret)) return reply(res,404,{error:'Not found.'});
+    const range = req.headers.range;
+    if (range && !/^bytes=(?:[0-9]{1,15}-[0-9]{0,15}|-[0-9]{1,15})$/.test(range)) {
+      return reply(res,416,{error:'Invalid video range.'});
+    }
+    // Video tickets can serve multiple byte ranges, but each request rechecks access.
+    const r = await pool.query(`SELECT substring(t.routine_slug from 7) AS slug
+      FROM standard_download_tickets t
+      WHERE t.token_hash=$1 AND t.expires_at>now() AND t.routine_slug LIKE 'video:%'
+      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND c.email=$3 AND c.email_verified_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
+          AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (substring(t.routine_slug from 7)=ANY($2::text[]))))))`,
+    [sha(secret),PRO_SLUGS,adminEmail||null]);
+    const file = r.rows[0] && fullVideo(r.rows[0].slug);
+    if (!file) return reply(res,404,{error:'Video unavailable.'});
+    const accessToken=await getDriveToken();
+    if(!accessToken)throw Error('Drive authorization unavailable');
+    const abort = new AbortController();
+    res.once('close',()=>abort.abort());
+    const upstream = await driveFetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(file.fileId)+'?alt=media',{
+      method:req.method,
+      headers:{Authorization:'Bearer '+accessToken,...(range?{Range:range}:{})},
+      signal:abort.signal,redirect:'error'
+    });
+    if(upstream.status===416){
+      const total=upstream.headers.get('content-range');
+      if(total&&/^bytes \*\/[0-9]+$/.test(total))res.setHeader('Content-Range',total);
+      await upstream.body?.cancel();return reply(res,416,{error:'Video range unavailable.'});
+    }
+    if(![200,206].includes(upstream.status)||(!upstream.body&&req.method!=='HEAD')){
+      await upstream.body?.cancel();return reply(res,502,{error:'Video temporarily unavailable.'});
+    }
+    const headers={'Content-Type':'video/mp4','Cache-Control':'private, no-store','Accept-Ranges':'bytes','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
+    for(const name of ['content-length','content-range']){
+      const value=upstream.headers.get(name);if(value)headers[name]=value;
+    }
+    res.writeHead(upstream.status,headers);
+    if(req.method==='HEAD')return res.end();
+    try{await pipeline(Readable.fromWeb(upstream.body),res);}catch{res.destroy();}
+  }
   function cleanup() {
     return pool.query('DELETE FROM standard_download_tickets WHERE expires_at <= now()');
   }
-  return { status, checkout, cancel, callback, ticket, download, cleanup, catalog: {
+  return { status, checkout, cancel, callback, ticket, download, video, cleanup, catalog: {
     slugs: [...entries.keys()],
     proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))

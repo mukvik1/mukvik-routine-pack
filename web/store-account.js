@@ -10,7 +10,7 @@ const currencyKey='Prices are in USD. Payment is processed in UAH, the store cur
 accountMessages.uk??={};accountMessages.uk[currencyKey]='Ціни вказані в USD. Оплата здійснюється у гривні — валюті магазину (Україна). Ваш банк конвертує цю суму у валюту картки за власним курсом; можливі комісії.';
 const T=k=>accountMessages[window.RP_I18N.language]?.[k]||window.RP_I18N.t(k),money=n=>new Intl.NumberFormat(window.RP_I18N.language,{style:'currency',currency:'USD'}).format(n/100);
 const read=k=>{try{return localStorage.getItem(k);}catch{return null;}},write=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}};
-let publicStandardPlan=null,standardPlan=null,standardAccess=null,subscriptionOnly=false,standardGeneration=0;
+let publicStandardPlan=null,standardPlan=null,standardAccess=null,subscriptionOnly=false,standardGeneration=0,videoGeneration=0;
 let token=read('mukvik_store_session'),user=null,catalog=[],cart=[],pendingCheckout=false,challenge=null,mode='login',providers={};
 const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
@@ -241,8 +241,16 @@ async function refreshStandard(force=false){
  }catch{if(generation===standardGeneration)standardAccess=null;}
 }
 function renderStandard(){
+ const playbackEpoch=++videoGeneration;
+ const player=document.querySelector('.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
+ const restorePreview=()=>{
+  if(player?.dataset.blurredSrc&&player.getAttribute('src')!==player.dataset.blurredSrc){
+   player.pause();player.src=player.dataset.blurredSrc;player.load();delete player.dataset.fullVideo;
+  }
+ };
  document.querySelectorAll('[data-standard-download]').forEach(n=>n.remove());
  if(!standardPlan){
+  restorePreview();
   document.querySelectorAll('[data-standard-cta]').forEach(n=>n.remove());
   for(const offer of document.querySelectorAll('.rp-plan-offer')){
    const name=offer.querySelector('.rp-plan-name');
@@ -305,7 +313,7 @@ function renderStandard(){
   offer.append(panel);
  }
  const adminAudit=user?.canAuditRoutineDownloads===true;
- if(!user||(!adminAudit&&(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())))return;
+ if(!user||(!adminAudit&&(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now()))){restorePreview();return;}
  const available=new Set(standardPlan.slugs.filter(slug=>adminAudit||standardAccess?.tier!=='standard'||!proSlugs.has(slug)));
  function appendDownload(host,slug){
   if(!host||!available.has(slug))return;
@@ -324,6 +332,20 @@ function renderStandard(){
  }
  const slug=/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
  if(slug)appendDownload(document.querySelector('[data-routine-actions]'),slug);
+ if(player&&slug&&available.has(slug)&&/^routine-0[1-6]$/.test(slug)){
+  if(!player.dataset.blurredSrc)player.dataset.blurredSrc=player.getAttribute('src');
+  if(!player.dataset.fullVideo){
+   api('/standard/routines/'+encodeURIComponent(slug)+'/video-ticket','POST',{}).then(result=>{
+    if(playbackEpoch!==videoGeneration||!player.isConnected)return;
+    const url=new URL(result.url,API);
+    if(url.origin!==API||!/^\/api\/v2\/standard\/video\/[\w-]{43}$/.test(url.pathname))return;
+    const playing=!player.paused;
+    player.dataset.fullVideo='true';
+    player.src=url.href;
+    if(playing)player.play().catch(()=>{});
+   }).catch(()=>{});
+  }
+ }else restorePreview();
 }
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));

@@ -528,6 +528,9 @@ function createCommerce(settings=process.env,overrides={}){
     if(req.method==='POST'&&callback){req.resume();await standard.callback(res,callback[1]);return true;}
     const download=/^\/api\/v2\/standard\/download\/([\w-]{43})$/.exec(url.pathname);
     if(req.method==='GET'&&download){await standard.download(res,download[1]);return true;}
+    const media=/^\/api\/v2\/standard\/video\/([\w-]{43})$/.exec(url.pathname);
+    if((req.method==='GET'||req.method==='HEAD')&&media){await standard.video(req,res,media[1]);return true;}
+
    }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
@@ -551,6 +554,9 @@ function createCommerce(settings=process.env,overrides={}){
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
     const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
     if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}
+    const media=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/video-ticket$/.exec(url.pathname);
+    if(req.method==='POST'&&media){await standard.ticket(res,user,media[1],true);return true;}
+
    }
    if(subscriptionOnly&&req.method==='POST'&&(url.pathname==='/api/v2/orders'||/^\/api\/v2\/orders\/[a-f0-9-]+\/monobank$/.test(url.pathname))){
     response(res,410,{error:'New one-time purchases are closed. Choose Standard to access the routine library.'});return true;
