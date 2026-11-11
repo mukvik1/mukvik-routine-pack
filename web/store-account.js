@@ -178,7 +178,7 @@ async function openRequestedAccount(){
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'));
  if(standardPlan){
   const section=el('section',undefined,'store-order');
-  section.append(el('h3','Standard subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
+  section.append(el('h3',standardAccess?.tier==='pro'?'Pro subscription':'Standard subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
   if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
   if(standardAccess?.cancellable){
    const cancel=button('Cancel auto-renewal',async()=>{
@@ -247,20 +247,39 @@ function renderStandard(){
   }
   return;
  }
+ const proSlugs=new Set(standardPlan.proSlugs||[]);
+ const listedSlugs=new Set(standardPlan.slugs);
+ for(const card of document.querySelectorAll('[data-standard-pack-card],.coming-grid.individual-grid article')){
+  if(card.querySelector('.rp-routine-tier'))continue;
+  const detail=card.querySelector('a.routine-detail-link[href],a[href^="/routines/"]');
+  const slug=card.dataset.standardPackCard || (detail && /^\/routines\/([a-z0-9-]+)\/$/.exec(new URL(detail.href).pathname)?.[1]);
+  if(!listedSlugs.has(slug))continue;
+  const tier=proSlugs.has(slug)?'pro':'standard';
+  card.classList.add('rp-tiered-routine');
+  const badge=el('span',tier==='pro'?'Pro':'Standard','rp-routine-tier rp-routine-tier-'+tier);
+  card.prepend(badge);
+ }
  for(const offer of document.querySelectorAll('.rp-plan-offer')){
+  const tier=offer.dataset.planTier||'standard';
+  const plan=standardPlan.plans?.[tier];
+  if(!plan){const pending=offer.querySelector('.rp-plan-pending');if(pending)pending.textContent='This plan is not available yet.';continue;}
   offer.querySelector('.rp-plan-name span')?.remove();
   const benefit=offer.querySelector('.rp-plan-features li:last-child');
   if(benefit)benefit.textContent='MP3 downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-  if(copy)copy.textContent='Listen to the previews and download individual routines with Standard.';
+  if(copy)copy.textContent='Listen to the previews. Choose Standard for the essentials or Pro for the full library.';
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
-  if(standardAccess?.active){panel.append(el('p','Your Standard downloads are available.'),button('Manage subscription',()=>{renderAccount();show(account);}));}
+  if(standardAccess?.active){
+   const currentTier=standardAccess.tier;
+   const current=currentTier===tier||(currentTier==='legacy'&&tier==='standard');
+   panel.append(el('p',current?'Your downloads are available.':'Choose another plan after your current paid period ends.'),button('Manage subscription',()=>{renderAccount();show(account);}));
+  }
   else {
-   const amount=new Intl.NumberFormat('en-UA',{style:'currency',currency:'UAH'}).format(standardPlan.amountKop/100);
+   const amount=new Intl.NumberFormat('en-UA',{style:'currency',currency:'UAH'}).format(plan.amountKop/100);
    const note=el('p',amount+' charged today and every month until cancelled. Your bank may convert this amount into your card currency.');
    const consent=el('input');consent.type='checkbox';
    const label=el('label');label.append(consent,document.createTextNode(' I agree to the monthly charge and the '));
@@ -271,7 +290,7 @@ function renderStandard(){
     if(!consent.checked){feedback.textContent='Confirm the monthly payment before continuing.';return;}
     start.disabled=true;
     try{
-     const result=await api('/standard/checkout','POST',{consent:true});
+     const result=await api('/standard/checkout','POST',{consent:true,tier});
      const url=new URL(result.checkoutUrl);
      if(url.protocol!=='https:'||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(url.hostname)||url.username||url.password)throw Error('Unexpected checkout link.');
      window.top.location.assign(url.href);
@@ -282,7 +301,7 @@ function renderStandard(){
   offer.append(panel);
  }
  if(!user||!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return;
- const available=new Set(standardPlan.slugs);
+ const available=new Set(standardPlan.slugs.filter(slug=>standardAccess.tier!=='standard'||!proSlugs.has(slug)));
  function appendDownload(host,slug){
   if(!host||!available.has(slug))return;
   const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';

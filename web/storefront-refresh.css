@@ -51,3 +51,11 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 
 .rp-plan .rp-standard-cta .store-button.primary{background:#2657ec;border-color:#2657ec;color:#fff}
 .site-header [data-cart][hidden],main a[hidden]{display:none!important}
+
+.rp-plan-tiers{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:stretch}
+.rp-plan-tiers>.rp-plan-copy{grid-column:1/-1;text-align:center}
+.rp-plan-tiers>.rp-plan-copy>p:last-child{margin-inline:auto}
+body[data-page="routines"] .coming-grid.individual-grid>article.rp-tiered-routine{position:relative;padding-top:48px!important}
+.rp-routine-tier{position:absolute;top:12px;right:12px;border-radius:999px;padding:5px 10px;border:1px solid #688efa;background:#19264d;color:#d5e0ff;font-weight:800;font-size:.72rem;letter-spacing:.04em}
+.rp-routine-tier-pro{background:#2657ec;border-color:#2657ec;color:#fff}
+@media(max-width:700px){.rp-plan-tiers{grid-template-columns:minmax(0,1fr)}}

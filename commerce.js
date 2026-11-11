@@ -547,7 +547,7 @@ function createCommerce(settings=process.env,overrides={}){
     if(!standard){response(res,503,{error:'Standard is not configured on this service.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard/plan'){response(res,200,{...standard.catalog,pilot:!standardPublic});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'));return true;}
-    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){await standard.checkout(res,user,(await body(req))?.consent);return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){const request=await body(req);await standard.checkout(res,user,request?.consent,request?.tier);return true;}
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
     const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
     if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}

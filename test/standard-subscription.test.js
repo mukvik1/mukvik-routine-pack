@@ -11,7 +11,7 @@ const pack = [{ fileId:'test_track_001', name:'Edit.mp3' },{ fileId:'test_video_
 const packManifest = [{slug:'routine-01',files:pack.slice(0,2).map(f=>({name:f.name,key:crypto.createHash('sha256').update(f.fileId).digest('hex')}))}];
 const files = { pack, ...Object.fromEntries([3,5,7,8,9,10,11,12].map(n=>['routine'+n,[{fileId:'other_routine_'+n,name:'Other.mp3'}]])) };
 const reply = (res,status,data) => Object.assign(res,{status,data});
-const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:69000,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
+const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:row.amount_kop,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
 
 function setup(){
  const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null };
@@ -20,8 +20,8 @@ function setup(){
   if(sql.startsWith('SELECT * FROM standard_subscriptions'))return {rows:state.row?[state.row]:[]};
   if(sql.startsWith('SELECT id,customer_id'))return {rows:state.row?.callback_hash===p[0]?[state.row]:[]};
   if(sql.startsWith('INSERT INTO standard_subscriptions')){
-   const [id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at]=p;
-   state.row={id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at};
+   const [id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at,tier]=p;
+   state.row={id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at,tier};
    return {rows:[]};
   }
   if(sql.startsWith('UPDATE standard_subscriptions SET paid_until')){
@@ -32,11 +32,12 @@ function setup(){
    state.row.cancelled_at=new Date();return {rows:[]};
   }
   if(sql.startsWith('INSERT INTO standard_download_tickets')){
-   if(!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date()))return {rowCount:0};
+   if(!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.tier)))return {rowCount:0};
    state.tickets.set(p[0],p[2]);return {rowCount:1};
   }
   if(sql.startsWith('DELETE FROM standard_download_tickets AS t')){
    const slug=state.tickets.get(p[0]);
+   if(state.row?.tier==='standard'&&p[1].includes(slug))return {rowCount:0};
    if(!slug||!(state.row?.paid_until>new Date()))return {rowCount:0};
    state.tickets.delete(p[0]);return {rowCount:1,rows:[{routine_slug:slug}]};
   }
@@ -102,4 +103,21 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  assert.ok(!zip.includes(Buffer.from('Bonus.mp3')));
  assert.equal(state.events.length,2);
  const replay={};await s.download(replay,token);assert.equal(replay.status,410);
+});
+
+test('Pro has its own billing amount and four exclusives; Standard cannot issue a Pro download',async()=>{
+ const pro=setup();
+ await pro.subscription.checkout({},user,true,'pro');
+ assert.equal(pro.state.requests[0].payload.amount,115000);
+ const callback=pro.state.requests[0].payload.webHookUrls.chargeUrl.split('/').at(-1);
+ pro.state.bankData={...bank(pro.state.row),summary:{totalPaid:1,totalFailed:0}};
+ await pro.subscription.callback({},callback);
+ const ticket={};await pro.subscription.ticket(ticket,user,'call-me-maybe-poker-face');assert.equal(ticket.status,200);
+ const standard=setup();
+ await standard.subscription.checkout({},user,true,'standard');
+ standard.state.bankData={...bank(standard.state.row),summary:{totalPaid:1,totalFailed:0}};
+ await standard.subscription.callback({},standard.state.requests[0].payload.webHookUrls.chargeUrl.split('/').at(-1));
+ const denied={};await standard.subscription.ticket(denied,user,'call-me-maybe-poker-face');assert.equal(denied.status,403);
+ standard.state.row.tier='legacy';
+ const retained={};await standard.subscription.ticket(retained,user,'call-me-maybe-poker-face');assert.equal(retained.status,200);
 });

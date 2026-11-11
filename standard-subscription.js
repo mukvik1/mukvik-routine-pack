@@ -6,8 +6,9 @@ const { pipeline } = require('node:stream/promises');
 const { USD_UAH_RATE, uahKopiykas, isTrustedCheckoutUrl } = require('./monobank');
 const manifest = require('./config/standard-pack-files.json');
 
-const PRICE_CENTS = 1500;
-const AMOUNT_KOP = uahKopiykas(PRICE_CENTS, USD_UAH_RATE);
+const PLAN_CENTS = Object.freeze({standard:1500,pro:2500});
+const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
+const allowedTiers = slug => PRO_SLUGS.includes(slug) ? ['legacy','pro'] : ['legacy','standard','pro'];
 const VALIDITY = 3600;
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 const random = () => crypto.randomBytes(32).toString('base64url');
@@ -134,17 +135,21 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     return reply(res, 200, {
       active: Boolean(row?.paid_until && +new Date(row.paid_until) > Date.now()),
       paidUntil: row?.paid_until || null,
+      tier: row?.tier || null,
       cancellable: Boolean(row && !row.cancelled_at),
       pending: Boolean(row && !row.cancelled_at && !row.paid_until),
       cancelled: Boolean(row?.cancelled_at)
     });
   }
-  async function checkout(res, user, consent) {
+  async function checkout(res, user, consent, tier = 'standard') {
+    if (!Object.hasOwn(PLAN_CENTS, tier)) return reply(res, 400, {error:'Choose Standard or Pro.'});
+    const amount = uahKopiykas(PLAN_CENTS[tier], USD_UAH_RATE);
     if (consent !== true || !user.email_verified_at) return reply(res, 400, { error: 'Verify your email and confirm the recurring payment terms.' });
     const result = await locked(user.id, async db => {
       let row = await latest(db, user.id);
       if (row && !row.cancelled_at) {
         if (!row.paid_until && +new Date(row.checkout_expires_at) > Date.now() && (!row.provider_status || ['created','pending'].includes(row.provider_status))) {
+          if ((row.tier || 'legacy') !== tier) return {status:409,data:{error:'Cancel the pending subscription in your account before selecting another plan.'}};
           return { status: 200, data: { checkoutUrl: row.checkout_url } };
         }
         row = await reconcile(db, row);
@@ -156,7 +161,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
       const id = crypto.randomUUID(), callback = random(), started = new Date();
       const callbackUrl = publicOrigin.origin + '/api/v2/standard/callback/' + callback;
       const created = await api('create', {
-        amount: AMOUNT_KOP, ccy: 980, interval: '1m', validity: VALIDITY,
+        amount, ccy: 980, interval: '1m', validity: VALIDITY,
         redirectUrl: webOrigin.origin + '/routines/?subscription=return#standard-plan',
         webHookUrls: { chargeUrl: callbackUrl, statusUrl: callbackUrl }
       }, 'POST');
@@ -164,9 +169,9 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
         throw Object.assign(Error('Invalid subscription checkout response'), { code: 'STANDARD_CHECKOUT_INVALID' });
       }
       await db.query(`INSERT INTO standard_subscriptions
-        (id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, user.id, created.subscriptionId, sha(callback), created.pageUrl, AMOUNT_KOP, started, new Date(+started + VALIDITY * 1000)]);
+        (id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at,tier)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, user.id, created.subscriptionId, sha(callback), created.pageUrl, amount, started, new Date(+started + VALIDITY * 1000), tier]);
       return { status: 201, data: { checkoutUrl: created.pageUrl } };
     });
     return reply(res, result.status, result.data);
@@ -197,16 +202,17 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const secret = random();
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
       SELECT $1,$2,$3,now()+interval '60 seconds'
-      WHERE EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now()) RETURNING token_hash`,
-    [sha(secret), user.id, slug]);
+      WHERE EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[])) RETURNING token_hash`,
+    [sha(secret), user.id, slug, allowedTiers(slug)]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/download/' + secret });
   }
   async function download(res, secret) {
     if (!secretPattern.test(secret)) return reply(res, 404, { error: 'Not found.' });
     const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now()
-      AND EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now())
-      RETURNING routine_slug`, [sha(secret)]);
+      AND EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
+        AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[])))))
+      RETURNING routine_slug`, [sha(secret),PRO_SLUGS]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
     const slug = r.rows[0].routine_slug, list = entries.get(slug);
     if (!list) return reply(res, 404, { error: 'Routine not found.' });
@@ -238,6 +244,10 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   function cleanup() {
     return pool.query('DELETE FROM standard_download_tickets WHERE expires_at <= now()');
   }
-  return { status, checkout, cancel, callback, ticket, download, cleanup, catalog: { priceCents: PRICE_CENTS, amountKop: AMOUNT_KOP, slugs: [...entries.keys()] } };
+  return { status, checkout, cancel, callback, ticket, download, cleanup, catalog: {
+    slugs: [...entries.keys()],
+    proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
+    plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
+  } };
 }
 module.exports = { createStandard, catalogFiles, interpretStatus, paidThrough };

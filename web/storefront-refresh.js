@@ -14,10 +14,17 @@
   }
 
   function plan(home) {
-    return '<section class="rp-plan' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
-      '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">One plan. Every routine.</h2><p>Preview the routines below. Standard gives you access to individual downloads.</p></div>' +
-      '<div class="rp-plan-offer"><p class="rp-plan-name">STANDARD <span>COMING SOON</span></p><p class="rp-plan-price">$15 <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>Built for DJs who want more than one routine.</p><ul class="rp-plan-features"><li>Individual routine library</li><li>Video previews for every routine</li><li>MP3 downloads with an active subscription</li></ul>' +
-      (home ? '<a href="/routines/#standard-plan">Explore the plan →</a>' : '<span class="rp-plan-pending">Subscription checkout is not open yet.</span>') + '</div></section>';
+    const offer = (tier, name, price, description) =>
+      '<div class="rp-plan-offer" data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p>' +
+      '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
+      '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Standard routines plus 4 Pro routines' : '10 Standard routines') +
+      '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
+      '<span class="rp-plan-pending">Checking availability…</span></div>';
+    return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
+      '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">Choose your plan.</h2>' +
+      '<p>Preview the routines and choose the downloads you want.</p></div>' +
+      offer('standard','Standard',15,'The essentials for your next set.') +
+      offer('pro','Pro',25,'The full library, including Pro exclusives.') + '</section>';
   }
   const nav = document.querySelector('.site-header nav');
   if (nav) {
