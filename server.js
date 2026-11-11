@@ -2,6 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createGzip } = require('node:zlib');
+const { pipeline } = require('node:stream');
 const geoAccess = require('./geo-access').createGeoAccess();
 const routinePaths = require('./config/routine-paths.json');
 const namedRoutines = new Map(routinePaths.map(routine => [routine.slug, routine.id]));
@@ -172,7 +174,13 @@ function serveStatic(req, res, pathname) {
     if (error || !stat.isFile()) return json(res, 404, { error: 'Not found' });
     const size = stat.size;
     const contentType = types[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-    const headers = { 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=300', 'Content-Type': contentType, 'X-Content-Type-Options': 'nosniff' };
+    const isHtml = contentType.startsWith('text/html');
+    const compressible = size >= 1024 && /^(?:text\/|image\/svg\+xml)/.test(contentType);
+    const etag = `W/"${size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
+    const headers = { 'Accept-Ranges': 'bytes', 'Cache-Control': isHtml ? 'public, no-cache' : relativePath.startsWith('assets/') ? 'public, max-age=3600' : 'public, max-age=300', 'Content-Type': contentType, 'X-Content-Type-Options': 'nosniff', ETag: etag };
+    if (compressible) headers.Vary = [res.getHeader('Vary'), 'Accept-Encoding'].filter(Boolean).join(', ');
+    const validators = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim().replace(/^W\//, ''));
+    if (validators.includes('*') || validators.includes(etag.slice(2))) return res.writeHead(304, headers).end();
     const range = req.headers.range;
     if (range) {
       const match = /^bytes=(\d*)-(\d*)$/.exec(range);
@@ -181,10 +189,18 @@ function serveStatic(req, res, pathname) {
       const end = match[2] && match[1] ? Math.min(Number(match[2]), size - 1) : size - 1;
       if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return res.writeHead(416, { ...headers, 'Content-Range': `bytes */${size}` }).end();
       res.writeHead(206, { ...headers, 'Content-Length': end - start + 1, 'Content-Range': `bytes ${start}-${end}/${size}` });
-      return fs.createReadStream(filePath, { start, end }).pipe(res);
+      if (req.method === 'HEAD') return res.end();
+      return pipeline(fs.createReadStream(filePath, { start, end }), res, () => {});
     }
-    res.writeHead(200, { ...headers, 'Content-Length': size });
-    fs.createReadStream(filePath).pipe(res);
+    const gzip = compressible && String(req.headers['accept-encoding'] || '').split(',').some(value => {
+      const [name, quality] = value.trim().toLowerCase().split(/\s*;\s*/, 2);
+      return name === 'gzip' && (!quality || /^q=(?:0?\.\d*[1-9]\d*|1(?:\.0*)?)$/.test(quality));
+    });
+    res.writeHead(200, gzip ? { ...headers, 'Content-Encoding': 'gzip' } : { ...headers, 'Content-Length': size });
+    if (req.method === 'HEAD') return res.end();
+    const stream = fs.createReadStream(filePath);
+    if (gzip) return pipeline(stream, createGzip({ level: 4 }), res, () => {});
+    pipeline(stream, res, () => {});
   });
 }
 

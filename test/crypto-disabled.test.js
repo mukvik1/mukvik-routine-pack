@@ -29,6 +29,22 @@ test('legacy invoice creation disabled; historical status routes remain',async()
   assert.equal(callback.status,401);
   const staticPage=await fetch('http://127.0.0.1:'+port+'/');
   assert.equal(staticPage.status,200);
+  const cssUrl='http://127.0.0.1:'+port+'/storefront-refresh.css';
+  const compressed=await fetch(cssUrl,{headers:{'Accept-Encoding':'gzip'}});
+  assert.equal(compressed.headers.get('content-encoding'),'gzip');
+  assert.match(compressed.headers.get('vary'),/Accept-Encoding/i);
+  assert.match(await compressed.text(),/\.rp-ticker/);
+  const cached=await fetch(cssUrl,{headers:{'If-None-Match':compressed.headers.get('etag')}});
+  assert.equal(cached.status,304);
+  const partial=await fetch(cssUrl,{headers:{Range:'bytes=0-15','Accept-Encoding':'gzip'}});
+  assert.equal(partial.status,206);
+  assert.equal(partial.headers.get('content-encoding'),null);
+  assert.equal((await partial.arrayBuffer()).byteLength,16);
+  const head=await fetch(cssUrl,{method:'HEAD',headers:{'Accept-Encoding':'gzip;q=0'}});
+  assert.equal(head.status,200);
+  assert.equal(head.headers.get('content-encoding'),null);
+  assert.ok(Number(head.headers.get('content-length'))>16);
+  assert.equal((await head.arrayBuffer()).byteLength,0);
  }finally{
   child.kill();
   await new Promise(resolve=>child.once('exit',resolve));
