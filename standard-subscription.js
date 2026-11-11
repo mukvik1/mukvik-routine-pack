@@ -5,6 +5,18 @@ const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { USD_UAH_RATE, uahKopiykas, isTrustedCheckoutUrl } = require('./monobank');
 const manifest = require('./config/standard-pack-files.json');
+const routinePaths = require('./config/routine-paths.json');
+const routineNames = new Map([
+  ...routinePaths.map(routine => [routine.id, routine.title]),
+  ['call-me-maybe-poker-face','Call Me Maybe x Poker Face'],
+  ['tell-me-why-trust-me','Tell Me Why x Trust Me'],
+  ['calm-down-crazy-in-love','Calm Down x Crazy in Love'],
+  ['yeah-la-vida-es-un-carnaval','Yeah x La Vida Es Un Carnaval'],
+  ['not-like-us-candy-shop','Not Like Us x Candy Shop'],
+  ['macarena-candy-shop','Macarena x Candy Shop'],
+  ['levitation-cant-stop-rompe',"Levitation to Can't Stop x Rompe"],
+  ['i-know-you-want-me-chandelier','I Know You Want Me x Chandelier']
+]);
 
 const PLAN_CENTS = Object.freeze({standard:1500,pro:2500});
 const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
@@ -241,8 +253,10 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
       });
     }
     zip.on('error', error => zip.outputStream.destroy(error));
-    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="' + slug +
-      '.zip"', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
+    const title = routineNames.get(slug) || slug;
+    const safeName = title.replace(/[^\x20-\x7e]/g, '').replace(/["\\/]/g, '').trim();
+    res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="' + safeName +
+      '.zip"; filename*=UTF-8\'\'' + encodeURIComponent(title + '.zip').replace(/['()*]/g, character => '%' + character.charCodeAt(0).toString(16).toUpperCase()), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
     zip.end();
     try { await pipeline(zip.outputStream, res); } catch { res.destroy(); }
   }

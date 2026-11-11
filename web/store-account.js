@@ -330,7 +330,7 @@ function renderStandard(){
   },'store-button primary');
   wrap.append(download,message);host.append(wrap);
  }
- const slug=/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
+ const slug=document.querySelector('main[data-routine-slug]')?.dataset.routineSlug||/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
  if(slug)appendDownload(document.querySelector('[data-routine-actions]'),slug);
  if(player&&slug&&available.has(slug)&&/^routine-0[1-6]$/.test(slug)){
   if(!player.dataset.blurredSrc)player.dataset.blurredSrc=player.getAttribute('src');

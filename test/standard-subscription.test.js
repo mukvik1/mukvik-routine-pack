@@ -98,6 +98,7 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  await s.download(response,token);
  const zip=Buffer.concat(parts);
  assert.equal(response.status,200);assert.equal(response.headers['Content-Type'],'application/zip');
+ assert.match(response.headers['Content-Disposition'],/Who%27s%20That%20Girl%20x%20Drop%20It%20Like%20It%27s%20Hot\.zip/);
  assert.equal(zip.readUInt32LE(0),0x04034b50);
  assert.ok(zip.includes(Buffer.from('Edit.mp3'))&&zip.includes(Buffer.from('Lesson.mp4')));
  assert.ok(!zip.includes(Buffer.from('Bonus.mp3')));

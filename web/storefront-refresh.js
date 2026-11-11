@@ -46,7 +46,7 @@
   });
   document.querySelectorAll('a[href^="/packs/routine-"]').forEach(node => {
     const slug = /^\/packs\/(routine-0[1-6])\/?$/.exec(node.getAttribute('href'))?.[1];
-    if (slug) node.href = '/routines/' + slug + '/';
+    if (slug) node.href = '/routines/' + ({'routine-01':'whos-that-girl-drop-it-like-its-hot','routine-02':'pyhu-shik-shak-shok','routine-03':'temperature-maad-city','routine-04':'shut-up-shut-up-and-let-me-go','routine-05':'axel-f-promiscuous','routine-06':'empire-state-of-mind'})[slug] + '/';
   });
 
   const hero = document.querySelector('.rp-home .rp-hero');
@@ -67,22 +67,33 @@
   }
 
   const packRoutines = [
-    ['Who’s That Girl × Drop It Like It’s Hot','routine-01'],
-    ['PYHU × Shik Shak Shok','routine-02'],
-    ['Temperature × M.A.A.D City','routine-03'],
-    ['Shut Up × Shut Up and Let Me Go','routine-04'],
-    ['Axel F × Promiscuous','routine-05'],
-    ['Empire State of Mind','routine-06']
+    ['Who’s That Girl × Drop It Like It’s Hot','routine-01','whos-that-girl-drop-it-like-its-hot'],
+    ['PYHU × Shik Shak Shok','routine-02','pyhu-shik-shak-shok'],
+    ['Temperature × M.A.A.D City','routine-03','temperature-maad-city'],
+    ['Shut Up × Shut Up and Let Me Go','routine-04','shut-up-shut-up-and-let-me-go'],
+    ['Axel F × Promiscuous','routine-05','axel-f-promiscuous'],
+    ['Empire State of Mind','routine-06','empire-state-of-mind']
   ];
+  const otherRoutines = [
+    ['Call Me Maybe × Poker Face','call-me-maybe-poker-face'],
+    ['Tell Me Why × Trust Me','tell-me-why-trust-me'],
+    ['Calm Down × Crazy in Love','calm-down-crazy-in-love'],
+    ['Yeah × La Vida Es Un Carnaval','yeah-la-vida-es-un-carnaval'],
+    ['Not Like Us × Candy Shop','not-like-us-candy-shop'],
+    ['Macarena × Candy Shop','macarena-candy-shop'],
+    ['Levitation to Can’t Stop × Rompe','levitation-cant-stop-rompe'],
+    ['I Know You Want Me × Chandelier','i-know-you-want-me-chandelier']
+  ];
+  const routinePages = [...packRoutines.map(([title,,path])=>[title,path]),...otherRoutines];
   function addPackRoutines(grid) {
     const fragment = document.createDocumentFragment();
-    for (const [i,[title,slug]] of packRoutines.entries()) {
+    for (const [i,[title,slug,path]] of packRoutines.entries()) {
       const number = i + 1;
       const card = document.createElement('article');
       card.id = slug;
       card.className = 'standalone-routine available-routine';
       card.dataset.standardPackCard = slug;
-      card.innerHTML = '<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="/assets/lesson-previews/pack-' + number + '-blurred.jpg"><div><h2></h2><a class="routine-detail-link" href="/routines/' + slug + '/">Open Routine</a></div></div>';
+      card.innerHTML = '<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="/assets/lesson-previews/pack-' + number + '-blurred.jpg"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
       card.querySelector('h2').textContent = title;
       fragment.append(card);
     }
@@ -105,10 +116,11 @@
       document.querySelectorAll('.store-heading').forEach(node => node.remove());
     } else {
       const main=document.querySelector('main');
-      const slug=/^\/routines\/(routine-0[1-6])\/?$/.exec(location.pathname)?.[1];
-      const entry=packRoutines.findIndex(([,id])=>id===slug);
+      const path=/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
+      const entry=packRoutines.findIndex(([,id,name])=>id===path||name===path);
       if(main&&entry>=0){
         const number=entry+1;
+        main.dataset.routineSlug=packRoutines[entry][1];
         document.title=packRoutines[entry][0]+' — MUKVIK';
         main.innerHTML='<section class="routine-detail-panel"><p><a href="/routines/">Routines</a></p><h1></h1><video class="routine-detail-video" controls playsinline preload="none" poster="/assets/lesson-previews/pack-'+number+'-blurred.jpg" src="/assets/lesson-previews/pack-'+number+'-blurred.mp4"></video></section>';
         main.querySelector('h1').textContent=packRoutines[entry][0];
@@ -125,6 +137,19 @@
           actions.append(play);
         }
         section.append(actions);
+        const position=routinePages.findIndex(([,name])=>name===path);
+        if(position>=0){
+          const pager=document.createElement('nav');pager.className='rp-routine-pager';pager.setAttribute('aria-label','Browse routines');
+          for(const [offset,side] of [[-1,'previous'],[1,'next']]){
+            const [title,name]=routinePages[(position+offset+routinePages.length)%routinePages.length];
+            const link=document.createElement('a');link.className='rp-routine-pager-'+side;link.href='/routines/'+name+'/';
+            link.setAttribute('aria-label',(offset<0?'Previous routine: ':'Next routine: ')+title);
+            const direction=document.createElement('span');direction.className='rp-pager-direction';direction.textContent=offset<0?'← Previous':'Next →';
+            const label=document.createElement('strong');label.textContent=title;
+            link.append(direction,label);pager.append(link);
+          }
+          section.after(pager);
+        }
       }
       main?.insertAdjacentHTML('beforeend',plan(false));
     }

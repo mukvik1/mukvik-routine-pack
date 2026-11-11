@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const geoAccess = require('./geo-access').createGeoAccess();
+const routinePaths = require('./config/routine-paths.json');
+const namedRoutines = new Map(routinePaths.map(routine => [routine.slug, routine.id]));
+const legacyRoutines = new Map(routinePaths.map(routine => [routine.id, routine.slug]));
 
 const root = path.join(__dirname, 'web');
 const port = process.env.PORT || 3000;
@@ -218,7 +221,7 @@ http.createServer(async (req, res) => {
   }
   if (/^\/packs(?:\/|$)/.test(pathname)) {
     const routine = /^\/packs\/(routine-0[1-6])(?:\/index\.html|\/)?$/.exec(pathname)?.[1];
-    const destination = routine ? '/routines/'+routine+'/' : pathname.includes('/get-the-pack') ? '/price/' : '/routines/';
+    const destination = routine ? '/routines/'+legacyRoutines.get(routine)+'/' : pathname.includes('/get-the-pack') ? '/price/' : '/routines/';
     res.writeHead(302, {Location: destination+url.search, 'Cache-Control':'no-store'});
     return res.end();
   }
@@ -227,5 +230,10 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location:'/?account=1&orderId='+encodeURIComponent(oldOrder), 'Cache-Control':'no-store'});
     return res.end();
   }
-  serveStatic(req, res, /^\/routines\/routine-0[1-6]\/?$/.test(pathname) ? '/routines/library-detail.html' : pathname === '/price' ? '/price/' : pathname);
+  const detail = /^\/routines\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(pathname)?.[1];
+  if (legacyRoutines.has(detail)) {
+    res.writeHead(301, { Location: '/routines/'+legacyRoutines.get(detail)+'/'+url.search, 'Cache-Control':'no-store' });
+    return res.end();
+  }
+  serveStatic(req, res, namedRoutines.has(detail) ? '/routines/library-detail.html' : pathname === '/price' ? '/price/' : pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));
