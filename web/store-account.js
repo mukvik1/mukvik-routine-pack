@@ -234,55 +234,23 @@ async function refreshStandard(force=false){
   if(generation===standardGeneration)standardAccess=value;
  }catch{if(generation===standardGeneration)standardAccess=null;}
 }
-const packRoutines=[
- ['Who’s That Girl × Drop It Like It’s Hot','routine-01'],
- ['PYHU × Shik Shak Shok','routine-02'],
- ['Temperature × M.A.A.D City','routine-03'],
- ['Shut Up × Shut Up and Let Me Go','routine-04'],
- ['Axel F × Promiscuous','routine-05'],
- ['Empire State of Mind','routine-06']
-];
-function standardCards(){
- const grid=document.querySelector('.coming-grid.individual-grid');
- if(!grid||grid.querySelector('[data-standard-pack-card]'))return;
- const fragment=document.createDocumentFragment();
- for(const [i,[title,slug]] of packRoutines.entries()){
-  const card=el('article',undefined,'standalone-routine available-routine');
-  card.dataset.standardPackCard=slug;
-  const layout=el('div',undefined,'individual-card-layout');
-  const preview=el('video',undefined,'individual-performance-video');
-  preview.controls=true;preview.playsInline=true;preview.preload='none';
-  preview.poster='/assets/lesson-previews/pack-'+(i+1)+'-blurred.jpg';
-  preview.src='/assets/lesson-previews/pack-'+(i+1)+'-blurred.mp4';
-  preview.setAttribute('aria-label','Preview: '+title);
-  const content=el('div'),actions=el('div',undefined,'rp-standard-actions');
-  const listen=button('Listen',()=>{
-   if(preview.paused)preview.play().catch(()=>{});else preview.pause();
-  });
-  actions.append(listen);
-  content.append(el('h2',title),actions);
-  layout.append(preview,content);card.append(layout);fragment.append(card);
- }
- grid.prepend(fragment);
-}
 function renderStandard(){
  document.querySelectorAll('[data-standard-download]').forEach(n=>n.remove());
  if(!standardPlan){
-  document.querySelectorAll('[data-standard-pack-card],[data-standard-cta]').forEach(n=>n.remove());
+  document.querySelectorAll('[data-standard-cta]').forEach(n=>n.remove());
   for(const offer of document.querySelectorAll('.rp-plan-offer')){
    const name=offer.querySelector('.rp-plan-name');
    if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
    const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-   if(copy)copy.textContent='Explore the individual routines now. Standard membership is being prepared for launch.';
+   if(copy)copy.textContent='Preview the routines below. Standard gives you access to individual downloads.';
    if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
   }
   return;
  }
- standardCards();
  for(const offer of document.querySelectorAll('.rp-plan-offer')){
   offer.querySelector('.rp-plan-name span')?.remove();
   const benefit=offer.querySelector('.rp-plan-features li:last-child');
-  if(benefit)benefit.textContent='Downloads while your membership is active';
+  if(benefit)benefit.textContent='MP3 downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
   if(copy)copy.textContent='Listen to the previews and download individual routines with Standard.';

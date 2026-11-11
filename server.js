@@ -216,9 +216,10 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location:'https://routinepack.download/?account=1', 'Cache-Control':'no-store'});
     return res.end();
   }
-  if (process.env.COMMERCE_ENABLED === 'true' && process.env.STANDARD_SUBSCRIPTIONS_ENABLED === 'true' &&
-      process.env.STANDARD_SUBSCRIPTION_ONLY === 'true' && /^\/packs(?:\/get-the-pack)?\/?$/.test(pathname)) {
-    res.writeHead(302, {Location: pathname.includes('get-the-pack') ? '/routines/#standard-plan' : '/routines/', 'Cache-Control':'no-store'});
+  if (/^\/packs(?:\/|$)/.test(pathname)) {
+    const routine = /^\/packs\/(routine-0[1-6])(?:\/index\.html|\/)?$/.exec(pathname)?.[1];
+    const anchor = routine ? '#'+routine : pathname.includes('/get-the-pack') ? '#standard-plan' : '';
+    res.writeHead(302, {Location: '/routines/'+url.search+anchor, 'Cache-Control':'no-store'});
     return res.end();
   }
   const oldOrder = url.searchParams.get('monoOrder');

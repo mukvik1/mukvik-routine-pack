@@ -90,8 +90,8 @@ function createCommerce(settings=process.env,overrides={}){
   pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
   getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
  });}catch(error){console.error('Standard integration unavailable:',error.code||error.name,error.routine||'');}
- const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED==='true');
- const subscriptionOnly=Boolean(standardPublic&&settings.STANDARD_SUBSCRIPTION_ONLY==='true');
+ const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED!=='pilot');
+ const subscriptionOnly=true;
  if(standard)console.log('Standard subscription integration ready: '+(standardPublic?'public':'admin pilot'));
  else if(!settings.MONOBANK_SUBSCRIPTION_TOKEN)console.log('Standard subscription integration off: token is not available to the service');
  function fileAt(code,index){
@@ -367,7 +367,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function putCart(req,res,user){
   const payload=await body(req);
-  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>subscriptionOnly||code!=='pack'))return response(res,400,{error:'Individual routines are moving to a subscription. Only Routine Pack 1 is available for one-time purchase.'});
+  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>subscriptionOnly||code!=='pack'))return response(res,400,{error:'One-time purchases are closed. Choose Standard to access the routine library.'});
   const codes=[...new Set(payload.productCodes)];
   const db=await pool.connect();
   try{
@@ -531,7 +531,7 @@ function createCommerce(settings=process.env,overrides={}){
    }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,standard:standardPublic?standard.catalog:null,subscriptionOnly,packPromotion:subscriptionOnly?null:packPromotion(),welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:subscriptionOnly?[]:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,standard:standardPublic?standard.catalog:null,subscriptionOnly,packPromotion:subscriptionOnly?null:packPromotion(),welcomeOffer:null,products:subscriptionOnly?[]:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}
