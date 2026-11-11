@@ -107,6 +107,5 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 @media(max-width:600px){.rp-routine-pager{width:calc(100% - 24px);gap:8px}.rp-routine-pager a{padding:12px;min-height:80px}.rp-routine-pager strong{font-size:.75rem}}
 
 /* Keep the tier label in its own space above the card content. */
-.coming-grid.individual-grid>article.rp-tiered-routine{position:relative;padding-top:44px!important}
-.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier{position:absolute;inset:10px 10px auto auto;font:700 11px/14px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:3px 7px;border:1px solid #7f9acc55;border-radius:6px;background:#131b2f;color:#b7c7ec}
+.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier{position:static;align-self:flex-end;justify-self:end;grid-column:1/-1;order:-1;flex:none;font:700 11px/14px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:3px 7px;border:1px solid #7f9acc55;border-radius:6px;background:#131b2f;color:#b7c7ec}
 .coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-pro{background:#233b83;color:#e7edff;border-color:#7290ff88}
