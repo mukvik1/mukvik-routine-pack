@@ -89,7 +89,7 @@ function createCommerce(settings=process.env,overrides={}){
  try{standard=require('./standard-subscription').createStandard(settings,{
   pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
   getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
- });}catch(error){console.error('Standard integration unavailable:',error.code||error.name);}
+ });}catch(error){console.error('Standard integration unavailable:',error.code||error.name,error.routine||'');}
  const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED==='true');
  const subscriptionOnly=Boolean(standardPublic&&settings.STANDARD_SUBSCRIPTION_ONLY==='true');
  if(standard)console.log('Standard subscription integration ready: '+(standardPublic?'public':'admin pilot'));

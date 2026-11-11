@@ -25,14 +25,34 @@ const existingRoutines = {
 };
 
 function catalogFiles(files, packManifest = manifest) {
-  const pack = new Map((files.pack || []).map(f => [sha(f.fileId), f.fileId]));
-  const entries = new Map(packManifest.map(r => [r.slug, r.files.map(f => ({ name: f.name, fileId: pack.get(f.key) }))]));
-  for (const [slug, code] of Object.entries(existingRoutines)) entries.set(slug, files[code]);
+  // Drive copies have different IDs. Prefer exact hashes; otherwise accept only
+  // a unique filename in the already validated, server-side Pack configuration.
+  const byHash = new Map(), byName = new Map(), claimed = new Set();
+  const basename = name => typeof name === 'string' ? name.split(/[\\/]/).pop().normalize('NFC').trim() : '';
+  for (const file of Array.isArray(files.pack) ? files.pack : []) {
+    if (!/^[-\w]{10,128}$/.test(file?.fileId || '')) continue;
+    byHash.set(sha(file.fileId), file.fileId);
+    const name = basename(file.name);
+    if (!byName.has(name)) byName.set(name, new Set());
+    byName.get(name).add(file.fileId);
+  }
+  const entries = new Map(packManifest.map(r => [r.slug, r.files.map(f => {
+    const matching = byName.get(basename(f.name));
+    const fileId = byHash.get(f.key) || (matching?.size === 1 ? matching.values().next().value : undefined);
+    if (!fileId || claimed.has(fileId)) {
+      throw Object.assign(Error('Invalid subscription file mapping: ' + r.slug), { code: 'STANDARD_FILES_INVALID', routine: r.slug });
+    }
+    claimed.add(fileId);
+    return { name: f.name, fileId };
+  })]));
+  for (const [slug, code] of Object.entries(existingRoutines)) {
+    entries.set(slug, Array.isArray(files[code]) ? files[code].map(file => ({fileId:file?.fileId,name:basename(file?.name)})) : null);
+  }
   for (const [slug, list] of entries) {
     if (!Array.isArray(list) || !list.length || list.some(f => !/^[-\w]{10,128}$/.test(f?.fileId || '') ||
       typeof f.name !== 'string' || !f.name || f.name.length > 160 || /[\\/\x00-\x1f]/.test(f.name) ||
       f.name === '.' || f.name === '..') || new Set(list.map(f => f.name.toLowerCase())).size !== list.length) {
-      throw Object.assign(Error('Invalid subscription file mapping: ' + slug), { code: 'STANDARD_FILES_INVALID' });
+      throw Object.assign(Error('Invalid subscription file mapping: ' + slug), { code: 'STANDARD_FILES_INVALID', routine: slug });
     }
   }
   return entries;

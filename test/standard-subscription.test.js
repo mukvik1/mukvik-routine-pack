@@ -66,6 +66,9 @@ test('a documented bank status must match subscription, amount and currency; no 
  assert.equal(interpretStatus(row,{...bank(row),ccy:840}),null);
  assert.equal(paidThrough('2026-01-31T12:00:00Z',1).toISOString(),'2026-02-28T12:00:00.000Z');
  assert.throws(()=>catalogFiles({...files,pack:[]},packManifest),/Invalid subscription file mapping/);
+ const copies=pack.map((f,i)=>({...f,fileId:'copied_file_'+i,name:'Original Pack/'+f.name}));
+ assert.equal(catalogFiles({...files,pack:copies},packManifest).get('routine-01')[0].fileId,copies[0].fileId);
+ assert.throws(()=>catalogFiles({...files,pack:[...copies,{...copies[0],fileId:'different_copy_01'}]},packManifest),/Invalid subscription file mapping/);
 });
 
 test('checkout requires consent, is reused, grants access only after bank payment, and cancellation preserves paid time',async()=>{
