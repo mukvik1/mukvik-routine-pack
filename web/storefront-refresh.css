@@ -18,7 +18,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
   .rp-home .rp-hero>.rp-hero-copy .rp-actions,.rp-home .rp-hero>.rp-hero-copy .rp-hero-facts{justify-content:flex-start}
   .rp-home .rp-hero .rp-ticker{width:100%;overflow:visible}
   .rp-home .rp-hero .rp-logo-group{width:100%;min-width:0;padding:0;gap:clamp(10px,1.1vw,18px);justify-content:space-between;animation:none}
-  .rp-home .rp-hero .rp-logo-group img{width:auto;max-width:21%;height:clamp(20px,2vw,29px);object-fit:contain}
+  .rp-home .rp-hero .rp-logo-group img{width:auto;max-width:17%;height:clamp(20px,2vw,29px);object-fit:contain}
   .rp-home .rp-hero .rp-logo-group img[src$="djay-official.png"]{height:clamp(24px,2.3vw,34px)}
   .rp-home .rp-hero .rp-logo-group:nth-child(2){display:none}
 }
