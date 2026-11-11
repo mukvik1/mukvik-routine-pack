@@ -5,7 +5,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 .rp-software,.rp-author,.rp-plan,.rp-routine-intro{width:min(1120px,calc(100% - 36px));margin:36px auto;color:#f5f6ff}
 .rp-software{overflow:hidden;background:transparent;border:0;padding:16px 0;-webkit-mask-image:linear-gradient(to right,transparent,#000 7%,#000 93%,transparent);mask-image:linear-gradient(to right,transparent,#000 7%,#000 93%,transparent)}
 .rp-ticker{display:flex;width:100%}
-.rp-logo-group{display:flex;align-items:center;gap:clamp(40px,5vw,64px);padding-right:clamp(40px,5vw,64px);box-sizing:border-box;flex:0 0 auto;min-width:100%;justify-content:space-between;animation:rp-ticker 25s linear infinite}
+.rp-logo-group{display:flex;align-items:center;gap:clamp(40px,5vw,64px);padding-right:clamp(40px,5vw,64px);box-sizing:border-box;flex:0 0 auto;min-width:100%;justify-content:space-between}
 .rp-logo-group img{display:block;max-width:170px;width:auto;height:39px;object-fit:contain;flex:none;filter:brightness(0) invert(1)}
 .rp-logo-group img[src$="djay-official.png"]{height:44px;filter:grayscale(1)}
 .rp-logo-group img[src$="traktor.svg"]{height:32px;max-width:180px}
@@ -22,8 +22,14 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
   .rp-home .rp-hero .rp-logo-group img[src$="djay-official.png"]{height:clamp(36px,4vw,52px)}
   .rp-home .rp-hero .rp-logo-group:nth-child(2){display:none}
 }
-@media(max-width:999px){.rp-home .rp-hero>.rp-software{width:100%;margin:24px 0 0;order:2}.rp-home .rp-hero>.rp-hero-copy{order:1}}
-@keyframes rp-ticker{from{transform:translate3d(0,0,0)}to{transform:translate3d(-100%,0,0)}}
+@media(max-width:999px){
+  .rp-home .rp-hero>.rp-software{width:100%;min-width:0;margin:24px 0 0;order:2;-webkit-mask-image:none;mask-image:none}
+  .rp-home .rp-hero>.rp-hero-copy{order:1}
+  .rp-ticker{width:max-content;min-width:200%;animation:rp-ticker 25s linear infinite}
+  .rp-logo-group{min-width:0;flex:1 0 auto}
+  .rp-logo-group img{width:clamp(104px,17vw,150px)}
+}
+@keyframes rp-ticker{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
 .rp-author{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);overflow:hidden;align-items:center;background:#1b2132;border:1px solid #475575;border-radius:16px}
 .rp-author img{display:block;width:100%;height:100%;min-height:0;aspect-ratio:1280/851;object-fit:cover;object-position:center}
 .rp-author div{padding:24px}
@@ -55,7 +61,7 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-get-started:focus-visible,.rp-plan a:focus-visible{outline:2px solid #adc2ff;outline-offset:4px}
 
 @media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{height:auto}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay-official.png"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
-@media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow{display:none!important}.rp-ticker{animation:none;width:auto;overflow-x:auto}.rp-logo-group{animation:none}.rp-logo-group:nth-child(2){display:none}}
+@media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow{display:none!important}.rp-ticker{animation:none;width:100%;min-width:0;overflow-x:auto}.rp-logo-group:nth-child(2){display:none}}
 .rp-standard-actions,.rp-standard-download{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
 .rp-standard-cta{display:grid;gap:10px;margin-top:12px}
 .rp-standard-cta label,.rp-standard-download [role=status]{font-size:.85rem}
