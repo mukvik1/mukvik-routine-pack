@@ -85,6 +85,15 @@ function createCommerce(settings=process.env,overrides={}){
  const gmail=mode==='gmail_api'?new OAuth2Client(settings.GMAIL_OAUTH_CLIENT_ID,settings.GMAIL_OAUTH_CLIENT_SECRET):null;
  if(gmail)gmail.setCredentials({refresh_token:settings.GMAIL_OAUTH_REFRESH_TOKEN});
  const auth=new GoogleAuth({credentials,scopes:['https://www.googleapis.com/auth/drive.readonly']});
+ let standard=null;
+ try{standard=require('./standard-subscription').createStandard(settings,{
+  pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
+  getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
+ });}catch(error){console.error('Standard integration unavailable:',error.code||error.name);}
+ const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED==='true');
+ const subscriptionOnly=Boolean(standardPublic&&settings.STANDARD_SUBSCRIPTION_ONLY==='true');
+ if(standard)console.log('Standard subscription integration ready: '+(standardPublic?'public':'admin pilot'));
+ else if(!settings.MONOBANK_SUBSCRIPTION_TOKEN)console.log('Standard subscription integration off: token is not available to the service');
  function fileAt(code,index){
   const list=files[code];
   if(!Array.isArray(list)||!Number.isSafeInteger(index)||index<0||index>=list.length)return null;
@@ -358,7 +367,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function putCart(req,res,user){
   const payload=await body(req);
-  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>code!=='pack'))return response(res,400,{error:'Individual routines are moving to a subscription. Only Routine Pack 1 is available for one-time purchase.'});
+  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>subscriptionOnly||code!=='pack'))return response(res,400,{error:'Individual routines are moving to a subscription. Only Routine Pack 1 is available for one-time purchase.'});
   const codes=[...new Set(payload.productCodes)];
   const db=await pool.connect();
   try{
@@ -380,6 +389,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  async function cart(res,user){
   const r=await pool.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY created_at,product_code',[user.id]);
+  if(subscriptionOnly)return response(res,200,{items:[]});
   response(res,200,{items:priceProducts(r.rows.filter(x=>x.product_code==='pack').map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(pool,user.id))});
  }
  async function newOrder(req,res,user){
@@ -513,9 +523,15 @@ function createCommerce(settings=process.env,overrides={}){
   try{
    if(req.method==='POST'&&url.pathname==='/api/v2/telegram/webhook'&&telegram){await telegram.handle(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/monobank/webhook'&&monobank){await monobank.webhook(req,res);return true;}
+   if(standard){
+    const callback=/^\/api\/v2\/standard\/callback\/([\w-]{43})$/.exec(url.pathname);
+    if(req.method==='POST'&&callback){req.resume();await standard.callback(res,callback[1]);return true;}
+    const download=/^\/api\/v2\/standard\/download\/([\w-]{43})$/.exec(url.pathname);
+    if(req.method==='GET'&&download){await standard.download(res,download[1]);return true;}
+   }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,packPromotion:packPromotion(),welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,standard:standardPublic?standard.catalog:null,subscriptionOnly,packPromotion:subscriptionOnly?null:packPromotion(),welcomeOffer:{productCode:'pack',priceCents:WELCOME_PACK_CENTS,discountPercent:WELCOME_DISCOUNT_PERCENT},products:subscriptionOnly?[]:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}
@@ -526,6 +542,19 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
    const user=await session(req);
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
+   if(url.pathname.startsWith('/api/v2/standard/')||url.pathname==='/api/v2/standard'){
+    if(!standardPublic&&user.email!==adminEmail){response(res,404,{error:'Not found.'});return true;}
+    if(!standard){response(res,503,{error:'Standard is not configured on this service.'});return true;}
+    if(req.method==='GET'&&url.pathname==='/api/v2/standard/plan'){response(res,200,{...standard.catalog,pilot:!standardPublic});return true;}
+    if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'));return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){await standard.checkout(res,user,(await body(req))?.consent);return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
+    const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
+    if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}
+   }
+   if(subscriptionOnly&&req.method==='POST'&&(url.pathname==='/api/v2/orders'||/^\/api\/v2\/orders\/[a-f0-9-]+\/monobank$/.test(url.pathname))){
+    response(res,410,{error:'New one-time purchases are closed. Choose Standard to access the routine library.'});return true;
+   }
    const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
    if(req.method==='POST'&&freeDownload){
     if(!user.email_verified_at){response(res,403,{error:'Confirm your email before downloading. Register or reset your password to confirm it.',code:'EMAIL_VERIFICATION_REQUIRED'});return true;}
@@ -575,6 +604,7 @@ function createCommerce(settings=process.env,overrides={}){
   }
  }
  const timer=setInterval(()=>{
+  standard?.cleanup().catch(error=>console.error('Standard ticket cleanup unavailable:',error.code||error.name));
   flushNotifications().catch(error=>console.error('Notification delivery unavailable:',error.code||error.name||'error'));
   flushRegistrationEmails().catch(error=>console.error('Registration notification unavailable:',error.code||error.name||'error'));
   pool.query("DELETE FROM password_login_attempts WHERE created_at<now()-interval '1 day'").catch(error=>console.error('Login attempt cleanup unavailable:',error.code||error.name||'error'));

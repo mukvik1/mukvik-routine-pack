@@ -10,6 +10,7 @@ const currencyKey='Prices are in USD. Payment is processed in UAH, the store cur
 accountMessages.uk??={};accountMessages.uk[currencyKey]='Ціни вказані в USD. Оплата здійснюється у гривні — валюті магазину (Україна). Ваш банк конвертує цю суму у валюту картки за власним курсом; можливі комісії.';
 const T=k=>accountMessages[window.RP_I18N.language]?.[k]||window.RP_I18N.t(k),money=n=>new Intl.NumberFormat(window.RP_I18N.language,{style:'currency',currency:'USD'}).format(n/100);
 const read=k=>{try{return localStorage.getItem(k);}catch{return null;}},write=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}};
+let publicStandardPlan=null,standardPlan=null,standardAccess=null,subscriptionOnly=false,standardGeneration=0;
 let token=read('mukvik_store_session'),user=null,catalog=[],cart=[],pendingCheckout=false,challenge=null,mode='login',providers={};
 const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
@@ -25,7 +26,7 @@ const error=el('p','','store-error');error.setAttribute('role','alert');
 const authTabs=el('div',undefined,'store-tabs');authTabs.append(button('SIGN IN',()=>{mode='login';challenge=null;renderAuth();}),button('SIGN UP',()=>{mode='register';challenge=null;renderAuth();}));
 const authBody=el('div');auth.append(authTabs,authBody,error);
 function show(d){for(const other of [auth,cartDialog,account])if(other!==d&&other.open)other.close();if(!d.open)d.showModal();}
-async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
+async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
 const status=el('p','','store-error');status.setAttribute('role','status');cartDialog.append(status);
 function renderAuth(){
  error.textContent='';authBody.replaceChildren();
@@ -76,7 +77,7 @@ async function downloadFree(slug){
  freeStatus.textContent=T('Please wait…');
  try{
   const response=await fetch(API+'/api/v2/free/'+encodeURIComponent(slug)+'/download',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
-  if(response.status===401){token=null;user=null;write('mukvik_store_session',null);renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
+  if(response.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
   if(response.status===403){const result=await response.json();if(result.code==='EMAIL_VERIFICATION_REQUIRED'){pendingFree=slug;openAuth('register');error.textContent=T(result.error);freeStatus.textContent='';return;}}
   if(!response.ok||!String(response.headers.get('content-type')).startsWith('application/zip'))throw Error(T('Service temporarily unavailable.'));
   const blob=await response.blob(),href=URL.createObjectURL(blob),a=el('a');a.href=href;a.download=slug+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
@@ -105,10 +106,12 @@ function renderPackOffer(){
 }
 function renderHeader(){
  renderPackOffer();
+ renderStandard();
+ if(subscriptionOnly)document.querySelectorAll('.site-header nav a[href="/packs/"],.site-header [data-cart],a[href="/packs/get-the-pack/"]').forEach(n=>n.hidden=true);
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
   box.replaceChildren();
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
-  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary',user.nickname||user.email);summary.title=user.email;const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);}),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;cart=[];write('mukvik_store_session',null);renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
+  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary',user.nickname||user.email);summary.title=user.email;const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),...(subscriptionOnly?[]:[button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);})]),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;cart=[];write('mukvik_store_session',null);renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
  });
  document.querySelectorAll('[data-cart-count]').forEach(n=>n.textContent=String(cart.length));
 }
@@ -116,7 +119,7 @@ async function saveCart(next){
  if(cartBusy)return false;cartBusy=true;status.textContent='';
  try{if(user)await api('/cart','PUT',{productCodes:next});cart=next;orderKey=null;if(!user)write('mukvik_guest_cart',JSON.stringify(cart));renderHeader();renderCart();return true;}catch(e){status.textContent=e.message;return false;}finally{cartBusy=false;}
 }
-async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);renderHeader();renderCart();}
+async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await refreshStandard();renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
 function currencyNote(cents){
  const note=el('p',undefined,'store-muted');note.style.fontSize='12px';note.style.lineHeight='1.5';
@@ -172,12 +175,27 @@ async function openRequestedAccount(){
   accountStatus.textContent=T('Payment status is temporarily unavailable. Please use Refresh to check again.');
  }
 }
-function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'),el('h3',T('Your orders')));
+function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'));
+ if(standardPlan){
+  const section=el('section',undefined,'store-order');
+  section.append(el('h3','Standard subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
+  if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
+  if(standardAccess?.cancellable){
+   const cancel=button('Cancel auto-renewal',async()=>{
+    if(!confirm('Cancel auto-renewal? You can still download until the end of your paid period.'))return;
+    cancel.disabled=true;
+    try{standardAccess=await api('/standard/cancel','POST',{});renderHeader();renderAccount();}catch(e){accountStatus.textContent=e.message;cancel.disabled=false;}
+   });
+   section.append(cancel);
+  }
+  accountBody.append(section);
+ }
+ accountBody.append(el('h3',T('Your orders')));
  if(!user.orders.length)accountBody.append(el('p',T('No orders yet.'),'store-muted'));
  for(const order of user.orders){const block=el('section',undefined,'store-order');block.append(el('strong',T('Order')+' '+order.id.slice(0,8)),el('p',T(order.status==='approved'?'Approved':order.status==='awaiting_manual_review'?'Awaiting payment confirmation':order.status==='cancelled'?'Cancelled':'Refunded'),'store-muted'));
   for(const item of order.items){block.append(el('p',item.name));for(const file of item.files||[]){const b=button('Download',async()=>{b.disabled=true;try{const r=await api('/orders/'+order.id+'/files/'+item.code+'/'+file.index+'/ticket','POST',{});const u=new URL(r.url,API);if(u.origin!==API)throw Error(T('Service temporarily unavailable.'));const a=el('a');a.href=u.href;a.download='';document.body.append(a);a.click();a.remove();}catch(e){accountStatus.textContent=e.message;}finally{b.disabled=false;}});b.textContent=T('Download')+' · '+file.name;block.append(b);}}
   block.append(el('strong',money(order.totalCents)));
-  if(order.status==='awaiting_manual_review'){
+  if(order.status==='awaiting_manual_review'&&!subscriptionOnly){
    const pay=button('PAY WITH MONOBANK',()=>showMonobankInvoice(order.id));
    block.append(pay);
   }
@@ -204,15 +222,140 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
   accountBody.append(load,report);
  }
 }
+async function refreshStandard(force=false){
+ const generation=++standardGeneration;
+ if(!user){standardAccess=null;standardPlan=publicStandardPlan;return;}
+ if(user.admin&&!standardPlan){
+  try{const plan=await api('/standard/plan');if(generation===standardGeneration)standardPlan=plan;}catch{}
+ }
+ if(!standardPlan||generation!==standardGeneration){return;}
+ try{
+  const value=await api('/standard'+(force?'?refresh=1':''));
+  if(generation===standardGeneration)standardAccess=value;
+ }catch{if(generation===standardGeneration)standardAccess=null;}
+}
+const packRoutines=[
+ ['Who’s That Girl × Drop It Like It’s Hot','routine-01'],
+ ['PYHU × Shik Shak Shok','routine-02'],
+ ['Temperature × M.A.A.D City','routine-03'],
+ ['Shut Up × Shut Up and Let Me Go','routine-04'],
+ ['Axel F × Promiscuous','routine-05'],
+ ['Empire State of Mind','routine-06']
+];
+function standardCards(){
+ const grid=document.querySelector('.coming-grid.individual-grid');
+ if(!grid||grid.querySelector('[data-standard-pack-card]'))return;
+ const fragment=document.createDocumentFragment();
+ for(const [i,[title,slug]] of packRoutines.entries()){
+  const card=el('article',undefined,'standalone-routine available-routine');
+  card.dataset.standardPackCard=slug;
+  const layout=el('div',undefined,'individual-card-layout');
+  const preview=el('video',undefined,'individual-performance-video');
+  preview.controls=true;preview.playsInline=true;preview.preload='none';
+  preview.poster='/assets/lesson-previews/pack-'+(i+1)+'-blurred.jpg';
+  preview.src='/assets/lesson-previews/pack-'+(i+1)+'-blurred.mp4';
+  preview.setAttribute('aria-label','Preview: '+title);
+  const content=el('div'),actions=el('div',undefined,'rp-standard-actions');
+  const listen=button('Listen',()=>{
+   if(preview.paused)preview.play().catch(()=>{});else preview.pause();
+  });
+  actions.append(listen);
+  content.append(el('h2',title),actions);
+  layout.append(preview,content);card.append(layout);fragment.append(card);
+ }
+ grid.prepend(fragment);
+}
+function renderStandard(){
+ document.querySelectorAll('[data-standard-download]').forEach(n=>n.remove());
+ if(!standardPlan){
+  document.querySelectorAll('[data-standard-pack-card],[data-standard-cta]').forEach(n=>n.remove());
+  for(const offer of document.querySelectorAll('.rp-plan-offer')){
+   const name=offer.querySelector('.rp-plan-name');
+   if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
+   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
+   if(copy)copy.textContent='Explore the individual routines now. Standard membership is being prepared for launch.';
+   if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
+  }
+  return;
+ }
+ standardCards();
+ for(const offer of document.querySelectorAll('.rp-plan-offer')){
+  offer.querySelector('.rp-plan-name span')?.remove();
+  const benefit=offer.querySelector('.rp-plan-features li:last-child');
+  if(benefit)benefit.textContent='Downloads while your membership is active';
+  offer.querySelector('.rp-plan-pending')?.remove();
+  const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
+  if(copy)copy.textContent='Listen to the previews and download individual routines with Standard.';
+  offer.querySelector('[data-standard-cta]')?.remove();
+  const panel=el('div',undefined,'rp-standard-cta');
+  panel.dataset.standardCta='';
+  if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
+  if(standardAccess?.active){panel.append(el('p','Your Standard downloads are available.'),button('Manage subscription',()=>{renderAccount();show(account);}));}
+  else {
+   const amount=new Intl.NumberFormat('en-UA',{style:'currency',currency:'UAH'}).format(standardPlan.amountKop/100);
+   const note=el('p',amount+' charged today and every month until cancelled. Your bank may convert this amount into your card currency.');
+   const consent=el('input');consent.type='checkbox';
+   const label=el('label');label.append(consent,document.createTextNode(' I agree to the monthly charge and the '));
+   const terms=el('a','subscription terms');terms.href='/standard-terms.html';terms.target='_blank';terms.rel='noopener';label.append(terms,'.');
+   const feedback=el('p','');feedback.setAttribute('role','status');
+   const start=button(user?'Subscribe with Monobank':'Sign in to subscribe',async()=>{
+    if(!user){openAuth('login');return;}
+    if(!consent.checked){feedback.textContent='Confirm the monthly payment before continuing.';return;}
+    start.disabled=true;
+    try{
+     const result=await api('/standard/checkout','POST',{consent:true});
+     const url=new URL(result.checkoutUrl);
+     if(url.protocol!=='https:'||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(url.hostname)||url.username||url.password)throw Error('Unexpected checkout link.');
+     window.top.location.assign(url.href);
+    }catch(e){feedback.textContent=e.message;start.disabled=false;}
+   },'store-button primary');
+   panel.append(note,label,start,feedback);
+  }
+  offer.append(panel);
+ }
+ if(!user||!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return;
+ const available=new Set(standardPlan.slugs);
+ function appendDownload(host,slug){
+  if(!host||!available.has(slug))return;
+  const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';
+  const message=el('span','');message.setAttribute('role','status');
+  const download=button('Download',async()=>{
+   download.disabled=true;message.textContent='';
+   try{
+    const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/ticket','POST',{});
+    const u=new URL(result.url,API);
+    if(u.origin!==API||!/^\/api\/v2\/standard\/download\/[\w-]{43}$/.test(u.pathname))throw Error('Unexpected download link.');
+    const a=el('a');a.href=u.href;a.referrerPolicy='no-referrer';document.body.append(a);a.click();a.remove();
+   }catch(e){message.textContent=e.message;}finally{download.disabled=false;}
+  },'store-button primary');
+  wrap.append(download,message);host.append(wrap);
+ }
+ document.querySelectorAll('[data-standard-pack-card]').forEach(card=>appendDownload(card.querySelector('.rp-standard-actions'),card.dataset.standardPackCard));
+ document.querySelectorAll('.coming-grid a.routine-detail-link[href]').forEach(link=>{
+  const slug=/^\/routines\/([a-z0-9-]+)\/$/.exec(new URL(link.href).pathname)?.[1];
+  if(slug)appendDownload(link.parentElement,slug);
+ });
+ const slug=/^\/(?:routines|packs)\/([a-z0-9-]+)\/$/.exec(location.pathname)?.[1];
+ if(slug)appendDownload(document.querySelector('main .rp-plan-offer')||document.querySelector('main'),slug);
+}
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));
 document.querySelectorAll('[data-cart]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();status.textContent='';renderCart();show(cartDialog);}));
 document.querySelectorAll('[data-buy]').forEach(b=>b.addEventListener('click',async e=>{e.preventDefault();const code=b.dataset.productId;if(!catalog.some(p=>p.code===code)){status.textContent=T('Service temporarily unavailable.');show(cartDialog);return;}b.setAttribute('aria-busy','true');await saveCart([...new Set([...cart,code])]);b.removeAttribute('aria-busy');show(cartDialog);}));
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderCart();renderAccount();});
 renderHeader();renderAuth();renderCart();
-async function loadCatalog(){const data=await api('/catalog');catalog=data.products;packPromotion=data.packPromotion;usdUahRate=Number(data.usdUahRate)||46;}
-try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}renderHeader();renderCart();}catch(e){status.textContent=e.message;}
+async function loadCatalog(){const data=await api('/catalog');catalog=data.products;packPromotion=data.packPromotion;usdUahRate=Number(data.usdUahRate)||46;publicStandardPlan=standardPlan=data.standard;subscriptionOnly=data.subscriptionOnly===true;}
+try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}await refreshStandard(accountQuery.get('subscription')==='return');renderHeader();renderCart();}catch(e){status.textContent=e.message;}
 if(accountRequested)await openRequestedAccount();
+if(accountQuery.get('subscription')==='return'&&user&&standardPlan&&!standardAccess?.active){
+ let attempts=0;
+ const poll=setInterval(async()=>{
+  if(++attempts>=6||!user)clearInterval(poll);
+  await refreshStandard(true);
+  if(standardAccess?.active){clearInterval(poll);renderHeader();}
+ },6000);
+}
+window.addEventListener('pageshow',event=>{if(event.persisted&&user&&standardPlan)refreshStandard().then(renderHeader);});
 try{providers=await api('/auth/providers');auth.querySelectorAll('[data-provider]').forEach(b=>{b.disabled=!providers[b.dataset.provider];});}catch{}
 })();
 

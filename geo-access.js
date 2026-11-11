@@ -18,7 +18,7 @@ function createGeoAccess({ railwayProxy = Boolean(process.env.RAILWAY_ENVIRONMEN
   return function geoAccess(req, res, url) {
     res.setHeader('X-Access-Policy', POLICY_VERSION);
     // These authenticated server callbacks must remain reachable from provider IPs.
-    if (req.method === 'POST' && WEBHOOKS.has(url.pathname)) return false;
+    if (req.method === 'POST' && (WEBHOOKS.has(url.pathname) || /^\/api\/v2\/standard\/callback\/[\w-]{43}$/.test(url.pathname))) return false;
     const ip = clientIp(req, railwayProxy);
     const country = ip ? lookup(ip)?.country : null;
     if (country !== 'RU') return false;

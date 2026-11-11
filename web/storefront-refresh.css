@@ -40,3 +40,8 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 @media(min-width:761px) and (max-width:1240px){.site-header.menu-open nav:has(.rp-price-link){grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay.png"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
 @media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow{display:none!important}.rp-ticker{animation:none;width:auto;overflow-x:auto}.rp-logo-group{animation:none}.rp-logo-group:nth-child(2){display:none}}
+.rp-standard-actions,.rp-standard-download{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+.rp-standard-cta{display:grid;gap:10px;margin-top:12px}
+.rp-standard-cta label,.rp-standard-download [role=status]{font-size:.85rem}
+.rp-standard-cta input{margin-right:5px}
+.rp-standard-cta [role=status]:empty,.rp-standard-download [role=status]:empty{display:none}

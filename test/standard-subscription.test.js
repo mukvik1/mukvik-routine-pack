@@ -1,0 +1,102 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const { PassThrough } = require('node:stream');
+const { createStandard, catalogFiles, interpretStatus, paidThrough } = require('../standard-subscription');
+
+const user = { id: 'customer', email_verified_at: new Date() };
+const settings = { STANDARD_SUBSCRIPTIONS_ENABLED:'true', MONOBANK_SUBSCRIPTION_TOKEN:'fake-only', PUBLIC_ORIGIN:'https://api.example.test', WEB_ORIGIN:'https://site.example.test' };
+const pack = [{ fileId:'test_track_001', name:'Edit.mp3' },{ fileId:'test_video_001', name:'Lesson.mp4' },{ fileId:'test_bonus_001',name:'Bonus.mp3' }];
+const packManifest = [{slug:'routine-01',files:pack.slice(0,2).map(f=>({name:f.name,key:crypto.createHash('sha256').update(f.fileId).digest('hex')}))}];
+const files = { pack, ...Object.fromEntries([3,5,7,8,9,10,11,12].map(n=>['routine'+n,[{fileId:'other_routine_'+n,name:'Other.mp3'}]])) };
+const reply = (res,status,data) => Object.assign(res,{status,data});
+const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:69000,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
+
+function setup(){
+ const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null };
+ const db = { release(){}, async query(sql,p=[]){
+  if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'||sql.includes('FROM customers'))return {rows:[]};
+  if(sql.startsWith('SELECT * FROM standard_subscriptions'))return {rows:state.row?[state.row]:[]};
+  if(sql.startsWith('SELECT id,customer_id'))return {rows:state.row?.callback_hash===p[0]?[state.row]:[]};
+  if(sql.startsWith('INSERT INTO standard_subscriptions')){
+   const [id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at]=p;
+   state.row={id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at};
+   return {rows:[]};
+  }
+  if(sql.startsWith('UPDATE standard_subscriptions SET paid_until')){
+   Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date()});
+   return {rows:[state.row]};
+  }
+  if(sql.startsWith('UPDATE standard_subscriptions SET cancelled_at')){
+   state.row.cancelled_at=new Date();return {rows:[]};
+  }
+  if(sql.startsWith('INSERT INTO standard_download_tickets')){
+   if(!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date()))return {rowCount:0};
+   state.tickets.set(p[0],p[2]);return {rowCount:1};
+  }
+  if(sql.startsWith('DELETE FROM standard_download_tickets AS t')){
+   const slug=state.tickets.get(p[0]);
+   if(!slug||!(state.row?.paid_until>new Date()))return {rowCount:0};
+   state.tickets.delete(p[0]);return {rowCount:1,rows:[{routine_slug:slug}]};
+  }
+  throw Error('Unexpected SQL '+sql);
+ }};
+ const subscription = createStandard(settings,{
+  pool:{query:db.query,connect:async()=>db},files,packManifest,reply,getDriveToken:async()=> 'fake-drive',
+  driveFetch:async url=>{state.events.push(url);return new Response(url.includes('video')?'video-test':'audio-test');},
+  fetchImpl:async (url,req)=>{
+   assert.equal(req.headers['X-Token'],'fake-only');
+   const path=new URL(url).pathname.split('/').at(-1), payload=req.body&&JSON.parse(req.body);
+   state.requests.push({path,payload});
+   if(path==='create')return Response.json({subscriptionId:'s2_test',pageUrl:'https://pay.mbnk.biz/s2_test'});
+   if(path==='status')return Response.json(state.bankData||bank(state.row));
+   if(path==='edit')return new Response(null,{status:200});
+   throw Error('Unexpected provider call');
+  }
+ });
+ return {state,subscription};
+}
+
+test('a documented bank status must match subscription, amount and currency; no access before first payment',()=>{
+ const row={provider_id:'s2_test',amount_kop:69000,created_at:new Date()};
+ assert.equal(interpretStatus(row,bank(row)).paidUntil,null);
+ assert.equal(interpretStatus(row,{...bank(row),amount:1}),null);
+ assert.equal(interpretStatus(row,{...bank(row),subscriptionId:'s2_other'}),null);
+ assert.equal(interpretStatus(row,{...bank(row),ccy:840}),null);
+ assert.equal(paidThrough('2026-01-31T12:00:00Z',1).toISOString(),'2026-02-28T12:00:00.000Z');
+ assert.throws(()=>catalogFiles({...files,pack:[]},packManifest),/Invalid subscription file mapping/);
+});
+
+test('checkout requires consent, is reused, grants access only after bank payment, and cancellation preserves paid time',async()=>{
+ const {subscription:s,state}=setup();
+ const denied={};await s.checkout(denied,user,false);assert.equal(denied.status,400);assert.equal(state.requests.length,0);
+ const start={};await s.checkout(start,user,true);assert.equal(start.status,201);
+ const {payload}=state.requests[0];
+ assert.equal(payload.amount,69000);assert.equal(payload.interval,'1m');
+ assert.match(payload.redirectUrl,/subscription=return/);
+ const retry={};await s.checkout(retry,user,true);assert.deepEqual(retry.data,start.data);
+ assert.equal(state.requests.filter(x=>x.path==='create').length,1);
+ const callback=payload.webHookUrls.chargeUrl.split('/').at(-1);
+ await s.callback({},callback);
+ const pending={};await s.ticket(pending,user,'routine-01');assert.equal(pending.status,403);
+ state.bankData={...bank(state.row),summary:{totalPaid:1,totalFailed:0}};
+ await s.callback({},callback);
+ const paid={};await s.status(paid,user);assert.equal(paid.data.active,true);
+ const cancel={};await s.cancel(cancel,user);
+ assert.equal(cancel.data.cancelled,true);assert.equal(cancel.data.active,true);
+ assert.deepEqual(state.requests.at(-1).payload,{subscriptionId:'s2_test',action:'cancel'});
+ const late={};await s.ticket(late,{id:'other'},'routine-01');assert.equal(late.status,403);
+ const ticket={};await s.ticket(ticket,user,'routine-01');assert.equal(ticket.status,200);
+ const response=new PassThrough(), parts=[];
+ response.on('data',part=>parts.push(part));response.writeHead=(status,headers)=>Object.assign(response,{status,headers});
+ const token=ticket.data.url.split('/').at(-1);
+ await s.download(response,token);
+ const zip=Buffer.concat(parts);
+ assert.equal(response.status,200);assert.equal(response.headers['Content-Type'],'application/zip');
+ assert.equal(zip.readUInt32LE(0),0x04034b50);
+ assert.ok(zip.includes(Buffer.from('Edit.mp3'))&&zip.includes(Buffer.from('Lesson.mp4')));
+ assert.ok(!zip.includes(Buffer.from('Bonus.mp3')));
+ assert.equal(state.events.length,2);
+ const replay={};await s.download(replay,token);assert.equal(replay.status,410);
+});
