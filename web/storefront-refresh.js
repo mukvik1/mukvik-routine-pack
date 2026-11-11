@@ -1,10 +1,10 @@
 (() => {
   'use strict';
-  if (document.querySelector('.rp-home') && matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches && !navigator.connection?.saveData) {
+  if (window.parent === window) {
     const snow = document.createElement('div');
     snow.className = 'rp-snow';
     snow.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 54; i++) {
       const flake = document.createElement('i');
       flake.style.cssText = '--x:' + Math.random() * 100 + '%;--size:' + (2 + Math.random() * 3.5) + 'px;--time:' + (11 + Math.random() * 16) + 's;--delay:-' + Math.random() * 27 + 's;--drift:' + (Math.random() * 80 - 40) + 'px';
       snow.append(flake);
@@ -63,11 +63,6 @@
     ];
     const logos = () => brands.map(([name, file]) => '<img src="/assets/software/' + file + '" alt="' + name + '" loading="eager" decoding="async">').join('');
     hero.querySelector('.rp-hero-copy')?.insertAdjacentHTML('afterend', '<section class="rp-software" aria-label="DJ software: rekordbox, Serato, VirtualDJ, Traktor and djay by Algoriddim"><div class="rp-ticker"><div class="rp-logo-group">' + logos() + '</div><div class="rp-logo-group" aria-hidden="true">' + logos() + '</div></div></section>');
-    const software = hero.querySelector('.rp-software');
-    if (software && 'IntersectionObserver' in window) {
-      software.classList.add('rp-ticker-observed');
-      new IntersectionObserver(([entry]) => software.classList.toggle('rp-ticker-visible', entry.isIntersecting)).observe(software);
-    }
     document.querySelector('main.rp-home')?.insertAdjacentHTML('beforeend', '<section class="rp-author"><img src="/assets/mukvik-live.jpg" width="1280" height="851" alt="Mukvik performing a DJ set in a club" loading="lazy" decoding="async"><div><p>BEHIND THE ROUTINES</p><h2>Meet Mukvik.</h2><p>I’m Mukvik, an open-format DJ and producer from Kyiv. I build routines around wordplay, tone play and transitions across hip-hop, R&amp;B, pop and club music.</p><a href="/about/">More about Mukvik →</a></div></section>');
   }
 

@@ -55,7 +55,7 @@ async function download(relativePath) {
     bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=named-routines-20261111"'));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261112-native-navigation"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
   }
   if (relativePath.startsWith('routines/') && relativePath.endsWith('.html')) {
     let html = bytes.toString('utf8');
@@ -66,7 +66,7 @@ async function download(relativePath) {
     bytes = Buffer.from(html);
   }
   if(relativePath.endsWith('.html')) {
-    bytes=Buffer.from(bytes.toString('utf8').replace(/(<img\b[^>]*\bsrc=["'])\/assets\/mukvik-logo(?:-transparent)?\.png(?=["'])/gi, '$1/assets/mukvik-logo-ui.webp'));
+    bytes=Buffer.from(bytes.toString('utf8').replaceAll('assets/mukvik-logo.png', 'assets/mukvik-logo-transparent.png'));
   }
 
   // Keep the storefront concise and the mobile hero close to the navigation.
@@ -146,14 +146,13 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
 
   if (relativePath.endsWith('.html')) {
     let html=bytes.toString('utf8');
-    if (relativePath === 'index.html') html=html.replace(/(<video\b[^>]*\bid="routine-player"[^>]*\bpreload=")metadata(")/, '$1none$2');
     if (/^(packs|routines|free|about)\//.test(relativePath)) {
-      if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261112-native-navigation"></head>');
-      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261112-native-navigation" defer></script></body>');
+      if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-persistent-background"></head>');
+      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261111-price" defer></script></body>');
     }
-    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261112-native-navigation');
+    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=17"><script defer src="/storefront-refresh.js?v=17"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=16"><script defer src="/storefront-refresh.js?v=14"></script></head>');
     bytes=Buffer.from(html);
   }
 
