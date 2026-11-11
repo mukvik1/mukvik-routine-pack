@@ -15,7 +15,7 @@
 
   function plan(home) {
     const offer = (tier, name, price, description) =>
-      '<div class="rp-plan-offer" data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p>' +
+      '<div class="rp-plan-offer rp-offer-' + tier + '" data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p><span class="rp-plan-edition">' + (tier==='pro'?'FULL LIBRARY':'ESSENTIALS') + '</span>' +
       '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
       '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Standard routines plus 4 Pro routines' : '10 Standard routines') +
       '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
@@ -30,11 +30,12 @@
   if (nav) {
     const price = document.createElement('a');
     price.className = 'rp-price-link';
-    price.href = '/#standard-plan';
+    price.href = '/price/';
+    if (/^\/price\/?$/.test(location.pathname)){price.classList.add('active');price.setAttribute('aria-current','page');}
     price.textContent = 'Price';
-    const packs = nav.querySelector('a[href="/packs/"]');
-    if (packs) packs.replaceWith(price);
-    else nav.insertBefore(price, nav.querySelector('a[href="/routines/"]'));
+    nav.querySelectorAll('a[href="/packs/"]').forEach(node=>node.remove());
+    const routines=nav.querySelector('a[href="/routines/"]');
+    if(routines)routines.after(price);else nav.append(price);
     price.addEventListener('click', () => nav.closest('.site-header')?.classList.remove('menu-open'));
   }
 
@@ -45,21 +46,24 @@
   });
   document.querySelectorAll('a[href^="/packs/routine-"]').forEach(node => {
     const slug = /^\/packs\/(routine-0[1-6])\/?$/.exec(node.getAttribute('href'))?.[1];
-    if (slug) node.href = '/routines/#' + slug;
+    if (slug) node.href = '/routines/' + slug + '/';
   });
 
   const hero = document.querySelector('.rp-home .rp-hero');
   if (hero) {
     const actions = hero.querySelector('.rp-actions');
-    if (actions) actions.innerHTML = '<a class="rp-get-started" href="#lessons">Get Started</a>';
+    document.querySelector('#lessons')?.remove();
+    const performances=document.querySelector('.rp-promo-wrap,.home-video-section');
+    if(performances)performances.id='performances';
+    if (actions) actions.innerHTML = '<a class="rp-get-started" href="'+(performances?'#performances':'/routines/')+'">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
       ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],
-      ['djay by Algoriddim', 'djay.png']
+      ['djay by Algoriddim', 'djay-white.svg']
     ];
     const logos = () => brands.map(([name, file]) => '<img src="/assets/software/' + file + '" alt="' + name + '" loading="eager" decoding="async">').join('');
     hero.insertAdjacentHTML('afterend', '<section class="rp-software" aria-label="DJ software: rekordbox, Serato, VirtualDJ, Traktor and djay by Algoriddim"><div class="rp-ticker"><div class="rp-logo-group">' + logos() + '</div><div class="rp-logo-group" aria-hidden="true">' + logos() + '</div></div></section>');
-    document.querySelector('main.rp-home')?.insertAdjacentHTML('beforeend', '<section class="rp-author"><img src="/assets/free-videos/get-right-x-just-a-lil-bit.jpg" alt="Mukvik performing at his DJ decks" loading="lazy"><div><p>BEHIND THE ROUTINES</p><h2>Meet Mukvik.</h2><p>I’m Mukvik, an open-format DJ and producer from Kyiv. I build routines around wordplay, tone play and transitions across hip-hop, R&amp;B, pop and club music.</p><a href="/about/">More about Mukvik →</a></div></section>' + plan(true));
+    document.querySelector('main.rp-home')?.insertAdjacentHTML('beforeend', '<section class="rp-author"><img src="/assets/free-videos/get-right-x-just-a-lil-bit.jpg" alt="Mukvik performing at his DJ decks" loading="lazy"><div><p>BEHIND THE ROUTINES</p><h2>Meet Mukvik.</h2><p>I’m Mukvik, an open-format DJ and producer from Kyiv. I build routines around wordplay, tone play and transitions across hip-hop, R&amp;B, pop and club music.</p><a href="/about/">More about Mukvik →</a></div></section>');
   }
 
   const packRoutines = [
@@ -78,16 +82,14 @@
       card.id = slug;
       card.className = 'standalone-routine available-routine';
       card.dataset.standardPackCard = slug;
-      card.innerHTML = '<div class="individual-card-layout"><video class="individual-performance-video" controls playsinline preload="none" poster="/assets/lesson-previews/pack-' + number + '-blurred.jpg" src="/assets/lesson-previews/pack-' + number + '-blurred.mp4"></video><div><h2></h2><div class="rp-standard-actions"><button type="button" class="store-button">Listen</button></div></div></div>';
-      const video = card.querySelector('video'), listen = card.querySelector('button');
+      card.innerHTML = '<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="/assets/lesson-previews/pack-' + number + '-blurred.jpg"><div><h2></h2><a class="routine-detail-link" href="/routines/' + slug + '/">Open Routine</a></div></div>';
       card.querySelector('h2').textContent = title;
-      video.setAttribute('aria-label','Preview: ' + title);
-      listen.addEventListener('click', () => video.paused ? video.play().catch(() => {}) : video.pause());
-      video.addEventListener('play', () => { listen.textContent = 'Pause'; });
-      for (const event of ['pause','ended']) video.addEventListener(event, () => { listen.textContent = 'Listen'; });
       fragment.append(card);
     }
     grid.prepend(fragment);
+  }
+  if (/^\/price\/?$/.test(location.pathname)) {
+    document.querySelector('main')?.insertAdjacentHTML('beforeend',plan(false));
   }
   if (document.body.dataset.page === 'routines' || location.pathname.startsWith('/routines/')) {
     document.querySelectorAll('.bundle-card,.cross-sell,.routine-offer,.bundle-offer,.routine-detail-actions').forEach(node => node.remove());
@@ -95,10 +97,36 @@
     const grid = document.querySelector('.coming-grid.individual-grid');
     if (grid) {
       addPackRoutines(grid);
-      grid.insertAdjacentHTML('beforebegin', '<div class="rp-routine-intro"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h1>Individual routines.</h1><p>Listen to the previews and explore the full routine library.</p></div>' + plan(false));
+      grid.insertAdjacentHTML('beforebegin','<div class="rp-routine-intro"><h1>Individual Routines</h1></div>');
+      for(const link of grid.querySelectorAll('a.routine-detail-link'))link.textContent='Open Routine';
+      for(const video of grid.querySelectorAll('video[poster]')){
+        const poster=document.createElement('img');poster.className=video.className;poster.src=video.poster;poster.alt='';poster.loading='lazy';video.replaceWith(poster);
+      }
       document.querySelectorAll('.store-heading').forEach(node => node.remove());
     } else {
-      document.querySelector('main')?.insertAdjacentHTML('beforeend', plan(false));
+      const main=document.querySelector('main');
+      const slug=/^\/routines\/(routine-0[1-6])\/?$/.exec(location.pathname)?.[1];
+      const entry=packRoutines.findIndex(([,id])=>id===slug);
+      if(main&&entry>=0){
+        const number=entry+1;
+        document.title=packRoutines[entry][0]+' — MUKVIK';
+        main.innerHTML='<section class="routine-detail-panel"><p><a href="/routines/">Routines</a></p><h1></h1><video class="routine-detail-video" controls playsinline preload="none" poster="/assets/lesson-previews/pack-'+number+'-blurred.jpg" src="/assets/lesson-previews/pack-'+number+'-blurred.mp4"></video></section>';
+        main.querySelector('h1').textContent=packRoutines[entry][0];
+      }
+      const section=main?.querySelector('.routine-detail-panel');
+      if(section){
+        const player=section.querySelector('video');
+        const actions=document.createElement('div');actions.className='rp-detail-controls';actions.dataset.routineActions='';
+        if(player){
+          const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';
+          play.addEventListener('click',()=>player.paused?player.play().catch(()=>{}):player.pause());
+          player.addEventListener('play',()=>play.textContent='Pause');
+          for(const event of ['pause','ended'])player.addEventListener(event,()=>play.textContent='Play');
+          actions.append(play);
+        }
+        section.append(actions);
+      }
+      main?.insertAdjacentHTML('beforeend',plan(false));
     }
   }
 

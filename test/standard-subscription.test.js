@@ -13,10 +13,10 @@ const files = { pack, ...Object.fromEntries([3,5,7,8,9,10,11,12].map(n=>['routin
 const reply = (res,status,data) => Object.assign(res,{status,data});
 const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:row.amount_kop,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
 
-function setup(){
+function setup(adminEmail){
  const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null };
  const db = { release(){}, async query(sql,p=[]){
-  if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'||sql.includes('FROM customers'))return {rows:[]};
+  if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'||sql.startsWith('SELECT id FROM customers'))return {rows:[]};
   if(sql.startsWith('SELECT * FROM standard_subscriptions'))return {rows:state.row?[state.row]:[]};
   if(sql.startsWith('SELECT id,customer_id'))return {rows:state.row?.callback_hash===p[0]?[state.row]:[]};
   if(sql.startsWith('INSERT INTO standard_subscriptions')){
@@ -32,19 +32,19 @@ function setup(){
    state.row.cancelled_at=new Date();return {rows:[]};
   }
   if(sql.startsWith('INSERT INTO standard_download_tickets')){
-   if(!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.tier)))return {rowCount:0};
-   state.tickets.set(p[0],p[2]);return {rowCount:1};
+   if(!p[4]&&!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.tier)))return {rowCount:0};
+   state.tickets.set(p[0],{slug:p[2],admin:p[4]});return {rowCount:1};
   }
   if(sql.startsWith('DELETE FROM standard_download_tickets AS t')){
-   const slug=state.tickets.get(p[0]);
-   if(state.row?.tier==='standard'&&p[1].includes(slug))return {rowCount:0};
-   if(!slug||!(state.row?.paid_until>new Date()))return {rowCount:0};
+   const saved=state.tickets.get(p[0]),slug=saved?.slug;
+   if(!saved?.admin&&state.row?.tier==='standard'&&p[1].includes(slug))return {rowCount:0};
+   if(!slug||!(saved.admin&&p[2]===adminEmail)&&!(state.row?.paid_until>new Date()))return {rowCount:0};
    state.tickets.delete(p[0]);return {rowCount:1,rows:[{routine_slug:slug}]};
   }
   throw Error('Unexpected SQL '+sql);
  }};
  const subscription = createStandard(settings,{
-  pool:{query:db.query,connect:async()=>db},files,packManifest,reply,getDriveToken:async()=> 'fake-drive',
+  pool:{query:db.query,connect:async()=>db},files,packManifest,adminEmail,reply,getDriveToken:async()=> 'fake-drive',
   driveFetch:async url=>{state.events.push(url);return new Response(url.includes('video')?'video-test':'audio-test');},
   fetchImpl:async (url,req)=>{
    assert.equal(req.headers['X-Token'],'fake-only');
@@ -120,4 +120,15 @@ test('Pro has its own billing amount and four exclusives; Standard cannot issue 
  const denied={};await standard.subscription.ticket(denied,user,'call-me-maybe-poker-face');assert.equal(denied.status,403);
  standard.state.row.tier='legacy';
  const retained={};await standard.subscription.ticket(retained,user,'call-me-maybe-poker-face');assert.equal(retained.status,200);
+});
+
+test('verified admin can audit an archive without a subscription; a matching unverified email cannot',async()=>{
+ const email='admin@example.test';
+ const {subscription:s,state}=setup(email);
+ const denied={};await s.ticket(denied,{id:'admin',email},'routine-01');assert.equal(denied.status,403);
+ const nonAdmin={};await s.ticket(nonAdmin,{id:'other',email:'other@example.test',email_verified_at:new Date()},'routine-01');assert.equal(nonAdmin.status,403);
+ const approved={};await s.ticket(approved,{id:'admin',email,email_verified_at:new Date()},'routine-01');assert.equal(approved.status,200);
+ const response=new PassThrough();response.resume();response.writeHead=status=>{response.status=status;};
+ await s.download(response,approved.data.url.split('/').at(-1));
+ assert.equal(response.status,200);assert.equal(state.events.length,2);
 });

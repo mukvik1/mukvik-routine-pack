@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=standard-pro-20261111"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=price-details-20261111"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -73,7 +73,8 @@ async function download(relativePath) {
   if (relativePath === 'index.html') {
     let html = bytes.toString('utf8');
     html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
-    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#lessons">Get Started</a></div>');
+    html = html.replace(/<section class="rp-section rp-showcase" id="lessons">[\s\S]*?(?=<section class="rp-promo-wrap">)/, '');
+    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#performances">Get Started</a></div>');
     bytes = Buffer.from(html);
   }
   if (relativePath === 'packs/index.html') {
@@ -147,11 +148,11 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     let html=bytes.toString('utf8');
     if (/^(packs|routines|free|about)\//.test(relativePath)) {
       if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-persistent-background"></head>');
-      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261024-persistent-background" defer></script></body>');
+      if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261111-price" defer></script></body>');
     }
-    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261024-persistent-background');
+    html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=8"><script defer src="/storefront-refresh.js?v=8"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=9"><script defer src="/storefront-refresh.js?v=9"></script></head>');
     bytes=Buffer.from(html);
   }
 

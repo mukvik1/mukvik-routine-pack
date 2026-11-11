@@ -16,7 +16,7 @@ const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
 const returnedOrder=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(orderId||'')?orderId:null;
 let accountRequested=accountQuery.get('account')==='1';
-let orderKey=null,cartBusy=false,pendingFree=null,usdUahRate=46,packPromotion=null;
+let orderKey=null,cartBusy=false,pendingFree=null,pendingPlanTier=null,usdUahRate=46,packPromotion=null;
 try{cart=JSON.parse(read('mukvik_guest_cart')||'[]');if(!Array.isArray(cart))cart=[];cart=cart.filter(code=>code==='pack');}catch{}
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
@@ -69,6 +69,12 @@ async function afterLogin(){
  auth.close();
  if(pendingFree){const slug=pendingFree;pendingFree=null;pendingCheckout=false;await downloadFree(slug);return;}
  if(accountRequested){await openRequestedAccount();return;}
+ if(pendingPlanTier){
+  const tier=pendingPlanTier;pendingPlanTier=null;
+  const offer=document.querySelector('[data-plan-tier="'+tier+'"]');
+  offer?.scrollIntoView({block:'nearest'});offer?.querySelector('button.primary')?.focus({preventScroll:true});
+  return;
+ }
  renderAccount();
  show(pendingCheckout?cartDialog:account);pendingCheckout=false;
 }
@@ -279,14 +285,12 @@ function renderStandard(){
    panel.append(el('p',current?'Your downloads are available.':'Choose another plan after your current paid period ends.'),button('Manage subscription',()=>{renderAccount();show(account);}));
   }
   else {
-   const amount=new Intl.NumberFormat('en-UA',{style:'currency',currency:'UAH'}).format(plan.amountKop/100);
-   const note=el('p',amount+' charged today and every month until cancelled. Your bank may convert this amount into your card currency.');
    const consent=el('input');consent.type='checkbox';
-   const label=el('label');label.append(consent,document.createTextNode(' I agree to the monthly charge and the '));
+   const label=el('label');label.append(consent,document.createTextNode(' I agree to $'+(plan.priceCents/100)+'/month, automatic renewal, and the '));
    const terms=el('a','subscription terms');terms.href='/standard-terms.html';terms.target='_blank';terms.rel='noopener';label.append(terms,'.');
    const feedback=el('p','');feedback.setAttribute('role','status');
-   const start=button(user?'Subscribe with Monobank':'Sign in to subscribe',async()=>{
-    if(!user){openAuth('login');return;}
+   const start=button(user?'Choose '+(tier==='pro'?'Pro':'Standard'):'Sign in to choose '+(tier==='pro'?'Pro':'Standard'),async()=>{
+    if(!user){pendingPlanTier=tier;openAuth('login');return;}
     if(!consent.checked){feedback.textContent='Confirm the monthly payment before continuing.';return;}
     start.disabled=true;
     try{
@@ -296,12 +300,13 @@ function renderStandard(){
      window.top.location.assign(url.href);
     }catch(e){feedback.textContent=e.message;start.disabled=false;}
    },'store-button primary');
-   panel.append(note,label,start,feedback);
+   panel.append(label,start,feedback);
   }
   offer.append(panel);
  }
- if(!user||!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return;
- const available=new Set(standardPlan.slugs.filter(slug=>standardAccess.tier!=='standard'||!proSlugs.has(slug)));
+ const adminAudit=user?.canAuditRoutineDownloads===true;
+ if(!user||(!adminAudit&&(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())))return;
+ const available=new Set(standardPlan.slugs.filter(slug=>adminAudit||standardAccess?.tier!=='standard'||!proSlugs.has(slug)));
  function appendDownload(host,slug){
   if(!host||!available.has(slug))return;
   const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';
@@ -317,13 +322,8 @@ function renderStandard(){
   },'store-button primary');
   wrap.append(download,message);host.append(wrap);
  }
- document.querySelectorAll('[data-standard-pack-card]').forEach(card=>appendDownload(card.querySelector('.rp-standard-actions'),card.dataset.standardPackCard));
- document.querySelectorAll('.coming-grid a.routine-detail-link[href]').forEach(link=>{
-  const slug=/^\/routines\/([a-z0-9-]+)\/$/.exec(new URL(link.href).pathname)?.[1];
-  if(slug)appendDownload(link.parentElement,slug);
- });
- const slug=/^\/(?:routines|packs)\/([a-z0-9-]+)\/$/.exec(location.pathname)?.[1];
- if(slug)appendDownload(document.querySelector('main .rp-plan-offer')||document.querySelector('main'),slug);
+ const slug=/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
+ if(slug)appendDownload(document.querySelector('[data-routine-actions]'),slug);
 }
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));

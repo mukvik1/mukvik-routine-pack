@@ -218,8 +218,8 @@ http.createServer(async (req, res) => {
   }
   if (/^\/packs(?:\/|$)/.test(pathname)) {
     const routine = /^\/packs\/(routine-0[1-6])(?:\/index\.html|\/)?$/.exec(pathname)?.[1];
-    const anchor = routine ? '#'+routine : pathname.includes('/get-the-pack') ? '#standard-plan' : '';
-    res.writeHead(302, {Location: '/routines/'+url.search+anchor, 'Cache-Control':'no-store'});
+    const destination = routine ? '/routines/'+routine+'/' : pathname.includes('/get-the-pack') ? '/price/' : '/routines/';
+    res.writeHead(302, {Location: destination+url.search, 'Cache-Control':'no-store'});
     return res.end();
   }
   const oldOrder = url.searchParams.get('monoOrder');
@@ -227,5 +227,5 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location:'/?account=1&orderId='+encodeURIComponent(oldOrder), 'Cache-Control':'no-store'});
     return res.end();
   }
-  serveStatic(req, res, pathname);
+  serveStatic(req, res, /^\/routines\/routine-0[1-6]\/?$/.test(pathname) ? '/routines/library-detail.html' : pathname === '/price' ? '/price/' : pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));

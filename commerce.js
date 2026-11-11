@@ -88,7 +88,7 @@ function createCommerce(settings=process.env,overrides={}){
  let standard=null;
  try{standard=require('./standard-subscription').createStandard(settings,{
   pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
-  getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
+  adminEmail,getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
  });}catch(error){console.error('Standard integration unavailable:',error.code||error.name,error.routine||'');}
  const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED!=='pilot');
  const subscriptionOnly=true;
@@ -430,7 +430,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
   }
-  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,welcomePackEligible:await welcomeEligible(pool,user.id),orders:[...orders.values()]});
+  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:await welcomeEligible(pool,user.id),orders:[...orders.values()]});
  }
  async function hideUnpaidOrder(res,user,orderId){
   const result=await pool.query(`UPDATE orders SET hidden_by_customer_at=COALESCE(hidden_by_customer_at,now())

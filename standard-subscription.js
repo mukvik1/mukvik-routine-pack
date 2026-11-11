@@ -82,7 +82,7 @@ function interpretStatus(row, data, now = Date.now()) {
   return { paidUntil, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
 }
 
-function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, driveFetch = fetch, reply, packManifest }) {
+function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, driveFetch = fetch, reply, packManifest, adminEmail }) {
   if (settings.STANDARD_SUBSCRIPTIONS_ENABLED === 'false' || !settings.MONOBANK_SUBSCRIPTION_TOKEN) return null;
   const entries = catalogFiles(files, packManifest);
   const publicOrigin = new URL(settings.PUBLIC_ORIGIN);
@@ -162,7 +162,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
       const callbackUrl = publicOrigin.origin + '/api/v2/standard/callback/' + callback;
       const created = await api('create', {
         amount, ccy: 980, interval: '1m', validity: VALIDITY,
-        redirectUrl: webOrigin.origin + '/routines/?subscription=return#standard-plan',
+        redirectUrl: webOrigin.origin + '/price/?subscription=return#standard-plan',
         webHookUrls: { chargeUrl: callbackUrl, statusUrl: callbackUrl }
       }, 'POST');
       if (!providerPattern.test(created?.subscriptionId || '') || !isTrustedCheckoutUrl(created.pageUrl)) {
@@ -202,17 +202,18 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const secret = random();
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
       SELECT $1,$2,$3,now()+interval '60 seconds'
-      WHERE EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[])) RETURNING token_hash`,
-    [sha(secret), user.id, slug, allowedTiers(slug)]);
+      WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[]))) RETURNING token_hash`,
+    [sha(secret), user.id, slug, allowedTiers(slug), Boolean(adminEmail && user.email===adminEmail && user.email_verified_at)]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/download/' + secret });
   }
   async function download(res, secret) {
     if (!secretPattern.test(secret)) return reply(res, 404, { error: 'Not found.' });
     const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now()
-      AND EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
-        AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[])))))
-      RETURNING routine_slug`, [sha(secret),PRO_SLUGS]);
+      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND c.email=$3 AND c.email_verified_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
+        AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
+      RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
     const slug = r.rows[0].routine_slug, list = entries.get(slug);
     if (!list) return reply(res, 404, { error: 'Routine not found.' });

@@ -7,7 +7,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 .rp-ticker{display:flex;width:100%}
 .rp-logo-group{display:flex;align-items:center;gap:clamp(40px,5vw,64px);padding-right:clamp(40px,5vw,64px);box-sizing:border-box;flex:0 0 auto;min-width:100%;justify-content:space-between;animation:rp-ticker 25s linear infinite}
 .rp-logo-group img{display:block;max-width:170px;width:auto;height:39px;object-fit:contain;flex:none;filter:brightness(0) invert(1)}
-.rp-logo-group img[src$="djay.png"]{height:44px}
+.rp-logo-group img[src$="djay-white.svg"]{height:44px}
 .rp-logo-group img[src$="traktor.svg"]{height:32px;max-width:180px}
 .rp-logo-group img[src$="virtualdj-white.svg"]{height:38px}
 @keyframes rp-ticker{from{transform:translate3d(0,0,0)}to{transform:translate3d(-100%,0,0)}}
@@ -41,7 +41,7 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-get-started:focus-visible,.rp-plan a:focus-visible{outline:2px solid #adc2ff;outline-offset:4px}
 
-@media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay.png"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
+@media(max-width:700px){.rp-author,.rp-plan{grid-template-columns:1fr}.rp-author img{max-height:235px}.rp-logo-group{gap:38px;padding-right:38px}.rp-logo-group img{height:32px;max-width:140px}.rp-logo-group img[src$="djay-white.svg"]{height:37px}.rp-logo-group img[src$="traktor.svg"]{height:28px}.rp-logo-group img[src$="virtualdj-white.svg"]{height:32px}.rp-snow i:nth-child(n+35){display:none}}
 @media(prefers-reduced-motion:reduce){body.rp-navigation-shell>.rp-snow:not([hidden]),.rp-snow{display:none!important}.rp-ticker{animation:none;width:auto;overflow-x:auto}.rp-logo-group{animation:none}.rp-logo-group:nth-child(2){display:none}}
 .rp-standard-actions,.rp-standard-download{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
 .rp-standard-cta{display:grid;gap:10px;margin-top:12px}
@@ -59,3 +59,28 @@ body[data-page="routines"] .coming-grid.individual-grid>article.rp-tiered-routin
 .rp-routine-tier{position:absolute;top:12px;right:12px;border-radius:999px;padding:5px 10px;border:1px solid #688efa;background:#19264d;color:#d5e0ff;font-weight:800;font-size:.72rem;letter-spacing:.04em}
 .rp-routine-tier-pro{background:#2657ec;border-color:#2657ec;color:#fff}
 @media(max-width:700px){.rp-plan-tiers{grid-template-columns:minmax(0,1fr)}}
+/* Membership pricing: two distinct cards, with a quiet cobalt highlight for Pro. */
+.rp-plan.rp-plan-tiers{width:min(940px,calc(100% - 32px));padding:0;margin:clamp(38px,8vw,104px) auto;background:none;border:0;gap:clamp(14px,2vw,24px)}
+.rp-plan-tiers>.rp-plan-copy{margin-bottom:clamp(16px,3vw,36px)}
+.rp-plan-tiers>.rp-plan-copy h2{font-size:clamp(38px,7vw,82px);letter-spacing:-.045em;line-height:.96;margin:12px 0 16px}
+.rp-plan-tiers>.rp-plan-copy>p:last-child{color:#aeb9cc}
+.rp-plan-tiers .rp-plan-offer{position:relative;min-width:0;display:flex;flex-direction:column;padding:clamp(22px,4vw,42px);border-radius:24px;border:1px solid #343f56;background:linear-gradient(155deg,#1b2333,#101624 62%);box-shadow:0 18px 55px #03061162;overflow:hidden}
+.rp-plan-tiers .rp-offer-pro{border-color:#708dff;background:radial-gradient(ellipse at top right,#263c8d 0%,#18213d 40%,#111724 78%);box-shadow:0 14px 55px #10276855}
+.rp-plan .rp-plan-name{font-size:1.05rem;letter-spacing:.08em;text-transform:uppercase}
+.rp-plan-edition{font-size:.65rem;letter-spacing:.11em;font-weight:800;color:#a3b8ec;margin-top:6px}
+.rp-plan-tiers .rp-plan-price{font-size:clamp(48px,7vw,76px);letter-spacing:-.055em;margin:24px 0 10px}
+.rp-plan-price small{letter-spacing:0;color:#afbdd8}
+.rp-plan-tiers .rp-plan-rate-note{color:#b4bfd6;margin:0 0 14px}
+.rp-plan-tiers .rp-plan-features{border-color:#36425b;margin-top:16px;margin-bottom:20px}
+.rp-plan .rp-plan-features>li::before{background:#223e81;color:#dce7ff}
+.rp-plan .rp-standard-cta{margin-top:auto}
+.rp-plan .rp-standard-cta label{line-height:1.5;color:#bdc8dd}
+.rp-plan .rp-standard-cta a{color:#b1c5ff}
+.rp-plan .rp-standard-cta .store-button.primary{min-height:48px;border-radius:12px;margin-top:6px}
+.rp-plan .rp-offer-standard .rp-standard-cta .store-button.primary{background:#222e46;border-color:#60749f}
+.rp-detail-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:18px}
+.rp-detail-controls:empty{display:none}
+body[data-page="routines"] .coming-grid.individual-grid>article.rp-tiered-routine{padding-top:42px!important}
+.rp-routine-tier{top:10px;right:10px;padding:3px 7px;font-size:.61rem;text-transform:uppercase;line-height:1.2;letter-spacing:.09em;border-radius:6px;border-color:#7f9acc55;background:#131b2f;color:#b7c7ec}
+.rp-routine-tier-pro{background:#233b83;color:#e7edff;border-color:#7290ff88}
+#performances{scroll-margin-top:24px}
