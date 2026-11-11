@@ -35,7 +35,7 @@
     if (actions) actions.innerHTML = '<a class="rp-get-started" href="#lessons">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
-      ['VirtualDJ', 'virtualdj.svg'], ['TRAKTOR', 'traktor.svg'],
+      ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],
       ['djay by Algoriddim', 'djay.png']
     ];
     const logos = () => brands.map(([name, file]) => '<img src="/assets/software/' + file + '" alt="' + name + '" loading="eager" decoding="async">').join('');
