@@ -71,16 +71,16 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-plan .rp-standard-cta .store-button.primary{background:#2657ec;border-color:#2657ec;color:#fff}
 .site-header [data-cart][hidden],main a[hidden]{display:none!important}
 
-.rp-plan-tiers{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:stretch}
+.rp-plan-tiers{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
 .rp-plan-tiers>.rp-plan-copy{grid-column:1/-1;text-align:center}
 .rp-plan-tiers>.rp-plan-copy>p:last-child{margin-inline:auto}
-@media(max-width:700px){.rp-plan-tiers{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:860px){.rp-plan-tiers{grid-template-columns:minmax(0,1fr)}}
 /* Membership pricing: two distinct cards, with a quiet cobalt highlight for Pro. */
 .rp-plan.rp-plan-tiers{width:min(940px,calc(100% - 32px));padding:0;margin:clamp(38px,8vw,104px) auto;background:none;border:0;gap:clamp(14px,2vw,24px)}
 .rp-plan-tiers>.rp-plan-copy{margin-bottom:clamp(16px,3vw,36px)}
 .rp-plan-tiers>.rp-plan-copy h2{font-size:clamp(38px,7vw,82px);letter-spacing:-.045em;line-height:.96;margin:12px 0 16px}
 .rp-plan-tiers>.rp-plan-copy>p:last-child{color:#aeb9cc}
-.rp-plan-tiers .rp-plan-offer{position:relative;min-width:0;display:flex;flex-direction:column;padding:clamp(22px,4vw,42px);border-radius:24px;border:1px solid #343f56;background:linear-gradient(155deg,#1b2333,#101624 62%);box-shadow:0 18px 55px #03061162;overflow:hidden}
+.rp-plan-tiers .rp-plan-offer{position:relative;min-width:0;display:flex;flex-direction:column;padding:clamp(22px,2.6vw,32px);border-radius:24px;border:1px solid #343f56;background:linear-gradient(155deg,#1b2333,#101624 62%);box-shadow:0 18px 55px #03061162;overflow:hidden}
 .rp-plan-tiers .rp-offer-pro{border-color:#708dff;background:radial-gradient(ellipse at top right,#263c8d 0%,#18213d 40%,#111724 78%);box-shadow:0 14px 55px #10276855}
 .rp-plan .rp-plan-name{font-size:1.05rem;letter-spacing:.08em;text-transform:uppercase}
 .rp-plan-edition{font-size:.65rem;letter-spacing:.11em;font-weight:800;color:#a3b8ec;margin-top:6px}
@@ -109,3 +109,7 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 /* Keep the tier label in its own space above the card content. */
 .coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier{position:static;align-self:flex-end;justify-self:end;grid-column:1/-1;order:-1;flex:none;font:700 11px/14px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:3px 7px;border:1px solid #7f9acc55;border-radius:6px;background:#131b2f;color:#b7c7ec}
 .coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-pro{background:#233b83;color:#e7edff;border-color:#7290ff88}
+
+.rp-plan .rp-offer-free>.store-button{margin-top:auto;align-self:flex-start;min-height:44px;align-items:center;color:#f0f6ff}
+.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-free{background:#123a37;color:#baf6e9;border-color:#59bcaa88}
+#free-routines{scroll-margin-top:24px}

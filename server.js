@@ -241,6 +241,10 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location: destination+url.search, 'Cache-Control':'no-store'});
     return res.end();
   }
+  if (['/free', '/free/', '/free/index.html'].includes(pathname)) {
+    res.writeHead(302, {Location:'/routines/'+url.search+'#free-routines', 'Cache-Control':'no-store'});
+    return res.end();
+  }
   const oldOrder = url.searchParams.get('monoOrder');
   if (pathname === '/' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(oldOrder || '')) {
     res.writeHead(302, {Location:'/?account=1&orderId='+encodeURIComponent(oldOrder), 'Cache-Control':'no-store'});

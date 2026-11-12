@@ -252,11 +252,11 @@ function renderStandard(){
  if(!standardPlan){
   restorePreview();
   document.querySelectorAll('[data-standard-cta]').forEach(n=>n.remove());
-  for(const offer of document.querySelectorAll('.rp-plan-offer')){
+  for(const offer of document.querySelectorAll('.rp-plan-offer:not(.rp-offer-free)')){
    const name=offer.querySelector('.rp-plan-name');
    if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
    const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-   if(copy)copy.textContent='Preview the routines below. Pro gives you access to individual downloads.';
+   if(copy)copy.textContent='Explore the free routines while subscriptions are unavailable.';
    if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
   }
   return;
@@ -273,7 +273,7 @@ function renderStandard(){
   const badge=el('span',tier==='pro'?'Ultra':'Pro','rp-routine-tier rp-routine-tier-'+tier);
   card.prepend(badge);
  }
- for(const offer of document.querySelectorAll('.rp-plan-offer')){
+ for(const offer of document.querySelectorAll('.rp-plan-offer:not(.rp-offer-free)')){
   const tier=offer.dataset.planTier||'standard';
   const plan=standardPlan.plans?.[tier];
   if(!plan){const pending=offer.querySelector('.rp-plan-pending');if(pending)pending.textContent='This plan is not available yet.';continue;}
@@ -282,7 +282,7 @@ function renderStandard(){
   if(benefit)benefit.textContent='MP3 downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-  if(copy)copy.textContent='Listen to the previews. Choose Pro for the essentials or Ultra for the full library.';
+  if(copy)copy.textContent='Start with Free, choose Pro for the essentials, or unlock the full library with Ultra.';
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
