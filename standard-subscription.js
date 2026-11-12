@@ -154,7 +154,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     });
   }
   async function checkout(res, user, consent, tier = 'standard') {
-    if (!Object.hasOwn(PLAN_CENTS, tier)) return reply(res, 400, {error:'Choose Standard or Pro.'});
+    if (!Object.hasOwn(PLAN_CENTS, tier)) return reply(res, 400, {error:'Choose Pro or Ultra.'});
     const amount = uahKopiykas(PLAN_CENTS[tier], USD_UAH_RATE);
     if (consent !== true || !user.email_verified_at) return reply(res, 400, { error: 'Verify your email and confirm the recurring payment terms.' });
     const result = await locked(user.id, async db => {

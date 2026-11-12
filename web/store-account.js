@@ -184,7 +184,7 @@ async function openRequestedAccount(){
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'));
  if(standardPlan){
   const section=el('section',undefined,'store-order');
-  section.append(el('h3',standardAccess?.tier==='pro'?'Pro subscription':'Standard subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
+  section.append(el('h3',standardAccess?.tier==='pro'?'Ultra subscription':'Pro subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
   if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
   if(standardAccess?.cancellable){
    const cancel=button('Cancel auto-renewal',async()=>{
@@ -256,7 +256,7 @@ function renderStandard(){
    const name=offer.querySelector('.rp-plan-name');
    if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
    const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-   if(copy)copy.textContent='Preview the routines below. Standard gives you access to individual downloads.';
+   if(copy)copy.textContent='Preview the routines below. Pro gives you access to individual downloads.';
    if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
   }
   return;
@@ -270,7 +270,7 @@ function renderStandard(){
   if(!listedSlugs.has(slug))continue;
   const tier=proSlugs.has(slug)?'pro':'standard';
   card.classList.add('rp-tiered-routine');
-  const badge=el('span',tier==='pro'?'Pro':'Standard','rp-routine-tier rp-routine-tier-'+tier);
+  const badge=el('span',tier==='pro'?'Ultra':'Pro','rp-routine-tier rp-routine-tier-'+tier);
   card.prepend(badge);
  }
  for(const offer of document.querySelectorAll('.rp-plan-offer')){
@@ -282,7 +282,7 @@ function renderStandard(){
   if(benefit)benefit.textContent='MP3 downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-  if(copy)copy.textContent='Listen to the previews. Choose Standard for the essentials or Pro for the full library.';
+  if(copy)copy.textContent='Listen to the previews. Choose Pro for the essentials or Ultra for the full library.';
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
@@ -297,7 +297,7 @@ function renderStandard(){
    const label=el('label');label.append(consent,document.createTextNode(' I agree to $'+(plan.priceCents/100)+'/month, automatic renewal, and the '));
    const terms=el('a','subscription terms');terms.href='/standard-terms.html';terms.target='_blank';terms.rel='noopener';label.append(terms,'.');
    const feedback=el('p','');feedback.setAttribute('role','status');
-   const start=button(user?'Choose '+(tier==='pro'?'Pro':'Standard'):'Sign in to choose '+(tier==='pro'?'Pro':'Standard'),async()=>{
+   const start=button(user?'Choose '+(tier==='pro'?'Ultra':'Pro'):'Sign in to choose '+(tier==='pro'?'Ultra':'Pro'),async()=>{
     if(!user){pendingPlanTier=tier;openAuth('login');return;}
     if(!consent.checked){feedback.textContent='Confirm the monthly payment before continuing.';return;}
     start.disabled=true;

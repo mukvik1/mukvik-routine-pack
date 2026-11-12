@@ -17,14 +17,14 @@
     const offer = (tier, name, price, description) =>
       '<div class="rp-plan-offer rp-offer-' + tier + '" data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p><span class="rp-plan-edition">' + (tier==='pro'?'FULL LIBRARY':'ESSENTIALS') + '</span>' +
       '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
-      '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Standard routines plus 4 Pro routines' : '10 Standard routines') +
+      '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Pro routines plus 4 Ultra routines' : '10 Pro routines') +
       '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
       '<span class="rp-plan-pending">Checking availability…</span></div>';
     return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
       '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">Choose your plan.</h2>' +
       '<p>Preview the routines and choose the downloads you want.</p></div>' +
-      offer('standard','Standard',15,'The essentials for your next set.') +
-      offer('pro','Pro',25,'The full library, including Pro exclusives.') + '</section>';
+      offer('standard','Pro',15,'The essentials for your next set.') +
+      offer('pro','Ultra',25,'The full library, including Ultra exclusives.') + '</section>';
   }
   const nav = document.querySelector('.site-header nav');
   if (nav) {
