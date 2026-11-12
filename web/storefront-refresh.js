@@ -15,13 +15,13 @@
 
   function plan(home) {
     const offer = (tier, name, price, description) =>
-      '<div class="rp-plan-offer rp-offer-' + tier + '" data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p><span class="rp-plan-edition">' + (tier==='pro'?'FULL LIBRARY':'ESSENTIALS') + '</span>' +
+      '<div class="rp-plan-offer rp-offer-' + tier + '" hidden data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p><span class="rp-plan-edition">' + (tier==='pro'?'FULL LIBRARY':'ESSENTIALS') + '</span>' +
       '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
       '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Pro routines plus 4 Ultra routines' : '10 Pro routines') +
       '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
       '<span class="rp-plan-pending">Checking availability…</span></div>';
-    const free = '<div class="rp-plan-offer rp-offer-free"><p class="rp-plan-name">Free</p><span class="rp-plan-edition">FREE ROUTINES</span>' +
-      '<p class="rp-plan-price">$0</p><p class="rp-plan-rate-note">No subscription required.</p><p>Get started with the free routines.</p>' +
+    const free = '<div class="rp-plan-offer rp-offer-free" hidden><p class="rp-plan-name">Free</p><span class="rp-plan-edition">FREE ROUTINES</span>' +
+      '<p class="rp-plan-price">$0</p><p class="rp-plan-rate-note">Activated when you create an account.</p><p>Get started with the free routines.</p>' +
       '<ul class="rp-plan-features"><li>6 free routines</li><li>Video previews</li><li>Downloads with a free account</li></ul>' +
       '<a class="store-button" href="/routines/#free-routines">Browse free routines</a></div>';
     return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +

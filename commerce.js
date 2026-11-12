@@ -545,12 +545,17 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
    const user=await session(req);
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
+   if(req.method==='POST'&&url.pathname==='/api/v2/auth/preview-session'){
+    const credential=/^Bearer ([a-zA-Z0-9_-]{40,100})$/.exec(req.headers.authorization)[1];
+    res.writeHead(204,{'Set-Cookie':'__Secure-rp-preview='+credential+'; Path=/assets/; Secure; HttpOnly; SameSite=Strict','Cache-Control':'no-store'});
+    res.end();return true;
+   }
    if(url.pathname.startsWith('/api/v2/standard/')||url.pathname==='/api/v2/standard'){
     if(!standardPublic&&user.email!==adminEmail){response(res,404,{error:'Not found.'});return true;}
     if(!standard){response(res,503,{error:'Standard is not configured on this service.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard/plan'){response(res,200,{...standard.catalog,pilot:!standardPublic});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'));return true;}
-    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){const request=await body(req);await standard.checkout(res,user,request?.consent,request?.tier);return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){if(user.email===adminEmail){response(res,403,{error:'Subscription checkout is not available for administrator accounts.'});return true;}const request=await body(req);await standard.checkout(res,user,request?.consent,request?.tier);return true;}
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
     const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
     if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}
@@ -619,7 +624,7 @@ function createCommerce(settings=process.env,overrides={}){
  telegramTimer?.unref?.();
  if(telegram)setImmediate(()=>telegram.installWebhook().then(()=>console.log('Telegram webhook registered for @'+String(settings.TELEGRAM_BOT_USERNAME||'owner-bot').replace(/[^A-Za-z0-9_]/g,''))).catch(error=>console.error('Telegram webhook unavailable:',error.code||error.name||'error')));
  timer.unref?.();
- return {handle,flushNotifications,flushRegistrationEmails,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
+ return {handle,previewSession:credential=>session({headers:{authorization:'Bearer '+credential}}),flushNotifications,flushRegistrationEmails,close:async()=>{clearInterval(timer);if(telegramTimer)clearInterval(telegramTimer);await pool.end();}};
 }
 module.exports={createCommerce,CATALOG,gmailRawMessage};
 })(require,module,exports);

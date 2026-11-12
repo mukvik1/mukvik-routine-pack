@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=mixed-routines-20261112"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=member-levels-20261112"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -146,13 +146,14 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
 
   if (relativePath.endsWith('.html')) {
     let html=bytes.toString('utf8');
+    html=html.replace(/(<video\b[^>]*\bpreload=")metadata(")/g,'$1none$2');
     if (/^(packs|routines|free|about)\//.test(relativePath)) {
       if (!html.includes('href="/video-background.css')) html=html.replace('</head>','<link rel="stylesheet" href="/video-background.css?v=20261024-persistent-background"></head>');
       if (!html.includes('src="/video-background.js')) html=html.replace('</body>','<script src="/video-background.js?v=20261111-price" defer></script></body>');
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=21"><script defer src="/storefront-refresh.js?v=21"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=22"><script defer src="/storefront-refresh.js?v=22"></script></head>');
     bytes=Buffer.from(html);
   }
 

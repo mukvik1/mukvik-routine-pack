@@ -45,6 +45,10 @@ test('legacy invoice creation disabled; historical status routes remain',async()
   assert.equal(head.headers.get('content-encoding'),null);
   assert.ok(Number(head.headers.get('content-length'))>16);
   assert.equal((await head.arrayBuffer()).byteLength,0);
+  for (const preview of ['/assets/free-videos/one-more-time.mp4','/assets/individual-previews/tell-me-why-trust-me.mp4','/assets/videos/stream-1/init.mp4','/assets/lesson-previews/pack-1-blurred.mp4']) {
+   const guest=await fetch('http://127.0.0.1:'+port+preview,{headers:{Range:'bytes=0-15'}});
+   assert.equal(guest.status,401);
+  }
  }finally{
   child.kill();
   await new Promise(resolve=>child.once('exit',resolve));

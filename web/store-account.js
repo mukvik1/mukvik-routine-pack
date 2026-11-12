@@ -16,7 +16,7 @@ const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
 const returnedOrder=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(orderId||'')?orderId:null;
 let accountRequested=accountQuery.get('account')==='1';
-let orderKey=null,cartBusy=false,pendingFree=null,pendingPlanTier=null,usdUahRate=46,packPromotion=null;
+let orderKey=null,cartBusy=false,pendingFree=null,pendingRoutine=null,usdUahRate=46,packPromotion=null;
 try{cart=JSON.parse(read('mukvik_guest_cart')||'[]');if(!Array.isArray(cart))cart=[];cart=cart.filter(code=>code==='pack');}catch{}
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
@@ -69,12 +69,7 @@ async function afterLogin(){
  auth.close();
  if(pendingFree){const slug=pendingFree;pendingFree=null;pendingCheckout=false;await downloadFree(slug);return;}
  if(accountRequested){await openRequestedAccount();return;}
- if(pendingPlanTier){
-  const tier=pendingPlanTier;pendingPlanTier=null;
-  const offer=document.querySelector('[data-plan-tier="'+tier+'"]');
-  offer?.scrollIntoView({block:'nearest'});offer?.querySelector('button.primary')?.focus({preventScroll:true});
-  return;
- }
+ if(pendingRoutine){const href=pendingRoutine;pendingRoutine=null;location.assign(href);return;}
  renderAccount();
  show(pendingCheckout?cartDialog:account);pendingCheckout=false;
 }
@@ -110,14 +105,60 @@ function renderPackOffer(){
  document.querySelectorAll('[data-pack-discount-applied]').forEach(n=>n.hidden=!eligible||Boolean(special));
  document.querySelectorAll('[data-pack-price-label]').forEach(n=>n.textContent=T(special?'Black Friday Special':eligible?'Welcome price':'Regular price'));
 }
+function memberLevel(){
+ if(!user)return null;
+ if(user.admin)return 'Admin';
+ if(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return 'Free';
+ return standardAccess.tier==='standard'?'Pro':'Ultra';
+}
+let previewToken=null;
+const previewSelector='video#routine-player, video.free-routine-video, video.routine-detail-video, .routine-detail-panel video, video.individual-performance-video';
+async function prepareMemberPreviews(){
+ if(!token||!user||!document.querySelector(previewSelector))return;
+ const credential=token;
+ try{
+  const response=await fetch('/api/v2/auth/preview-session',{method:'POST',headers:{Authorization:'Bearer '+credential},cache:'no-store'});
+  if(!response.ok||token!==credential)return;
+  previewToken=credential;
+  for(const video of document.querySelectorAll(previewSelector))if(video.error)video.load();
+ }catch{}
+}
+function renderMemberGate(){
+ const ready=Boolean(user&&token&&token===previewToken);
+ document.documentElement.toggleAttribute('data-rp-member',ready);
+ for(const video of document.querySelectorAll(previewSelector)){
+  video.classList.add('rp-member-preview');
+  if(!ready)video.pause();
+  if(!video.nextElementSibling?.matches('.rp-join-preview')){
+   const join=button('Create a free account to watch',async()=>{
+    if(!user){openAuth('register');return;}
+    await prepareMemberPreviews();renderMemberGate();
+   },'store-button primary rp-join-preview');
+   video.after(join);
+  }
+  video.nextElementSibling.textContent=user?'Load preview':'Create a free account to watch';
+ }
+}
+window.addEventListener('click',event=>{
+ if(user||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+ const control=event.target.closest?.('[data-video],.preview-toggle,.rp-detail-controls>button,a[href]');
+ if(!control)return;
+ if(control.matches('a[href]')){
+  const target=new URL(control.href,location.href);
+  if(target.origin!==location.origin||!/^\/(routines|free)\/[a-z0-9-]+\/?$/.test(target.pathname))return;
+  pendingRoutine=target.href;
+ }
+ event.preventDefault();event.stopImmediatePropagation();openAuth('register');
+},true);
 function renderHeader(){
+ renderMemberGate();
  renderPackOffer();
  renderStandard();
  if(subscriptionOnly)document.querySelectorAll('.site-header nav a[href="/packs/"],.site-header [data-cart],a[href="/packs/get-the-pack/"]').forEach(n=>n.hidden=true);
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
   box.replaceChildren();
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
-  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary',user.nickname||user.email);summary.title=user.email;const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),...(subscriptionOnly?[]:[button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);})]),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;cart=[];write('mukvik_store_session',null);renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
+  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),...(subscriptionOnly?[]:[button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);})]),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;cart=[];write('mukvik_store_session',null);renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
  });
  document.querySelectorAll('[data-cart-count]').forEach(n=>n.textContent=String(cart.length));
 }
@@ -125,7 +166,7 @@ async function saveCart(next){
  if(cartBusy)return false;cartBusy=true;status.textContent='';
  try{if(user)await api('/cart','PUT',{productCodes:next});cart=next;orderKey=null;if(!user)write('mukvik_guest_cart',JSON.stringify(cart));renderHeader();renderCart();return true;}catch(e){status.textContent=e.message;return false;}finally{cartBusy=false;}
 }
-async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await refreshStandard();renderHeader();renderCart();}
+async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await Promise.all([refreshStandard(),prepareMemberPreviews()]);renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
 function currencyNote(cents){
  const note=el('p',undefined,'store-muted');note.style.fontSize='12px';note.style.lineHeight='1.5';
@@ -182,9 +223,10 @@ async function openRequestedAccount(){
  }
 }
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'));
- if(standardPlan){
+ if(subscriptionOnly||standardPlan){
   const section=el('section',undefined,'store-order');
-  section.append(el('h3',standardAccess?.tier==='pro'?'Ultra subscription':'Pro subscription'),el('p',standardAccess?.active?'Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString():standardAccess?.pending?'Payment pending.':'No active subscription.','store-muted'));
+  const level=memberLevel();
+  section.append(el('h3',level==='Admin'?'Admin access':level+' membership'),el('p',level==='Admin'?'You have administrative access.':level==='Free'?(standardAccess?.pending?'Payment pending. Your Free membership is active.':'Your Free membership is active.'):('Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString()),'store-muted'));
   if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
   if(standardAccess?.cancellable){
    const cancel=button('Cancel auto-renewal',async()=>{
@@ -240,7 +282,28 @@ async function refreshStandard(force=false){
   if(generation===standardGeneration)standardAccess=value;
  }catch{if(generation===standardGeneration)standardAccess=null;}
 }
+function renderMembershipOffers(){
+ const level=memberLevel();
+ for(const section of document.querySelectorAll('.rp-plan-tiers')){
+  let visible=0;
+  for(const offer of section.querySelectorAll('.rp-plan-offer')){
+   const tier=offer.dataset.planTier;
+   const showOffer=!level?!token&&!tier:level==='Free'?Boolean(tier):level==='Pro'&&tier==='pro';
+   offer.hidden=!showOffer;
+   if(showOffer)visible++;
+   if(!tier&&!offer.querySelector('[data-free-join]')){
+    const join=button('Create your Free account',()=>openAuth('register'),'store-button primary');
+    join.dataset.freeJoin='';offer.querySelector('a')?.replaceWith(join);
+   }
+  }
+  section.dataset.visiblePlans=String(visible);
+  const title=section.querySelector('.rp-plan-copy h2'),copy=section.querySelector('.rp-plan-copy>p:last-child');
+  if(title)title.textContent=!level?(token?'Checking membership…':'Start with Free.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.';
+  if(copy)copy.textContent=!level?(token?'Please wait.':'Create an account to activate Free and unlock the routines.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
+ }
+}
 function renderStandard(){
+ renderMembershipOffers();
  const playbackEpoch=++videoGeneration;
  const player=document.querySelector('.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
  const restorePreview=()=>{
@@ -255,8 +318,6 @@ function renderStandard(){
   for(const offer of document.querySelectorAll('.rp-plan-offer:not(.rp-offer-free)')){
    const name=offer.querySelector('.rp-plan-name');
    if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
-   const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-   if(copy)copy.textContent='Explore the free routines while subscriptions are unavailable.';
    if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
   }
   return;
@@ -275,30 +336,27 @@ function renderStandard(){
  }
  for(const offer of document.querySelectorAll('.rp-plan-offer:not(.rp-offer-free)')){
   const tier=offer.dataset.planTier||'standard';
+  if(offer.hidden)continue;
   const plan=standardPlan.plans?.[tier];
   if(!plan){const pending=offer.querySelector('.rp-plan-pending');if(pending)pending.textContent='This plan is not available yet.';continue;}
   offer.querySelector('.rp-plan-name span')?.remove();
   const benefit=offer.querySelector('.rp-plan-features li:last-child');
   if(benefit)benefit.textContent='MP3 downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
-  const copy=offer.closest('.rp-plan')?.querySelector('.rp-plan-copy > p:last-child');
-  if(copy)copy.textContent='Start with Free, choose Pro for the essentials, or unlock the full library with Ultra.';
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
   if(standardAccess?.active){
-   const currentTier=standardAccess.tier;
-   const current=currentTier===tier||(currentTier==='legacy'&&tier==='standard');
-   panel.append(el('p',current?'Your downloads are available.':'Choose another plan after your current paid period ends.'),button('Manage subscription',()=>{renderAccount();show(account);}));
+   panel.append(el('p',standardAccess.cancelled?'You can switch to Ultra after your current paid period ends.':'You can switch to Ultra after your current paid period ends. Turn off Pro auto-renewal in your account to make the switch.'),button('Manage Pro',()=>{renderAccount();show(account);}));
   }
   else {
    const consent=el('input');consent.type='checkbox';
    const label=el('label');label.append(consent,document.createTextNode(' I agree to $'+(plan.priceCents/100)+'/month, automatic renewal, and the '));
    const terms=el('a','subscription terms');terms.href='/standard-terms.html';terms.target='_blank';terms.rel='noopener';label.append(terms,'.');
    const feedback=el('p','');feedback.setAttribute('role','status');
-   const start=button(user?'Choose '+(tier==='pro'?'Ultra':'Pro'):'Sign in to choose '+(tier==='pro'?'Ultra':'Pro'),async()=>{
-    if(!user){pendingPlanTier=tier;openAuth('login');return;}
+   const start=button('Choose '+(tier==='pro'?'Ultra':'Pro'),async()=>{
+    if(!user||user.admin){renderHeader();return;}
     if(!consent.checked){feedback.textContent='Confirm the monthly payment before continuing.';return;}
     start.disabled=true;
     try{
@@ -354,7 +412,7 @@ document.querySelectorAll('[data-buy]').forEach(b=>b.addEventListener('click',as
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderCart();renderAccount();});
 renderHeader();renderAuth();renderCart();
 async function loadCatalog(){const data=await api('/catalog');catalog=data.products;packPromotion=data.packPromotion;usdUahRate=Number(data.usdUahRate)||46;publicStandardPlan=standardPlan=data.standard;subscriptionOnly=data.subscriptionOnly===true;}
-try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}await refreshStandard(accountQuery.get('subscription')==='return');renderHeader();renderCart();}catch(e){status.textContent=e.message;}
+try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}await Promise.all([refreshStandard(accountQuery.get('subscription')==='return'),prepareMemberPreviews()]);renderHeader();renderCart();}catch(e){status.textContent=e.message;}
 if(accountRequested)await openRequestedAccount();
 if(accountQuery.get('subscription')==='return'&&user&&standardPlan&&!standardAccess?.active){
  let attempts=0;

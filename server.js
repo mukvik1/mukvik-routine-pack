@@ -165,7 +165,7 @@ async function ipn(req, res) {
   json(res, 200, { ok: true });
 }
 
-function serveStatic(req, res, pathname) {
+function serveStatic(req, res, pathname, privateMedia = false) {
   const relativePath = pathname === '/' ? 'index.html' : (pathname === '/account' || pathname === '/account/' ? 'account/index.html' : pathname.replace(/^\/+/, '')+(pathname.endsWith('/')?'index.html':''));
   const filePath = path.resolve(root, relativePath);
   if (!filePath.startsWith(`${root}${path.sep}`)) return json(res, 403, { error: 'Forbidden' });
@@ -178,6 +178,7 @@ function serveStatic(req, res, pathname) {
     const compressible = size >= 1024 && /^(?:text\/|image\/svg\+xml)/.test(contentType);
     const etag = `W/"${size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
     const headers = { 'Accept-Ranges': 'bytes', 'Cache-Control': isHtml ? 'public, no-cache' : relativePath.startsWith('assets/') ? 'public, max-age=3600' : 'public, max-age=300', 'Content-Type': contentType, 'X-Content-Type-Options': 'nosniff', ETag: etag };
+    if(privateMedia)headers['Cache-Control']='private, no-store';
     if (compressible) headers.Vary = [res.getHeader('Vary'), 'Accept-Encoding'].filter(Boolean).join(', ');
     const validators = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim().replace(/^W\//, ''));
     if (validators.includes('*') || validators.includes(etag.slice(2))) return res.writeHead(304, headers).end();
@@ -230,6 +231,15 @@ http.createServer(async (req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return json(res, 400, { error: 'Invalid path' }); }
+  const previewPath=path.posix.normalize(pathname);
+  const privateMedia=/^\/assets\/(?:(?:free-videos|lesson-previews|individual-previews)\/[^/]+\.mp4|videos\/(?:video-\d+\.mp4|stream-\d+\/[^/]+\.(?:mp4|m4s|m3u8)))$/i.test(previewPath);
+  if(privateMedia){
+    const credential=/(?:^|;\s*)__Secure-rp-preview=([a-zA-Z0-9_-]{40,100})(?:;|$)/.exec(req.headers.cookie||'')?.[1];
+    try {
+      if(!credential||!await commerce?.previewSession(credential))return json(res,401,{error:'Sign in to watch routine previews.'});
+    } catch {return json(res,503,{error:'Preview access is temporarily unavailable.'});}
+    return serveStatic(req,res,previewPath,true);
+  }
   if (process.env.COMMERCE_ENABLED !== 'true' && (pathname === '/account' || pathname.startsWith('/account/'))) return json(res, 404, { error: 'Not found' });
   if (process.env.MONOBANK_ENABLED === 'true' && (pathname === '/account' || pathname === '/account/')) {
     res.writeHead(302, {Location:'https://routinepack.download/?account=1', 'Cache-Control':'no-store'});

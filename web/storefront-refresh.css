@@ -113,3 +113,13 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-plan .rp-offer-free>.store-button{margin-top:auto;align-self:flex-start;min-height:44px;align-items:center;color:#f0f6ff}
 .coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-free{background:#123a37;color:#baf6e9;border-color:#59bcaa88}
 #free-routines{scroll-margin-top:24px}
+
+.rp-plan .rp-plan-offer[hidden]{display:none!important}
+.rp-plan-tiers[data-visible-plans="0"],.rp-plan-tiers[data-visible-plans="1"]{grid-template-columns:minmax(0,1fr);max-width:490px}
+@media(min-width:861px){.rp-plan-tiers[data-visible-plans="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.store-user-menu summary>.rp-member-tier{display:inline-block;margin-inline-start:6px;padding:2px 5px;border:1px solid #6788bd;border-radius:5px;color:#c0d7ff;font:700 10px/1.2 system-ui,sans-serif;vertical-align:middle}
+html:not([data-rp-member]) :is(#routine-player,.free-routine-video,.routine-detail-video,.routine-detail-panel video,video.individual-performance-video,.rp-detail-controls>button){display:none!important}
+html[data-rp-member] .rp-join-preview{display:none!important}
+.rp-join-preview{margin:16px auto}
+
+.store-user-menu summary>.rp-member-name{display:inline-block;max-width:calc(100% - 64px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
