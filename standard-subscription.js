@@ -312,4 +312,4 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
   } };
 }
-module.exports = { createStandard, catalogFiles, interpretStatus, paidThrough };
+module.exports = { createStandard, catalogFiles, interpretStatus, paidThrough, FREE_PACK_SLUGS };

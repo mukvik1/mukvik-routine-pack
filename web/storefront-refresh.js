@@ -80,6 +80,8 @@
     ['Empire State of Mind','routine-06','empire-state-of-mind']
   ];
   const freePackSlugs = new Set(['routine-04','routine-06']);
+  const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
+  const badgeFor = tier => '<span class="rp-routine-tier rp-routine-tier-'+tier+'">'+({free:'Free',standard:'Pro',pro:'Ultra'})[tier]+'</span>';
   const otherRoutines = [
     ['Call Me Maybe × Poker Face','call-me-maybe-poker-face'],
     ['Tell Me Why × Trust Me','tell-me-why-trust-me'],
@@ -164,10 +166,9 @@
       card.className = 'standalone-routine available-routine';
       card.dataset.standardPackCard = slug;
       const isFree=freePackSlugs.has(slug);
-      if(isFree)card.classList.add('rp-tiered-routine');
-      const badge=isFree?'<span class="rp-routine-tier rp-routine-tier-free">Free</span>':'';
-      const poster=isFree?'':'<img class="individual-performance-video" loading="lazy" alt="" src="/assets/lesson-previews/pack-'+number+'-blurred.jpg">';
-      card.innerHTML = badge+'<div class="individual-card-layout">'+poster+'<div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
+      card.classList.add('rp-tiered-routine');
+      const image=isFree?'/assets/free-videos/'+path+'.jpg':'/assets/lesson-previews/pack-'+number+'-blurred.jpg';
+      card.innerHTML = badgeFor(isFree?'free':ultraRoutines.has(slug)?'pro':'standard')+'<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="'+image+'"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
       card.querySelector('h2').textContent = title;
       fragment.append(card);
     }
@@ -181,6 +182,13 @@
     document.querySelectorAll('[data-buy]').forEach(node => node.remove());
     const grid = document.querySelector('.coming-grid.individual-grid');
     if (grid) {
+      for (const [title,slug] of otherRoutines) {
+        const link=grid.querySelector('a.routine-detail-link[href="/routines/'+slug+'/"]');
+        const card=link?.closest('article');
+        if(!card||card.querySelector('.rp-routine-tier'))continue;
+        card.classList.add('rp-tiered-routine');
+        card.insertAdjacentHTML('afterbegin',badgeFor(ultraRoutines.has(slug)?'pro':'standard'));
+      }
       addPackRoutines(grid);
       addFreeRoutines(grid);
       grid.insertAdjacentHTML('beforebegin','<div class="rp-routine-intro"><h1>Individual Routines</h1></div>');
@@ -197,7 +205,8 @@
         const number=entry+1;
         main.dataset.routineSlug=packRoutines[entry][1];
         document.title=packRoutines[entry][0]+' — MUKVIK';
-        const source=freePackSlugs.has(packRoutines[entry][1])?'data-free-pack-video':'poster="/assets/lesson-previews/pack-'+number+'-blurred.jpg" src="/assets/lesson-previews/pack-'+number+'-blurred.mp4"';
+        const media=freePackSlugs.has(packRoutines[entry][1])?'/assets/free-videos/'+packRoutines[entry][2]:'/assets/lesson-previews/pack-'+number+'-blurred';
+        const source='poster="'+media+'.jpg" src="'+media+'.mp4"';
         main.innerHTML='<section class="routine-detail-panel"><p><a href="/routines/">Routines</a></p><h1></h1><video class="routine-detail-video" controls playsinline preload="none" '+source+'></video></section>';
         main.querySelector('h1').textContent=packRoutines[entry][0];
       }
