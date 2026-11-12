@@ -288,7 +288,7 @@ function renderMembershipOffers(){
   let visible=0;
   for(const offer of section.querySelectorAll('.rp-plan-offer')){
    const tier=offer.dataset.planTier;
-   const showOffer=!level?!token&&!tier:level==='Free'?Boolean(tier):level==='Pro'&&tier==='pro';
+   const showOffer=!level?!token:level==='Free'?Boolean(tier):level==='Pro'&&tier==='pro';
    offer.hidden=!showOffer;
    if(showOffer)visible++;
    if(!tier&&!offer.querySelector('[data-free-join]')){
@@ -299,14 +299,18 @@ function renderMembershipOffers(){
   section.dataset.visiblePlans=String(visible);
   const title=section.querySelector('.rp-plan-copy h2'),copy=section.querySelector('.rp-plan-copy>p:last-child');
   if(title)title.textContent=!level?(token?'Checking membership…':'Start with Free.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.';
-  if(copy)copy.textContent=!level?(token?'Please wait.':'Create an account to activate Free and unlock the routines.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
+  if(copy)copy.textContent=!level?(token?'Please wait.':'Compare Free, Pro and Ultra. Create a free account to get started.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
  }
 }
 function renderStandard(){
  renderMembershipOffers();
  const playbackEpoch=++videoGeneration;
- const player=document.querySelector('.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
+ const player=document.querySelector('.routine-detail-panel video[data-free-pack-video],.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
  const restorePreview=()=>{
+  if(player?.hasAttribute('data-free-pack-video')&&player.hasAttribute('src')){
+   player.pause();player.removeAttribute('src');player.load();delete player.dataset.fullVideo;
+   return;
+  }
   if(player?.dataset.blurredSrc&&player.getAttribute('src')!==player.dataset.blurredSrc){
    player.pause();player.src=player.dataset.blurredSrc;player.load();delete player.dataset.fullVideo;
   }
@@ -346,6 +350,10 @@ function renderStandard(){
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
+  if(!user){
+   panel.append(button('Create account for '+(tier==='pro'?'Ultra':'Pro'),()=>openAuth('register'),'store-button primary'));
+   offer.append(panel);continue;
+  }
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
   if(standardAccess?.active){
    panel.append(el('p',standardAccess.cancelled?'You can switch to Ultra after your current paid period ends.':'You can switch to Ultra after your current paid period ends. Turn off Pro auto-renewal in your account to make the switch.'),button('Manage Pro',()=>{renderAccount();show(account);}));
@@ -371,8 +379,10 @@ function renderStandard(){
   offer.append(panel);
  }
  const adminAudit=user?.canAuditRoutineDownloads===true;
- if(!user||(!adminAudit&&(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now()))){restorePreview();return;}
- const available=new Set(standardPlan.slugs.filter(slug=>adminAudit||standardAccess?.tier!=='standard'||!proSlugs.has(slug)));
+ if(!user){restorePreview();return;}
+ const paidActive=standardAccess?.active&&+new Date(standardAccess.paidUntil)>Date.now();
+ const freeSlugs=new Set(standardPlan.freeSlugs||[]);
+ const available=new Set(standardPlan.slugs.filter(slug=>freeSlugs.has(slug)||adminAudit||(paidActive&&(standardAccess.tier!=='standard'||!proSlugs.has(slug)))));
  function appendDownload(host,slug){
   if(!host||!available.has(slug))return;
   const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';

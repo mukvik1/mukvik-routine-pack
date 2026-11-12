@@ -13,7 +13,7 @@ const files = { pack, ...Object.fromEntries([3,5,7,8,9,10,11,12].map(n=>['routin
 const reply = (res,status,data) => Object.assign(res,{status,data});
 const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:row.amount_kop,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
 
-function setup(adminEmail){
+function setup(adminEmail, manifest=packManifest){
  const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null };
  const db = { release(){}, async query(sql,p=[]){
   if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'||sql.startsWith('SELECT id FROM customers'))return {rows:[]};
@@ -38,13 +38,13 @@ function setup(adminEmail){
   if(sql.startsWith('DELETE FROM standard_download_tickets AS t')){
    const saved=state.tickets.get(p[0]),slug=saved?.slug;
    if(!saved?.admin&&state.row?.tier==='standard'&&p[1].includes(slug))return {rowCount:0};
-   if(!slug||!(saved.admin&&p[2]===adminEmail)&&!(state.row?.paid_until>new Date()))return {rowCount:0};
+   if(!slug||!(saved.admin&&(p[2]===adminEmail||p[3]?.includes(slug)))&&!(state.row?.paid_until>new Date()))return {rowCount:0};
    state.tickets.delete(p[0]);return {rowCount:1,rows:[{routine_slug:slug}]};
   }
   throw Error('Unexpected SQL '+sql);
  }};
  const subscription = createStandard(settings,{
-  pool:{query:db.query,connect:async()=>db},files,packManifest,adminEmail,reply,getDriveToken:async()=> 'fake-drive',
+  pool:{query:db.query,connect:async()=>db},files,packManifest:manifest,adminEmail,reply,getDriveToken:async()=> 'fake-drive',
   driveFetch:async url=>{state.events.push(url);return new Response(url.includes('video')?'video-test':'audio-test');},
   fetchImpl:async (url,req)=>{
    assert.equal(req.headers['X-Token'],'fake-only');
@@ -132,4 +132,16 @@ test('verified admin can audit an archive without a subscription; a matching unv
  const response=new PassThrough();response.resume();response.writeHead=status=>{response.status=status;};
  await s.download(response,approved.data.url.split('/').at(-1));
  assert.equal(response.status,200);assert.equal(state.events.length,2);
+});
+
+test('verified Free members can download and request original video for the reclassified routines',async()=>{
+ const {subscription:s}=setup(null,[{...packManifest[0],slug:'routine-04'}]);
+ assert.deepEqual(s.catalog.freeSlugs,['routine-04']);
+ const denied={};await s.ticket(denied,{id:user.id},'routine-04',true);assert.equal(denied.status,403);
+ const video={};await s.ticket(video,user,'routine-04',true);assert.equal(video.status,200);
+ assert.match(video.data.url,/\/standard\/video\//);
+ const archive={};await s.ticket(archive,user,'routine-04');assert.equal(archive.status,200);
+ const response=new PassThrough();response.resume();response.writeHead=status=>{response.status=status;};
+ await s.download(response,archive.data.url.split('/').at(-1));
+ assert.equal(response.status,200);
 });

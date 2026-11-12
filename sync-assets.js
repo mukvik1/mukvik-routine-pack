@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=member-levels-20261112"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=free-pack-20261112"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -153,7 +153,7 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=22"><script defer src="/storefront-refresh.js?v=22"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=22"><script defer src="/storefront-refresh.js?v=23"></script></head>');
     bytes=Buffer.from(html);
   }
 

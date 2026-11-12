@@ -19,6 +19,7 @@ const routineNames = new Map([
 ]);
 
 const PLAN_CENTS = Object.freeze({standard:1500,pro:2500});
+const FREE_PACK_SLUGS = Object.freeze(['routine-04','routine-06']);
 const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
 const allowedTiers = slug => PRO_SLUGS.includes(slug) ? ['legacy','pro'] : ['legacy','standard','pro'];
 const VALIDITY = 3600;
@@ -219,17 +220,17 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
       SELECT $1,$2,$3,now()+($6::integer*interval '1 second')
       WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[]))) RETURNING token_hash`,
-    [sha(secret), user.id, media?'video:'+slug:slug, allowedTiers(slug), Boolean(adminEmail && user.email===adminEmail && user.email_verified_at), media?1800:60]);
+    [sha(secret), user.id, media?'video:'+slug:slug, allowedTiers(slug), Boolean(user.email_verified_at && (FREE_PACK_SLUGS.includes(slug) || (adminEmail && user.email===adminEmail))), media?1800:60]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/'+(media?'video/':'download/')+secret });
   }
   async function download(res, secret) {
     if (!secretPattern.test(secret)) return reply(res, 404, { error: 'Not found.' });
     const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now() AND t.routine_slug NOT LIKE 'video:%'
-      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND c.email=$3 AND c.email_verified_at IS NOT NULL)
+      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$3 OR t.routine_slug=ANY($4::text[])) AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
         AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
-      RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null]);
+      RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
     const slug = r.rows[0].routine_slug, list = entries.get(slug);
     if (!list) return reply(res, 404, { error: 'Routine not found.' });
@@ -270,10 +271,10 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const r = await pool.query(`SELECT substring(t.routine_slug from 7) AS slug
       FROM standard_download_tickets t
       WHERE t.token_hash=$1 AND t.expires_at>now() AND t.routine_slug LIKE 'video:%'
-      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND c.email=$3 AND c.email_verified_at IS NOT NULL)
+      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$3 OR substring(t.routine_slug from 7)=ANY($4::text[])) AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
           AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (substring(t.routine_slug from 7)=ANY($2::text[]))))))`,
-    [sha(secret),PRO_SLUGS,adminEmail||null]);
+    [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     const file = r.rows[0] && fullVideo(r.rows[0].slug);
     if (!file) return reply(res,404,{error:'Video unavailable.'});
     const accessToken=await getDriveToken();
@@ -306,6 +307,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   }
   return { status, checkout, cancel, callback, ticket, download, video, cleanup, catalog: {
     slugs: [...entries.keys()],
+    freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
     proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
   } };
