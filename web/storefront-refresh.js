@@ -1,5 +1,42 @@
 (() => {
   'use strict';
+  // Paint a display-only account summary before account and subscription requests.
+  const headerKey='rp_account_header_v1';
+  const sessionTag=token=>{
+    let hash=2166136261;
+    for(const character of token)hash=Math.imul(hash^character.charCodeAt(0),16777619);
+    return hash>>>0;
+  };
+  const clearHeader=()=>{try{sessionStorage.removeItem(headerKey);}catch{}};
+  window.RPAccountHeader={
+    save(token,name,level){
+      if(!token||!['Free','Pro','Ultra','Admin'].includes(level))return;
+      try{sessionStorage.setItem(headerKey,JSON.stringify({tag:sessionTag(token),name:String(name||'Account').slice(0,80),level}));}catch{}
+    },
+    clear:clearHeader
+  };
+  let headerToken=null,headerSnapshot=null;
+  try{
+    headerToken=localStorage.getItem('mukvik_store_session');
+    if(headerToken){
+      const snapshot=JSON.parse(sessionStorage.getItem(headerKey)||'null');
+      if(snapshot?.tag===sessionTag(headerToken)&&typeof snapshot.name==='string'&&['Free','Pro','Ultra','Admin'].includes(snapshot.level))headerSnapshot=snapshot;
+    }else clearHeader();
+  }catch{}
+  for(const box of document.querySelectorAll('[data-store-auth]')){
+    if(headerToken){
+      const summary=document.createElement('span');summary.className='rp-account-pending';
+      const name=document.createElement('span');name.className='rp-member-name';name.textContent=headerSnapshot?.name||'Account';
+      summary.append(name);
+      if(headerSnapshot){
+        const badge=document.createElement('span');badge.className='rp-member-tier';badge.textContent=headerSnapshot.level;summary.append(badge);
+      }
+      box.replaceChildren(summary);
+      box.setAttribute('aria-busy','true');
+    }
+    box.dataset.rpAuthReady='';
+  }
+
   if (window.parent === window) {
     const snow = document.createElement('div');
     snow.className = 'rp-snow';

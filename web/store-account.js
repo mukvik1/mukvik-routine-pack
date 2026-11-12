@@ -26,7 +26,7 @@ const error=el('p','','store-error');error.setAttribute('role','alert');
 const authTabs=el('div',undefined,'store-tabs');authTabs.append(button('SIGN IN',()=>{mode='login';challenge=null;renderAuth();}),button('SIGN UP',()=>{mode='register';challenge=null;renderAuth();}));
 const authBody=el('div');auth.append(authTabs,authBody,error);
 function show(d){for(const other of [auth,cartDialog,account])if(other!==d&&other.open)other.close();if(!d.open)d.showModal();}
-async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
+async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
 const status=el('p','','store-error');status.setAttribute('role','status');cartDialog.append(status);
 function renderAuth(){
  error.textContent='';authBody.replaceChildren();
@@ -79,7 +79,7 @@ async function downloadFree(slug){
  freeStatus.textContent=T('Please wait…');
  try{
   const response=await fetch(API+'/api/v2/free/'+encodeURIComponent(slug)+'/download',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
-  if(response.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
+  if(response.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
   if(response.status===403){const result=await response.json();if(result.code==='EMAIL_VERIFICATION_REQUIRED'){pendingFree=slug;openAuth('register');error.textContent=T(result.error);freeStatus.textContent='';return;}}
   if(!response.ok||!String(response.headers.get('content-type')).startsWith('application/zip'))throw Error(T('Service temporarily unavailable.'));
   const blob=await response.blob(),href=URL.createObjectURL(blob),a=el('a');a.href=href;a.download=slug+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
@@ -131,10 +131,14 @@ function renderHeader(){
  renderPackOffer();
  renderStandard();
  if(subscriptionOnly)document.querySelectorAll('.site-header nav a[href="/packs/"],.site-header [data-cart],a[href="/packs/get-the-pack/"]').forEach(n=>n.hidden=true);
+ if(user&&(user.admin||standardAccess||!standardPlan))window.RPAccountHeader?.save(token,user.nickname,memberLevel());
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
+  if(!user&&token)return;
+  box.dataset.rpAuthReady='';
+  box.removeAttribute('aria-busy');
   box.replaceChildren();
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
-  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),...(subscriptionOnly?[]:[button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);})]),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;cart=[];write('mukvik_store_session',null);renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
+  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),...(subscriptionOnly?[]:[button('Your cart',()=>{menu.open=false;renderCart();show(cartDialog);})]),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;cart=[];write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();renderCart();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
  });
  document.querySelectorAll('[data-cart-count]').forEach(n=>n.textContent=String(cart.length));
 }
@@ -142,7 +146,7 @@ async function saveCart(next){
  if(cartBusy)return false;cartBusy=true;status.textContent='';
  try{if(user)await api('/cart','PUT',{productCodes:next});cart=next;orderKey=null;if(!user)write('mukvik_guest_cart',JSON.stringify(cart));renderHeader();renderCart();return true;}catch(e){status.textContent=e.message;return false;}finally{cartBusy=false;}
 }
-async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await refreshStandard();renderHeader();renderCart();}
+async function finishLogin(access){window.RPAccountHeader?.clear();token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await refreshStandard();renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
 function currencyNote(cents){
  const note=el('p',undefined,'store-muted');note.style.fontSize='12px';note.style.lineHeight='1.5';
