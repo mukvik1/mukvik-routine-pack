@@ -13,9 +13,17 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
 @media(min-width:1000px){
   body .rp-home .rp-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:clamp(36px,5vw,90px);align-items:center}
   .rp-home .rp-hero>.rp-software{grid-column:2;grid-row:1;width:100%;margin:0;padding:0;overflow:visible;-webkit-mask-image:none;mask-image:none}
-  .rp-home .rp-hero>.rp-hero-copy{grid-column:1;grid-row:1;align-items:flex-start;text-align:left}
-  .rp-home .rp-hero>.rp-hero-copy h1{margin-left:0;margin-right:0}
-  .rp-home .rp-hero>.rp-hero-copy .rp-actions,.rp-home .rp-hero>.rp-hero-copy .rp-hero-facts{justify-content:flex-start}
+  .rp-home .rp-hero>.rp-hero-copy{grid-column:1;grid-row:1;justify-self:center;display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;max-width:680px;padding-top:0}
+  .rp-home .rp-hero>.rp-hero-copy h1{max-width:12ch;margin:0 auto 16px;text-align:center;text-wrap:balance}
+  .rp-home .rp-hero>.rp-hero-copy .rp-lead{max-width:43ch;margin-inline:auto;text-align:center;text-wrap:pretty}
+  .rp-home .rp-hero>.rp-hero-copy .rp-actions,.rp-home .rp-hero>.rp-hero-copy .rp-hero-facts{justify-content:center;margin-inline:auto}
+  body[data-page="home"]>footer{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);grid-template-areas:"brand social" "copy social" "legal legal" "seller seller";column-gap:clamp(36px,5vw,90px);row-gap:14px;padding-inline:max(32px,calc((100vw - 1376px)/2));justify-items:center;text-align:center}
+  body[data-page="home"]>footer>a:first-child{grid-area:brand}
+  body[data-page="home"]>footer>.footer-copy{grid-area:copy;justify-items:center}
+  body[data-page="home"]>footer>.social-links{grid-area:social;justify-content:center}
+  body[data-page="home"]>footer>.legal-links{grid-area:legal;justify-content:center;margin-top:10px}
+  body[data-page="home"]>footer>.seller-line{grid-area:seller}
+  body[data-page="home"]>footer .footer-privacy{justify-content:center}
   .rp-home .rp-hero .rp-ticker{width:100%;overflow:visible;justify-content:center}
   .rp-home .rp-hero .rp-logo-group{width:100%;min-width:0;padding:0;gap:clamp(14px,2vw,24px);flex-direction:column;justify-content:center;animation:none}
   .rp-home .rp-hero .rp-logo-group img{width:auto;max-width:min(100%,240px);height:clamp(32px,3.4vw,46px);object-fit:contain}

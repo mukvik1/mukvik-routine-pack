@@ -72,6 +72,7 @@ async function download(relativePath) {
   // Keep the storefront concise and the mobile hero close to the navigation.
   if (relativePath === 'index.html') {
     let html = bytes.toString('utf8');
+    html = html.replace(/(<div class="rp-hero-copy"[^>]*>\s*)<p class="rp-kicker"[^>]*>\s*MUKVIK ROUTINE PACK\s*<\/p>/i,'$1');
     html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
     html = html.replace(/<section class="rp-section rp-showcase" id="lessons">[\s\S]*?(?=<section class="rp-promo-wrap">)/, '');
     html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#performances">Get Started</a></div>');
@@ -173,7 +174,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=26"><script defer src="/storefront-refresh.js?v=27"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=28"><script defer src="/storefront-refresh.js?v=27"></script></head>');
     bytes=Buffer.from(html);
   }
 
