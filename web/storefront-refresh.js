@@ -85,7 +85,6 @@
     price.addEventListener('click', () => nav.closest('.site-header')?.classList.remove('menu-open'));
   }
 
-  document.querySelectorAll('.site-header [data-cart],main a[href="/packs/get-the-pack/"]').forEach(node => node.hidden = true);
   document.querySelectorAll('main a[href="/free/"]').forEach(node => node.href='/routines/#free-routines');
   document.querySelectorAll('main a[href="/packs/"]').forEach(node => {
     if (node.matches('.route-card')) node.remove();
@@ -221,7 +220,6 @@
   }
   if (document.body.dataset.page === 'routines' || location.pathname.startsWith('/routines/')) {
     document.querySelectorAll('.bundle-card,.cross-sell,.routine-offer,.bundle-offer,.routine-detail-actions').forEach(node => node.remove());
-    document.querySelectorAll('[data-buy]').forEach(node => node.remove());
     const grid = document.querySelector('.coming-grid.individual-grid');
     if (grid) {
       for (const [title,slug] of otherRoutines) {

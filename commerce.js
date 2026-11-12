@@ -1,7 +1,6 @@
 (function commerceModule(require,module,exports){
 'use strict';
 const crypto=require('node:crypto');
-const {welcomeEligible,priceProducts,packPromotion,WELCOME_PACK_CENTS,WELCOME_DISCOUNT_PERCENT}=require('./welcome-pricing');
 const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
 const {pipeline}=require('node:stream/promises');
@@ -365,64 +364,6 @@ function createCommerce(settings=process.env,overrides={}){
   if(match)await pool.query('UPDATE sessions SET revoked_at=now() WHERE token_hash=$1',[sha(match[1])]);
   response(res,200,{ok:true});
  }
- async function putCart(req,res,user){
-  const payload=await body(req);
-  if(!Array.isArray(payload.productCodes)||payload.productCodes.length>1||payload.productCodes.some(code=>subscriptionOnly||code!=='pack'))return response(res,400,{error:'One-time purchases are closed. Choose Standard to access the routine library.'});
-  const codes=[...new Set(payload.productCodes)];
-  const db=await pool.connect();
-  try{
-   await db.query('BEGIN');
-   // Serialize cart writes for this customer, including an initially empty cart.
-   await db.query('SELECT id FROM customers WHERE id=$1 FOR UPDATE',[user.id]);
-   const previous=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code',[user.id]);
-   const before=previous.rows.map(item=>item.product_code);
-   await db.query('DELETE FROM cart_items WHERE customer_id=$1',[user.id]);
-   for(const code of codes)await db.query('INSERT INTO cart_items(customer_id,product_code) VALUES($1,$2)',[user.id,code]);
-   const added=codes.filter(code=>!before.includes(code)),removed=before.filter(code=>!codes.includes(code));
-   if(added.length||removed.length){
-    const describe=code=>({code,name:CATALOG[code]?.name||code});
-    await db.query("INSERT INTO customer_activity(customer_id,kind,payload) VALUES($1,'cart_updated',$2::jsonb)",[user.id,JSON.stringify({added:added.map(describe),removed:removed.map(describe),products:codes.map(describe)})]);
-   }
-   await db.query('COMMIT');
-   response(res,200,{productCodes:codes});
-  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
- }
- async function cart(res,user){
-  const r=await pool.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY created_at,product_code',[user.id]);
-  if(subscriptionOnly)return response(res,200,{items:[]});
-  response(res,200,{items:priceProducts(r.rows.filter(x=>x.product_code==='pack').map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(pool,user.id))});
- }
- async function newOrder(req,res,user){
-  const payload=await body(req),key=payload.idempotencyKey;
-  if(typeof key!=='string'||!uuidPattern.test(key))return response(res,400,{error:'Invalid idempotency key.'});
-  const db=await pool.connect();
-  try{
-   await db.query('BEGIN');
-   await db.query('SELECT id FROM customers WHERE id=$1 FOR UPDATE',[user.id]);
-   const prior=await db.query('SELECT id,status,total_cents FROM orders WHERE customer_id=$1 AND idempotency_key=$2',[user.id,key]);
-   if(prior.rowCount){await db.query('COMMIT');return response(res,200,{order:prior.rows[0]});}
-   const c=await db.query('SELECT product_code FROM cart_items WHERE customer_id=$1 ORDER BY product_code FOR UPDATE',[user.id]);
-   if(!c.rowCount){await db.query('ROLLBACK');return response(res,400,{error:'Cart is empty.'});}
-   if(c.rows.some(x=>x.product_code!=='pack')){await db.query('ROLLBACK');return response(res,409,{error:'Individual routines are moving to a subscription. Remove them from your cart and try again.'});}
-   const products=priceProducts(c.rows.map(x=>({code:x.product_code,...CATALOG[x.product_code]})),await welcomeEligible(db,user.id));
-   if(products.some(x=>!Number.isInteger(x.cents))){await db.query('ROLLBACK');return response(res,400,{error:'Invalid product.'});}
-   const total=products.reduce((sum,x)=>sum+x.cents,0),orderId=crypto.randomUUID();
-   if(payload.expectedTotalCents!==undefined&&payload.expectedTotalCents!==total){
-    await db.query('ROLLBACK');return response(res,409,{error:'The price changed. Please review your cart and try again.'});
-   }
-   const created=await db.query("INSERT INTO orders(id,customer_id,idempotency_key,currency,total_cents) VALUES($1,$2,$3,'USD',$4) ON CONFLICT(customer_id,idempotency_key) DO NOTHING RETURNING id,status,total_cents",[orderId,user.id,key,total]);
-   if(!created.rowCount){
-    const existing=await db.query('SELECT id,status,total_cents FROM orders WHERE customer_id=$1 AND idempotency_key=$2',[user.id,key]);
-    await db.query('COMMIT');return response(res,200,{order:existing.rows[0]});
-   }
-   for(const p of products)await db.query('INSERT INTO order_items(order_id,product_code,name,price_cents) VALUES($1,$2,$3,$4)',[orderId,p.code,p.name,p.cents]);
-   await db.query("INSERT INTO order_events(order_id,actor_id,event_type) VALUES($1,$2,'order_created')",[orderId,user.id]);
-   if(telegram)await db.query("INSERT INTO telegram_notifications(order_id,kind) VALUES($1,'new_order') ON CONFLICT DO NOTHING",[orderId]);
-   await db.query('DELETE FROM cart_items WHERE customer_id=$1',[user.id]);
-   await db.query('COMMIT');
-   response(res,201,{order:created.rows[0],message:monobank?'Proceed to secure Monobank checkout to pay in UAH.':'Contact Mukvik to pay; access is granted only after approval.'});
-  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
- }
  async function me(res,user){
   const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,o.created_at,i.product_code,i.name,i.price_cents,(e.order_id IS NOT NULL AND o.status='approved') AS accessible FROM orders o JOIN order_items i ON i.order_id=o.id LEFT JOIN entitlements e ON e.order_id=i.order_id AND e.product_code=i.product_code AND e.customer_id=$1 WHERE o.customer_id=$1 AND (o.hidden_by_customer_at IS NULL OR o.status IN ('approved','refunded')) ORDER BY o.created_at DESC,i.product_code",[user.id]);
   const orders=new Map();
@@ -430,7 +371,7 @@ function createCommerce(settings=process.env,overrides={}){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
   }
-  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:await welcomeEligible(pool,user.id),orders:[...orders.values()]});
+  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:false,orders:[...orders.values()]});
  }
  async function hideUnpaidOrder(res,user,orderId){
   const result=await pool.query(`UPDATE orders SET hidden_by_customer_at=COALESCE(hidden_by_customer_at,now())
@@ -534,7 +475,7 @@ function createCommerce(settings=process.env,overrides={}){
    }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
    if(oauthRoute&&(req.method==='GET'||(req.method==='POST'&&oauthRoute[2]))){await oauth(req,res,url,oauthRoute[1],Boolean(oauthRoute[2]));return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,standard:standardPublic?standard.catalog:null,subscriptionOnly,packPromotion:subscriptionOnly?null:packPromotion(),welcomeOffer:null,products:subscriptionOnly?[]:[{code:'pack',name:CATALOG.pack.name,priceCents:CATALOG.pack.cents}]});return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/catalog'){response(res,200,{currency:'USD',paymentCurrency:'UAH',usdUahRate:require('./monobank').USD_UAH_RATE,standard:standardPublic?standard.catalog:null,subscriptionOnly,packPromotion:null,welcomeOffer:null,products:[]});return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/start'){await startPasswordRegistration(req,res);return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/register/confirm'){await confirmPasswordChallenge(req,res,'register');return true;}
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/password/login'){await loginWithPassword(req,res);return true;}
@@ -559,7 +500,7 @@ function createCommerce(settings=process.env,overrides={}){
 
    }
    if(subscriptionOnly&&req.method==='POST'&&(url.pathname==='/api/v2/orders'||/^\/api\/v2\/orders\/[a-f0-9-]+\/monobank$/.test(url.pathname))){
-    response(res,410,{error:'New one-time purchases are closed. Choose Standard to access the routine library.'});return true;
+    response(res,410,{error:'New one-time purchases are closed. Choose a subscription to access the routine library.'});return true;
    }
    const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
    if(req.method==='POST'&&freeDownload){
@@ -579,9 +520,8 @@ function createCommerce(settings=process.env,overrides={}){
    }
    if(req.method==='POST'&&url.pathname==='/api/v2/auth/logout'){await logout(req,res);return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/me'){await me(res,user);return true;}
-   if(req.method==='GET'&&url.pathname==='/api/v2/cart'){await cart(res,user);return true;}
-   if(req.method==='PUT'&&url.pathname==='/api/v2/cart'){await putCart(req,res,user);return true;}
-   if(req.method==='POST'&&url.pathname==='/api/v2/orders'){await newOrder(req,res,user);return true;}
+   if(req.method==='GET'&&url.pathname==='/api/v2/cart'){response(res,200,{items:[]});return true;}
+   if(req.method==='PUT'&&url.pathname==='/api/v2/cart'){const payload=await body(req);if(Array.isArray(payload.productCodes)&&payload.productCodes.length===0){response(res,200,{productCodes:[]});}else{response(res,410,{error:'The cart has been replaced by subscriptions.'});}return true;}
    const removeOrder=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/hide$/.exec(url.pathname);
    if(req.method==='POST'&&removeOrder&&uuidPattern.test(removeOrder[1])){await hideUnpaidOrder(res,user,removeOrder[1]);return true;}
    const monoCheckout=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank$/.exec(url.pathname);
