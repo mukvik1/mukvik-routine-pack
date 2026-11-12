@@ -52,7 +52,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=free-pack-20261112"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=public-previews-20261112"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -131,6 +131,26 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
   }
   if (relativePath === 'app.js') {
     let js = bytes.toString('utf8');
+    // Consent is shared with the navigation shell even when embedded storage is blocked.
+    js = js.replace('let consentState = safeRead(CONSENT_KEY);', `const validConsent = value => value === 'accepted' || value === 'declined';
+const consentHost = (() => { try { return window.top.location.origin === location.origin ? window.top : window; } catch { return window; } })();
+const cookieConsent = () => { try { return document.cookie.split(';').map(part => part.trim()).find(part => part.startsWith(CONSENT_KEY+'='))?.split('=')[1]; } catch { return null; } };
+let consentState = [consentHost.RPConsentChoice, safeRead(CONSENT_KEY), cookieConsent()].find(validConsent);
+if (consentState) consentHost.RPConsentChoice = consentState;`);
+    js = js.replace('  safeWrite(CONSENT_KEY, consentState);', `  safeWrite(CONSENT_KEY, consentState);
+  try { document.cookie = CONSENT_KEY+'='+consentState+'; Path=/; Max-Age=31536000; SameSite=Lax; Secure'; } catch {}
+  consentHost.RPConsentChoice = consentState;
+  window.dispatchEvent(new Event('rp-consent-change'));
+  if (consentHost !== window) consentHost.dispatchEvent(new Event('rp-consent-change'));`);
+    js = js.replace("document.querySelectorAll('[data-cookie-settings]')", `window.addEventListener('rp-consent-change', () => {
+  const next = consentHost.RPConsentChoice;
+  if (!validConsent(next)) return;
+  consentState = next;
+  if (consentPanel) consentPanel.hidden = true;
+  if (pixelStarted && typeof window.fbq === 'function') window.fbq('consent', next === 'accepted' ? 'grant' : 'revoke');
+  if (next === 'accepted') loadMetaPixel();
+});
+document.querySelectorAll('[data-cookie-settings]')`);
     // Ask on every routine page, including returning visitors.
     js = js.replace("if (followWall && safeRead(FOLLOW_KEY) === 'confirmed') revealFree();\nelse if (followWall && safeSessionRead(FOLLOW_OPEN_KEY) === 'opened') enableConfirmFollow();",
       "if (followWall) enableConfirmFollow();");
@@ -140,7 +160,7 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     bytes = Buffer.from(js);
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/app\.js(?:\?[^"]*)?"/g, 'src="/app.js?v=20261024-follow-confirm"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/app\.js(?:\?[^"]*)?"/g, 'src="/app.js?v=consent-20261112"'));
   }
 
 
@@ -153,7 +173,7 @@ body[data-page="routines"] .individual-grid>.bundle-card .routine-includes{margi
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=22"><script defer src="/storefront-refresh.js?v=24"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=25"><script defer src="/storefront-refresh.js?v=25"></script></head>');
     bytes=Buffer.from(html);
   }
 

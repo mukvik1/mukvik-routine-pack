@@ -27,8 +27,8 @@
     return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
       '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">Choose your plan.</h2>' +
       '<p>Preview the routines and choose the downloads you want.</p></div>' +
-      free + offer('standard','Pro',15,'The essentials for your next set.') +
-      offer('pro','Ultra',25,'The full library, including Ultra exclusives.') + '</section>';
+      offer('standard','Pro',15,'The essentials for your next set.') +
+      offer('pro','Ultra',25,'The full library, including Ultra exclusives.') + free + '</section>';
   }
   const nav = document.querySelector('.site-header nav');
   if (nav) {
@@ -40,6 +40,11 @@
     nav.querySelectorAll('a[href="/packs/"],a[href="/free/"]').forEach(node=>node.remove());
     const routines=nav.querySelector('a[href="/routines/"]');
     if(routines)routines.after(price);else nav.append(price);
+    nav.classList.add('rp-main-menu');
+    const label=document.createElement('span');label.className='rp-menu-heading';label.textContent='Quick links';nav.prepend(label);
+    const legal=document.createElement('div');legal.className='rp-menu-legal';
+    legal.innerHTML='<span class="rp-menu-heading">Legal</span><a href="/legal/terms/">Terms &amp; Conditions</a><a href="/legal/privacy/">Privacy Policy</a><button type="button" data-cookie-settings>Cookie settings</button>';
+    nav.append(legal);
     price.addEventListener('click', () => nav.closest('.site-header')?.classList.remove('menu-open'));
   }
 

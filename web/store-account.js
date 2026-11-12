@@ -66,10 +66,11 @@ function renderAuth(){
 }
 const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');document.querySelector('.free-catalog')?.append(freeStatus);
 async function afterLogin(){
+ const routine=pendingRoutine;
  auth.close();
  if(pendingFree){const slug=pendingFree;pendingFree=null;pendingCheckout=false;await downloadFree(slug);return;}
  if(accountRequested){await openRequestedAccount();return;}
- if(pendingRoutine){const href=pendingRoutine;pendingRoutine=null;location.assign(href);return;}
+ if(routine){pendingRoutine=null;location.assign(routine);return;}
  renderAccount();
  show(pendingCheckout?cartDialog:account);pendingCheckout=false;
 }
@@ -111,47 +112,22 @@ function memberLevel(){
  if(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return 'Free';
  return standardAccess.tier==='standard'?'Pro':'Ultra';
 }
-let previewToken=null;
-const previewSelector='video#routine-player, video.free-routine-video, video.routine-detail-video, .routine-detail-panel video, video.individual-performance-video';
-async function prepareMemberPreviews(){
- if(!token||!user||!document.querySelector(previewSelector))return;
- const credential=token;
- try{
-  const response=await fetch('/api/v2/auth/preview-session',{method:'POST',headers:{Authorization:'Bearer '+credential},cache:'no-store'});
-  if(!response.ok||token!==credential)return;
-  previewToken=credential;
-  for(const video of document.querySelectorAll(previewSelector))if(video.error)video.load();
- }catch{}
-}
-function renderMemberGate(){
- const ready=Boolean(user&&token&&token===previewToken);
- document.documentElement.toggleAttribute('data-rp-member',ready);
- for(const video of document.querySelectorAll(previewSelector)){
-  video.classList.add('rp-member-preview');
-  if(!ready)video.pause();
-  if(!video.nextElementSibling?.matches('.rp-join-preview')){
-   const join=button('Create a free account to watch',async()=>{
-    if(!user){openAuth('register');return;}
-    await prepareMemberPreviews();renderMemberGate();
-   },'store-button primary rp-join-preview');
-   video.after(join);
-  }
-  video.nextElementSibling.textContent=user?'Load preview':'Create a free account to watch';
- }
-}
+const watchWithoutAccount=button('Continue watching',()=>{
+ const href=pendingRoutine;pendingRoutine=null;auth.close();
+ if(href)location.assign(href);
+},'store-text-button rp-watch-guest');
+watchWithoutAccount.hidden=true;auth.append(watchWithoutAccount);
+auth.addEventListener('close',()=>{pendingRoutine=null;watchWithoutAccount.hidden=true;});
 window.addEventListener('click',event=>{
- if(user||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
- const control=event.target.closest?.('[data-video],.preview-toggle,.rp-detail-controls>button,a[href]');
- if(!control)return;
- if(control.matches('a[href]')){
-  const target=new URL(control.href,location.href);
-  if(target.origin!==location.origin||!/^\/(routines|free)\/[a-z0-9-]+\/?$/.test(target.pathname))return;
-  pendingRoutine=target.href;
- }
- event.preventDefault();event.stopImmediatePropagation();openAuth('register');
+ if(user||token||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+ const link=event.target.closest?.('a.routine-detail-link[href]');
+ if(!link)return;
+ const target=new URL(link.href,location.href);
+ if(target.origin!==location.origin||!/^\/(routines|free)\/[a-z0-9-]+\/?$/.test(target.pathname))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ pendingRoutine=target.href;watchWithoutAccount.hidden=false;openAuth('register');
 },true);
 function renderHeader(){
- renderMemberGate();
  renderPackOffer();
  renderStandard();
  if(subscriptionOnly)document.querySelectorAll('.site-header nav a[href="/packs/"],.site-header [data-cart],a[href="/packs/get-the-pack/"]').forEach(n=>n.hidden=true);
@@ -166,7 +142,7 @@ async function saveCart(next){
  if(cartBusy)return false;cartBusy=true;status.textContent='';
  try{if(user)await api('/cart','PUT',{productCodes:next});cart=next;orderKey=null;if(!user)write('mukvik_guest_cart',JSON.stringify(cart));renderHeader();renderCart();return true;}catch(e){status.textContent=e.message;return false;}finally{cartBusy=false;}
 }
-async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await Promise.all([refreshStandard(),prepareMemberPreviews()]);renderHeader();renderCart();}
+async function finishLogin(access){token=access;write('mukvik_store_session',token);user=await api('/me');const remote=await api('/cart');const merged=[...new Set([...remote.items.map(x=>x.code),...cart])].filter(code=>catalog.some(p=>p.code===code));await api('/cart','PUT',{productCodes:merged});cart=merged;write('mukvik_guest_cart',null);await refreshStandard();renderHeader();renderCart();}
 const cartBody=el('div');cartDialog.append(cartBody);
 function currencyNote(cents){
  const note=el('p',undefined,'store-muted');note.style.fontSize='12px';note.style.lineHeight='1.5';
@@ -298,8 +274,8 @@ function renderMembershipOffers(){
   }
   section.dataset.visiblePlans=String(visible);
   const title=section.querySelector('.rp-plan-copy h2'),copy=section.querySelector('.rp-plan-copy>p:last-child');
-  if(title)title.textContent=!level?(token?'Checking membership…':'Start with Free.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.';
-  if(copy)copy.textContent=!level?(token?'Please wait.':'Compare Free, Pro and Ultra. Create a free account to get started.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
+  if(title)title.textContent=!level?(token?'Checking membership…':'Choose your plan.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.';
+  if(copy)copy.textContent=!level?(token?'Please wait.':'Choose the access that fits your sets. Watch previews anytime.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
  }
 }
 function renderStandard(){
@@ -351,7 +327,7 @@ function renderStandard(){
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
   if(!user){
-   panel.append(button('Create account for '+(tier==='pro'?'Ultra':'Pro'),()=>openAuth('register'),'store-button primary'));
+   panel.append(button('Create your '+(tier==='pro'?'Ultra':'Pro')+' account',()=>openAuth('register'),'store-button primary'));
    offer.append(panel);continue;
   }
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
@@ -379,7 +355,16 @@ function renderStandard(){
   offer.append(panel);
  }
  const adminAudit=user?.canAuditRoutineDownloads===true;
- if(!user){restorePreview();return;}
+ if(!user){
+  restorePreview();
+  const host=document.querySelector('[data-routine-actions]');
+  if(host){
+   const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';
+   wrap.append(button('Sign up to download',()=>openAuth('register'),'store-button primary'));
+   host.append(wrap);
+  }
+  return;
+ }
  const paidActive=standardAccess?.active&&+new Date(standardAccess.paidUntil)>Date.now();
  const freeSlugs=new Set(standardPlan.freeSlugs||[]);
  const available=new Set(standardPlan.slugs.filter(slug=>freeSlugs.has(slug)||adminAudit||(paidActive&&(standardAccess.tier!=='standard'||!proSlugs.has(slug)))));
@@ -422,7 +407,7 @@ document.querySelectorAll('[data-buy]').forEach(b=>b.addEventListener('click',as
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderCart();renderAccount();});
 renderHeader();renderAuth();renderCart();
 async function loadCatalog(){const data=await api('/catalog');catalog=data.products;packPromotion=data.packPromotion;usdUahRate=Number(data.usdUahRate)||46;publicStandardPlan=standardPlan=data.standard;subscriptionOnly=data.subscriptionOnly===true;}
-try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}await Promise.all([refreshStandard(accountQuery.get('subscription')==='return'),prepareMemberPreviews()]);renderHeader();renderCart();}catch(e){status.textContent=e.message;}
+try{await loadCatalog();cart=cart.filter(c=>catalog.some(p=>p.code===c));if(token){try{user=await api('/me');}catch{user=null;}if(user)try{cart=(await api('/cart')).items.map(x=>x.code);}catch{}}await refreshStandard(accountQuery.get('subscription')==='return');renderHeader();renderCart();}catch(e){status.textContent=e.message;}
 if(accountRequested)await openRequestedAccount();
 if(accountQuery.get('subscription')==='return'&&user&&standardPlan&&!standardAccess?.active){
  let attempts=0;

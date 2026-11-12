@@ -93,7 +93,6 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-plan .rp-standard-cta label{line-height:1.5;color:#bdc8dd}
 .rp-plan .rp-standard-cta a{color:#b1c5ff}
 .rp-plan .rp-standard-cta .store-button.primary{min-height:48px;border-radius:12px;margin-top:6px}
-.rp-plan .rp-offer-standard .rp-standard-cta .store-button.primary{background:#222e46;border-color:#60749f}
 .rp-detail-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:18px}
 .rp-detail-controls:empty{display:none}
 #performances{scroll-margin-top:24px}
@@ -118,8 +117,31 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-plan-tiers[data-visible-plans="0"],.rp-plan-tiers[data-visible-plans="1"]{grid-template-columns:minmax(0,1fr);max-width:490px}
 @media(min-width:861px){.rp-plan-tiers[data-visible-plans="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .store-user-menu summary>.rp-member-tier{display:inline-block;margin-inline-start:6px;padding:2px 5px;border:1px solid #6788bd;border-radius:5px;color:#c0d7ff;font:700 10px/1.2 system-ui,sans-serif;vertical-align:middle}
-html:not([data-rp-member]) :is(#routine-player,.free-routine-video,.routine-detail-video,.routine-detail-panel video,video.individual-performance-video,.rp-detail-controls>button){display:none!important}
-html[data-rp-member] .rp-join-preview{display:none!important}
-.rp-join-preview{margin:16px auto}
 
 .store-user-menu summary>.rp-member-name{display:inline-block;max-width:calc(100% - 64px);overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+
+/* Plan cards use a quiet, readable surface and a single action style. */
+.rp-plan.rp-plan-tiers{width:min(1040px,calc(100% - 32px))}
+.rp-plan-tiers .rp-plan-offer{color:#15223a;background:#f4f7fd;border:1px solid #b4c3df;border-radius:18px;box-shadow:0 14px 38px #04081445;text-align:left}
+.rp-plan-tiers .rp-offer-standard{border-color:#78a2ff}
+.rp-plan-tiers .rp-offer-pro{background:#eaf1ff;border-color:#78a2ff}
+.rp-plan-tiers .rp-plan-offer :is(.rp-plan-name,.rp-plan-price){color:#13213b}
+.rp-plan-tiers .rp-plan-offer :is(p,small,label,li,.rp-plan-pending){color:#304564}
+.rp-plan-tiers .rp-plan-offer :is(.rp-plan-edition,.rp-plan-rate-note,a){color:#244fa7}
+.rp-plan-tiers .rp-plan-features{border-color:#c7d4ec}
+.rp-plan-tiers .rp-plan-offer .store-button.primary{display:flex;width:100%;min-height:46px;align-items:center;justify-content:center;border-radius:999px;background:#2657ec;border-color:#2657ec;color:#fff;text-align:center}
+.rp-plan-tiers .rp-plan-offer>.store-button{margin-top:auto}
+.rp-plan-tiers .rp-plan-offer .store-button.primary:hover{background:#1b46cd;border-color:#1b46cd}
+.rp-plan-tiers .rp-plan-offer .store-button:focus-visible{outline:2px solid #244fa7;outline-offset:3px}
+#store-auth .store-dialog-head{align-items:center}
+#store-auth button.store-close{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;padding:0;border:0;background:transparent;color:#fff;box-shadow:none;font:400 28px/1 Arial,sans-serif;border-radius:8px}
+#store-auth button.store-close:hover,#store-auth button.store-close:focus-visible{background:#26334d}
+#store-auth .rp-watch-guest:not([hidden]){display:block;margin:12px auto 0;text-decoration:underline}
+.rp-main-menu>.rp-menu-heading,.rp-main-menu>.rp-menu-legal{display:none}
+@media(max-width:1240px){
+ .site-header.menu-open nav.rp-main-menu,.site-header nav.rp-main-menu.open{gap:0;background:#111622;border:1px solid #323d52;border-radius:14px;padding:16px;max-height:min(65dvh,540px);overflow:auto;overscroll-behavior:contain}
+ .site-header nav.rp-main-menu>.rp-menu-heading,.site-header nav.rp-main-menu .rp-menu-heading{display:block;padding:8px 10px;font:700 12px/1.4 system-ui,sans-serif;color:#a7bcdf;border-bottom:1px solid #38455f}
+ .site-header nav.rp-main-menu>.rp-menu-legal{display:grid;margin-top:12px}
+ .site-header nav.rp-main-menu :is(a,button){display:block;min-height:44px;padding:12px 10px;border:0;border-radius:6px;background:transparent;text-align:left;font:600 14px/1.35 system-ui,sans-serif;color:#eef3ff}
+ .site-header nav.rp-main-menu :is(a,button):is(:hover,:focus-visible,.active){background:#223252;color:#fff}
+}
