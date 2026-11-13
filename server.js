@@ -245,6 +245,10 @@ http.createServer(async (req, res) => {
     res.writeHead(302, {Location:'/routines/'+url.search+'#free-routines', 'Cache-Control':'no-store'});
     return res.end();
   }
+  if (/^\/free\/get-right-x-just-a-lil-bit(?:\/index\.html|\/)?$/.test(pathname)) {
+    res.writeHead(302,{Location:'/routines/get-right-x-just-a-lil-bit/'+url.search,'Cache-Control':'no-store'});
+    return res.end();
+  }
   const oldOrder = url.searchParams.get('monoOrder');
   if (pathname === '/' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(oldOrder || '')) {
     res.writeHead(302, {Location:'/?account=1&orderId='+encodeURIComponent(oldOrder), 'Cache-Control':'no-store'});
@@ -255,5 +259,5 @@ http.createServer(async (req, res) => {
     res.writeHead(301, { Location: '/routines/'+legacyRoutines.get(detail)+'/'+url.search, 'Cache-Control':'no-store' });
     return res.end();
   }
-  serveStatic(req, res, namedRoutines.has(detail) ? '/routines/library-detail.html' : pathname === '/price' ? '/price/' : pathname);
+  serveStatic(req, res, (namedRoutines.has(detail) || detail==='get-right-x-just-a-lil-bit') ? '/routines/library-detail.html' : pathname === '/price' ? '/price/' : pathname);
 }).listen(port, () => console.log(`MUKVIK Routine Pack running on ${port}`));

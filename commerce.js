@@ -7,7 +7,6 @@ const {pipeline}=require('node:stream/promises');
 const freeFiles=require('node:fs');
 const freePath=require('node:path');
 const freeRoutines=new Map([
- ['get-right-x-just-a-lil-bit','GET RIGHT × JUST A LIL BIT'],
  ['work-it-x-candy-shop','WORK IT × CANDY SHOP'],
  ['rihanna-routine','RIHANNA ROUTINE'],
  ...require('./config/free-routines.json').map(r=>[r.slug,r.title])
