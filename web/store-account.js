@@ -60,7 +60,7 @@ function renderAuth(){
  if(!registration&&!reset)authBody.append(button('Forgot password?',()=>{mode='reset';renderAuth();},'store-text-button'));
  if(reset)authBody.append(button('Back to sign in',()=>{mode='login';renderAuth();},'store-text-button'));
 }
-const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');(document.querySelector('.free-intro [data-routine-actions]')||document.querySelector('.free-catalog'))?.append(freeStatus);
+const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');(document.querySelector('[data-routine-actions]:has([data-free-routine-download])')||document.querySelector('.free-catalog'))?.append(freeStatus);
 async function afterLogin(){
  const routine=pendingRoutine;
  auth.close();

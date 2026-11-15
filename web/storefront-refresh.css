@@ -169,3 +169,9 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 
 .rp-detail-controls>[role=status]:empty{display:none}
 .rp-detail-controls>[role=status]{grid-column:1/-1;text-align:center;margin:0}
+
+body main.routine-detail-main>.routine-detail-panel.rp-unified-detail>h1{
+  max-width:780px;margin:12px auto 22px;font-size:clamp(29px,5vw,64px)!important;
+  line-height:1.11!important;text-align:center;text-wrap:balance;overflow-wrap:anywhere
+}
+body main.routine-detail-main>.rp-unified-detail>.routine-detail-video{margin:0 auto}

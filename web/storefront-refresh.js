@@ -215,12 +215,31 @@
     download.textContent='Download';
     const status=document.createElement('span');status.dataset.routineDownloadStatus='';status.setAttribute('role','status');
     actions.append(download,status);
-    const feature=freeSlug&&section.querySelector('.free-routine-feature');
-    if(feature)feature.after(actions);else section.append(actions);
+    section.append(actions);
+  }
+  function normalizeRoutineDetail(section) {
+    const heading=section.querySelector('h1');
+    if(!heading)return;
+    const video=section.querySelector('video');
+    const crumb=document.createElement('p');
+    crumb.innerHTML='<a href="/routines/">Routines</a>';
+    section.className='routine-detail-panel rp-unified-detail';
+    section.closest('main')?.classList.add('routine-detail-main');
+    if(video){
+      video.className='routine-detail-video';
+      section.replaceChildren(crumb,heading,video);
+    }else section.replaceChildren(crumb,heading);
   }
   const freeDetail=document.querySelector('main .free-intro');
   const freeSlug=/^\/free\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
   if(freeDetail&&freeSlug){
+    normalizeRoutineDetail(freeDetail);
+    const instructions=document.querySelector('#follow-wall p:not(.eyebrow)');
+    if(instructions){
+      instructions.removeAttribute('data-i18n');
+      instructions.removeAttribute('data-follow-question');
+      instructions.textContent='To get your free download, follow @mukvik.ofc on Instagram and sign in or create a free account.';
+    }
     addRoutineActions(freeDetail,freeSlug,true);
     addRoutinePager(freeDetail);
   }
@@ -286,6 +305,7 @@
       }
       const section=main?.querySelector('.routine-detail-panel');
       if(section){
+        normalizeRoutineDetail(section);
         addRoutineActions(section,main.dataset.routineSlug||path);
         addRoutinePager(section);
       }
