@@ -121,11 +121,24 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 @media(max-width:600px){.rp-routine-pager{width:calc(100% - 24px);gap:8px}.rp-routine-pager a{padding:12px;min-height:80px}.rp-routine-pager strong{font-size:.75rem}}
 
 /* Keep the tier label in its own space above the card content. */
-.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier{position:static;align-self:flex-end;justify-self:end;grid-column:1/-1;order:-1;flex:none;font:700 11px/14px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding:3px 7px;border:1px solid #7f9acc55;border-radius:6px;background:#131b2f;color:#b7c7ec}
-.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-pro{background:#233b83;color:#e7edff;border-color:#7290ff88}
-
-.rp-plan .rp-offer-free>.store-button{margin-top:auto;align-self:flex-start;min-height:44px;align-items:center;color:#f0f6ff}
-.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier-free{background:#123a37;color:#baf6e9;border-color:#59bcaa88}
+.coming-grid.individual-grid>article.rp-tiered-routine>.rp-routine-tier,.rp-unified-detail>.rp-routine-tier{
+  position:static;display:inline-flex;align-items:center;justify-content:center;align-self:flex-end;justify-self:end;
+  grid-column:1/-1;order:-1;flex:none;font:800 11px/15px system-ui,sans-serif;letter-spacing:.10em;
+  text-transform:uppercase;white-space:nowrap;padding:4px 9px;border:1px solid var(--tier-edge);
+  border-radius:7px;background:var(--tier-bg);color:var(--tier-ink)
+}
+.rp-routine-tier-standard,.rp-unified-detail[data-detail-tier="standard"]{--tier-bg:#1e409f;--tier-edge:#92b5ff;--tier-ink:#fff;--tier-watermark:#90b3ff}
+.rp-routine-tier-pro,.rp-unified-detail[data-detail-tier="pro"]{--tier-bg:#583192;--tier-edge:#d7afff;--tier-ink:#fff;--tier-watermark:#cda4ff}
+.rp-routine-tier-free,.rp-unified-detail[data-detail-tier="free"]{--tier-bg:#105047;--tier-edge:#7fe1cb;--tier-ink:#edfff9;--tier-watermark:#81e4ce}
+.rp-unified-detail{position:relative;isolation:isolate;overflow:hidden}
+.rp-unified-detail::before{
+  position:absolute;inset:22px 0 auto;z-index:-1;pointer-events:none;text-align:center;
+  color:var(--tier-watermark);opacity:.13;font:900 clamp(68px,16vw,192px)/1 system-ui,sans-serif;
+  letter-spacing:.06em;content:"PRO" / ""
+}
+.rp-unified-detail[data-detail-tier="free"]::before{content:"FREE" / ""}
+.rp-unified-detail[data-detail-tier="pro"]::before{content:"ULTRA" / ""}
+.rp-unified-detail>.rp-routine-tier{margin:0 auto 4px}
 #free-routines{scroll-margin-top:24px}
 
 .rp-plan .rp-plan-offer[hidden]{display:none!important}

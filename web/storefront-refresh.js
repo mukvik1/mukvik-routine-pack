@@ -122,6 +122,7 @@
   ];
   const freePackSlugs = new Set(['routine-04','routine-06']);
   const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
+  const tierFor = id => freePackSlugs.has(id)?'free':ultraRoutines.has(id)?'pro':'standard';
   const badgeFor = tier => '<span class="rp-routine-tier rp-routine-tier-'+tier+'">'+({free:'Free',standard:'Pro',pro:'Ultra'})[tier]+'</span>';
   const promotedRoutine=['Get Right × Just a Lil Bit','get-right-x-just-a-lil-bit'];
   const otherRoutines = [
@@ -217,7 +218,7 @@
     actions.append(download,status);
     section.append(actions);
   }
-  function normalizeRoutineDetail(section) {
+  function normalizeRoutineDetail(section,tier) {
     const heading=section.querySelector('h1');
     if(!heading)return;
     const video=section.querySelector('video');
@@ -229,11 +230,13 @@
       video.className='routine-detail-video';
       section.replaceChildren(crumb,heading,video);
     }else section.replaceChildren(crumb,heading);
+    section.dataset.detailTier=tier;
+    crumb.insertAdjacentHTML('afterend',badgeFor(tier));
   }
   const freeDetail=document.querySelector('main .free-intro');
   const freeSlug=/^\/free\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
   if(freeDetail&&freeSlug){
-    normalizeRoutineDetail(freeDetail);
+    normalizeRoutineDetail(freeDetail,'free');
     const instructions=document.querySelector('#follow-wall p:not(.eyebrow)');
     if(instructions){
       instructions.removeAttribute('data-i18n');
@@ -255,7 +258,7 @@
       const isFree=freePackSlugs.has(slug);
       card.classList.add('rp-tiered-routine');
       const image=isFree?'/assets/free-videos/'+path+'.jpg':'/assets/lesson-previews/pack-'+number+'-blurred.jpg';
-      card.innerHTML = badgeFor(isFree?'free':ultraRoutines.has(slug)?'pro':'standard')+'<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="'+image+'"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
+      card.innerHTML = badgeFor(tierFor(slug))+'<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="'+image+'"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
       card.querySelector('h2').textContent = title;
       fragment.append(card);
     }
@@ -273,7 +276,7 @@
         const card=link?.closest('article');
         if(!card||card.querySelector('.rp-routine-tier'))continue;
         card.classList.add('rp-tiered-routine');
-        card.insertAdjacentHTML('afterbegin',badgeFor(ultraRoutines.has(slug)?'pro':'standard'));
+        card.insertAdjacentHTML('afterbegin',badgeFor(tierFor(slug)));
       }
       const [title,slug]=promotedRoutine;
       const card=document.createElement('article');
@@ -305,7 +308,7 @@
       }
       const section=main?.querySelector('.routine-detail-panel');
       if(section){
-        normalizeRoutineDetail(section);
+        normalizeRoutineDetail(section,tierFor(main.dataset.routineSlug||path));
         addRoutineActions(section,main.dataset.routineSlug||path);
         addRoutinePager(section);
       }
