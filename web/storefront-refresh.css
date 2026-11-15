@@ -101,7 +101,14 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-plan .rp-standard-cta label{line-height:1.5;color:#bdc8dd}
 .rp-plan .rp-standard-cta a{color:#b1c5ff}
 .rp-plan .rp-standard-cta .store-button.primary{min-height:48px;border-radius:12px;margin-top:6px}
-.rp-detail-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:18px}
+.routine-detail-panel,.free-intro:has(>.rp-detail-controls){text-align:center}
+.routine-detail-panel>h1,.free-intro:has(>.rp-detail-controls)>h1{margin-inline:auto;text-align:center;text-wrap:balance}
+.routine-detail-panel>.routine-detail-video{margin-inline:auto;margin-bottom:0}
+.rp-detail-controls{box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:min(100%,144px);margin:18px auto 0;text-align:center}
+.rp-detail-controls.rp-detail-controls-pair{grid-template-columns:repeat(2,minmax(0,1fr));width:min(100%,298px)}
+.rp-detail-controls>.store-button{box-sizing:border-box;display:grid;place-items:center;width:100%;min-height:46px;margin:0;padding:10px 8px;border-radius:8px;font:700 14px/1.25 system-ui,sans-serif;letter-spacing:0;text-align:center;text-decoration:none}
+.rp-detail-controls>.store-button.primary{background:#2657ec;border-color:#2657ec;color:#fff}
+.rp-detail-controls>.store-button:focus-visible{outline:2px solid #8db3ff;outline-offset:3px}
 .rp-detail-controls:empty{display:none}
 #performances{scroll-margin-top:24px}
 .rp-routine-pager{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(900px,calc(100% - 32px));margin:24px auto 42px}
@@ -161,4 +168,4 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-account-pending>.rp-member-tier{flex:none;padding:2px 5px;border:1px solid #6788bd;border-radius:5px;color:#c0d7ff;font:700 10px/1.2 system-ui,sans-serif}
 
 .rp-detail-controls>[role=status]:empty{display:none}
-.rp-detail-controls>[role=status]{flex-basis:100%;text-align:center;margin:0}
+.rp-detail-controls>[role=status]{grid-column:1/-1;text-align:center;margin:0}

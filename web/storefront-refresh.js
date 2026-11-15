@@ -200,6 +200,7 @@
     const player=section.querySelector('video');
     const actions=document.createElement('div');actions.className='rp-detail-controls';actions.dataset.routineActions='';
     if(player){
+      actions.classList.add('rp-detail-controls-pair');
       const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';
       play.addEventListener('click',()=>player.paused?player.play().catch(()=>{}):player.pause());
       player.addEventListener('play',()=>play.textContent='Pause');
@@ -214,7 +215,8 @@
     download.textContent='Download';
     const status=document.createElement('span');status.dataset.routineDownloadStatus='';status.setAttribute('role','status');
     actions.append(download,status);
-    section.append(actions);
+    const feature=freeSlug&&section.querySelector('.free-routine-feature');
+    if(feature)feature.after(actions);else section.append(actions);
   }
   const freeDetail=document.querySelector('main .free-intro');
   const freeSlug=/^\/free\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
