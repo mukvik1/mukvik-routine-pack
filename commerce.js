@@ -1,5 +1,6 @@
 (function commerceModule(require,module,exports){
 'use strict';
+const { isRoutineAudio } = require('./routine-audio');
 const crypto=require('node:crypto');
 const {validPassword,hashPassword,verifyPassword}=require('./passwords');
 const {Readable}=require('node:stream');
@@ -96,7 +97,7 @@ function createCommerce(settings=process.env,overrides={}){
   const list=files[code];
   if(!Array.isArray(list)||!Number.isSafeInteger(index)||index<0||index>=list.length)return null;
   const file=list[index];
-  if(!file||!/^[-\w]{10,128}$/.test(file.fileId)||typeof file.name!=='string'||file.name.length>160)return null;
+  if(!file||!/^[-\w]{10,128}$/.test(file.fileId)||!isRoutineAudio(file.name)||file.name.length>160)return null;
   return file;
  }
  async function session(req){
@@ -368,7 +369,7 @@ function createCommerce(settings=process.env,overrides={}){
   const orders=new Map();
   for(const row of r.rows){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
-   orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).map((file,index)=>({index,name:file.name})):[]});
+   orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).flatMap((file,index)=>fileAt(row.product_code,index)?[{index,name:file.name}]:[]):[]});
   }
   response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:false,orders:[...orders.values()]});
  }

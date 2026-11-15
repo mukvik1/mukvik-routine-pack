@@ -223,7 +223,7 @@ function renderMembershipOffers(){
 function renderStandard(){
  renderMembershipOffers();
  const playbackEpoch=++videoGeneration;
- const player=document.querySelector('.routine-detail-panel video[data-free-pack-video],.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
+ const player=document.querySelector('.routine-detail-panel video[data-routine-lesson],.routine-detail-panel video[data-free-pack-video],.routine-detail-panel video[src*="-blurred.mp4"],.routine-detail-panel video[data-blurred-src]');
  const restorePreview=()=>{
   if(player?.hasAttribute('data-free-pack-video')&&player.hasAttribute('src')){
    player.pause();player.removeAttribute('src');player.load();delete player.dataset.fullVideo;
@@ -262,7 +262,7 @@ function renderStandard(){
   if(!plan){const pending=offer.querySelector('.rp-plan-pending');if(pending)pending.textContent='This plan is not available yet.';continue;}
   offer.querySelector('.rp-plan-name span')?.remove();
   const benefit=offer.querySelector('.rp-plan-features li:last-child');
-  if(benefit)benefit.textContent='MP3 downloads with an active subscription';
+  if(benefit)benefit.textContent='Audio downloads with an active subscription';
   offer.querySelector('.rp-plan-pending')?.remove();
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');
@@ -301,7 +301,7 @@ function renderStandard(){
  const freeSlugs=new Set(standardPlan.freeSlugs||[]);
  const available=new Set(standardPlan.slugs.filter(slug=>freeSlugs.has(slug)||adminAudit||(paidActive&&(standardAccess.tier!=='standard'||!proSlugs.has(slug)))));
  const slug=document.querySelector('[data-routine-download]')?.dataset.routineDownload;
- if(player&&slug&&available.has(slug)&&/^routine-0[1-6]$/.test(slug)){
+ if(player&&slug&&available.has(slug)&&(standardPlan.videoSlugs||[]).includes(slug)){
   if(!player.dataset.blurredSrc)player.dataset.blurredSrc=player.getAttribute('src');
   if(!player.dataset.fullVideo){
    api('/standard/routines/'+encodeURIComponent(slug)+'/video-ticket','POST',{}).then(result=>{

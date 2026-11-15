@@ -100,9 +100,10 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  assert.equal(response.status,200);assert.equal(response.headers['Content-Type'],'application/zip');
  assert.match(response.headers['Content-Disposition'],/Who%27s%20That%20Girl%20x%20Drop%20It%20Like%20It%27s%20Hot\.zip/);
  assert.equal(zip.readUInt32LE(0),0x04034b50);
- assert.ok(zip.includes(Buffer.from('Edit.mp3'))&&zip.includes(Buffer.from('Lesson.mp4')));
+ assert.ok(zip.includes(Buffer.from('Edit.mp3')));
+ assert.ok(!zip.includes(Buffer.from('Lesson.mp4')));
  assert.ok(!zip.includes(Buffer.from('Bonus.mp3')));
- assert.equal(state.events.length,2);
+ assert.equal(state.events.length,1);
  const replay={};await s.download(replay,token);assert.equal(replay.status,410);
 });
 
@@ -155,7 +156,7 @@ test('verified admin can audit an archive without a subscription; a matching unv
  const approved={};await s.ticket(approved,{id:'admin',email,email_verified_at:new Date()},'routine-01');assert.equal(approved.status,200);
  const response=new PassThrough();response.resume();response.writeHead=status=>{response.status=status;};
  await s.download(response,approved.data.url.split('/').at(-1));
- assert.equal(response.status,200);assert.equal(state.events.length,2);
+ assert.equal(response.status,200);assert.equal(state.events.length,1);
 });
 
 test('verified Free members can download and request original video for the reclassified routines',async()=>{

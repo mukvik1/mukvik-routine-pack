@@ -6,10 +6,13 @@ const { pipeline } = require('node:stream/promises');
 const { USD_UAH_RATE, uahKopiykas, isTrustedCheckoutUrl } = require('./monobank');
 const path = require('node:path');
 const fs = require('node:fs');
+const { isRoutineAudio } = require('./routine-audio');
 const localArchives = new Map([['get-right-x-just-a-lil-bit','Get Right x Just a Lil Bit.zip']]);
 const manifest = require('./config/standard-pack-files.json');
 const routinePaths = require('./config/routine-paths.json');
-const addedRoutines = require('./config/routine-media.json').filter(routine => routine.files);
+const importedMedia = require('./config/routine-media.json');
+const addedRoutines = importedMedia.filter(routine => routine.files);
+const privateVideoSlugs = new Set(importedMedia.map(routine => routine.slug));
 const routineNames = new Map([
   ...routinePaths.map(routine => [routine.id, routine.title]),
   ...addedRoutines.map(routine => [routine.slug, routine.title]),
@@ -102,7 +105,7 @@ function interpretStatus(row, data, now = Date.now()) {
   return { paidUntil, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
 }
 
-function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, driveFetch = fetch, reply, packManifest, adminEmail, archiveRoot = path.join(__dirname,'web','downloads') }) {
+function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, driveFetch = fetch, reply, packManifest, adminEmail, archiveRoot = path.join(__dirname,'web','downloads'), privateVideoRoot = path.join(__dirname,'private-routine-videos') }) {
   if (settings.STANDARD_SUBSCRIPTIONS_ENABLED === 'false' || !settings.MONOBANK_SUBSCRIPTION_TOKEN) return null;
   const entries = catalogFiles(files, packManifest);
   const publicOrigin = new URL(settings.PUBLIC_ORIGIN);
@@ -218,6 +221,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     return reply(res, 200, { ok: true });
   }
   function fullVideo(slug) {
+    if (privateVideoSlugs.has(slug)) return { local: path.join(privateVideoRoot, slug + '.mp4') };
     if (!/^routine-0[1-6]$/.test(slug)) return null;
     return entries.get(slug)?.find(file=>/\.mp4$/i.test(file.name))||null;
   }
@@ -239,7 +243,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
         AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
       RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
-    const slug = r.rows[0].routine_slug, list = entries.get(slug);
+    const slug = r.rows[0].routine_slug, list = entries.get(slug)?.filter(file => isRoutineAudio(file.name));
     if (localArchives.has(slug)) {
       const filename=path.join(archiveRoot,slug+'.zip');
       let stat;
@@ -249,7 +253,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
       try { await pipeline(fs.createReadStream(filename),res); } catch { res.destroy(); }
       return;
     }
-    if (!list) return reply(res, 404, { error: 'Routine not found.' });
+    if (!list?.length) return reply(res, 404, { error: 'Routine not found.' });
     const driveToken = await getDriveToken();
     if (!driveToken) throw Error('Drive authorization unavailable');
     const { ZipFile } = require('yazl');
@@ -293,6 +297,21 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     const file = r.rows[0] && fullVideo(r.rows[0].slug);
     if (!file) return reply(res,404,{error:'Video unavailable.'});
+    if (file.local) {
+      const stat = await fs.promises.stat(file.local).catch(() => null);
+      if (!stat?.isFile() || !stat.size) return reply(res,404,{error:'Video unavailable.'});
+      const size = stat.size;
+      const headers = {'Content-Type':'video/mp4','Cache-Control':'private, no-store','Accept-Ranges':'bytes','Content-Disposition':'inline','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
+      const [, first, last] = range?.match(/^bytes=(\d*)-(\d*)$/) || [];
+      const start = range && !first ? Math.max(0, size - Number(last)) : Number(first || 0);
+      const end = range && first && last ? Math.min(size - 1, Number(last)) : size - 1;
+      if (start > end || start >= size) return res.writeHead(416, {...headers,'Content-Range': 'bytes */' + size}).end();
+      if (range) headers['Content-Range'] = 'bytes ' + start + '-' + end + '/' + size;
+      res.writeHead(range ? 206 : 200, {...headers,'Content-Length': end - start + 1});
+      if (req.method === 'HEAD') return res.end();
+      try { await pipeline(fs.createReadStream(file.local,{start,end}),res); } catch { res.destroy(); }
+      return;
+    }
     const accessToken=await getDriveToken();
     if(!accessToken)throw Error('Drive authorization unavailable');
     const abort = new AbortController();
@@ -324,6 +343,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   return { status, checkout, cancel, callback, ticket, download, video, cleanup, catalog: {
     slugs: [...entries.keys(), ...localArchives.keys()],
     freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
+    videoSlugs: [...entries.keys()].filter(slug => fullVideo(slug)),
     proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
   } };

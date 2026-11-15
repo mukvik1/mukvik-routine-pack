@@ -18,7 +18,8 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
   const token = await auth.getAccessToken();
   if (!token) throw Error('Routine media: missing Drive access token.');
   const destination = path.join(root, 'assets', 'routine-previews');
-  await fs.mkdir(destination, { recursive: true });
+  const privateVideos = path.join(root, '..', 'private-routine-videos');
+  await Promise.all([destination, privateVideos].map(directory => fs.mkdir(directory, { recursive: true })));
   const endpoint = id => 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true';
   const headers = { Authorization: 'Bearer ' + token };
   let next = 0;
@@ -45,11 +46,13 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
         await pipeline(Readable.fromWeb(response.body), createWriteStream(source));
         const video = path.join(destination, slug + '.mp4');
         const ffmpeg = (args, timeout) => exec('ffmpeg', ['-v', 'error', '-y', '-threads', '2', ...args], { timeout });
-        await ffmpeg(['-i', source, '-t', '40', '-map', '0:v:0', '-map', '0:a:0?',
+        const fullVideo = path.join(privateVideos, slug + '.mp4');
+        await ffmpeg(['-i', source, '-map', '0:v:0', '-map', '0:a:0?',
           '-vf', "scale=w='min(iw,960)':h='min(ih,960)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v', 'libx264', '-threads', '2', '-preset', 'fast', '-crf', '23',
-          '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', video], 180000);
-        await ffmpeg(['-ss', '1', '-i', video, '-frames:v', '1', '-update', '1', path.join(destination, slug + '.jpg')], 30000);
+          '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fullVideo], 180000);
+        await ffmpeg(['-i', fullVideo, '-t', '20', '-c', 'copy', '-movflags', '+faststart', video], 30000);
+        await ffmpeg(['-i', video, '-frames:v', '1', '-update', '1', path.join(destination, slug + '.jpg')], 30000);
         console.log('Imported routine preview: ' + slug);
       } catch (error) {
         throw Error('Routine media ' + slug + ': ' + error.message);

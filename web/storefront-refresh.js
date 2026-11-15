@@ -239,6 +239,7 @@
     section.closest('main')?.classList.add('routine-detail-main');
     if(video){
       video.className='routine-detail-video';
+      video.setAttribute('controlslist','nodownload');
       section.replaceChildren(crumb,heading,video);
     }else section.replaceChildren(crumb,heading);
     section.dataset.detailTier=tier;
@@ -323,7 +324,7 @@
         main.dataset.routineSlug=id;
         document.title=title+' — MUKVIK';
         const media=mediaSlugs.has(slug)?previewPath(slug):entry<0||freePackSlugs.has(id)?'/assets/free-videos/'+slug:'/assets/lesson-previews/pack-'+number+'-blurred';
-        const source='poster="'+media+'.jpg" src="'+media+'.mp4"';
+        const source=(mediaSlugs.has(slug)?'data-routine-lesson ':'')+'poster="'+media+'.jpg" src="'+media+'.mp4"';
         main.innerHTML='<section class="routine-detail-panel"><p><a href="/routines/">Routines</a></p><h1></h1><video class="routine-detail-video" controls playsinline preload="none" '+source+'></video></section>';
         main.querySelector('h1').textContent=title;
       }

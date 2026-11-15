@@ -15,6 +15,7 @@
     "google-auth-library": "^9.15.1",
     "nodemailer": "^6.10.1",
     "pg": "^8.13.3",
+    "yauzl": "3.2.0",
     "yazl": "3.3.1"
   }
 }
