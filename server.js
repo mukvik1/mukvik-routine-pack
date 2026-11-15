@@ -7,6 +7,9 @@ const { pipeline } = require('node:stream');
 const geoAccess = require('./geo-access').createGeoAccess();
 const routinePaths = require('./config/routine-paths.json');
 const namedRoutines = new Map(routinePaths.map(routine => [routine.slug, routine.id]));
+for (const routine of require('./config/routine-media.json')) {
+  namedRoutines.set(routine.slug, routine.slug);
+}
 const legacyRoutines = new Map(routinePaths.map(routine => [routine.id, routine.slug]));
 
 const root = path.join(__dirname, 'web');

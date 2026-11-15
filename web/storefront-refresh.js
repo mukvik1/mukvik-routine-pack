@@ -54,12 +54,12 @@
     const offer = (tier, name, price, description) =>
       '<div class="rp-plan-offer rp-offer-' + tier + '" hidden data-plan-tier="' + tier + '"><p class="rp-plan-name">' + name + '</p><span class="rp-plan-edition">' + (tier==='pro'?'FULL LIBRARY':'ESSENTIALS') + '</span>' +
       '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
-      '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Pro routines plus 4 Ultra routines' : '9 Pro routines') +
+      '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Pro routines plus ' + tierCounts.pro + ' Ultra routines' : tierCounts.standard + ' Pro routines') +
       '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
       '<span class="rp-plan-pending">Checking availability…</span></div>';
     const free = '<div class="rp-plan-offer rp-offer-free" hidden><p class="rp-plan-name">Free</p><span class="rp-plan-edition">FREE ROUTINES</span>' +
       '<p class="rp-plan-price">$0</p><p class="rp-plan-rate-note">Activated when you create an account.</p><p>Get started with the free routines.</p>' +
-      '<ul class="rp-plan-features"><li>7 free routines</li><li>Video previews</li><li>Downloads with a free account</li></ul>' +
+      '<ul class="rp-plan-features"><li>' + tierCounts.free + ' free routines</li><li>Video previews</li><li>Downloads with a free account</li></ul>' +
       '<a class="store-button" href="/routines/#free-routines">Browse free routines</a></div>';
     return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
       '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">Choose your plan.</h2>' +
@@ -120,8 +120,13 @@
     ['Axel F × Promiscuous','routine-05','axel-f-promiscuous'],
     ['Empire State of Mind','routine-06','empire-state-of-mind']
   ];
+  // The Railway build inserts only public catalogue fields here.
+  const routineMedia = /* routine-media:start */[]/* routine-media:end */;
+  const newRoutines = routineMedia.filter(routine => routine.title);
+  const mediaSlugs = new Set(routineMedia.map(routine => routine.slug));
+  const previewPath = slug => '/assets/routine-previews/' + slug;
   const freePackSlugs = new Set(['routine-04','routine-06']);
-  const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
+  const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval', ...newRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
   const tierFor = id => freePackSlugs.has(id)?'free':ultraRoutines.has(id)?'pro':'standard';
   const badgeFor = tier => '<span class="rp-routine-tier rp-routine-tier-'+tier+'">'+({free:'Free',standard:'Pro',pro:'Ultra'})[tier]+'</span>';
   const promotedRoutine=['Get Right × Just a Lil Bit','get-right-x-just-a-lil-bit'];
@@ -134,7 +139,8 @@
     ['Not Like Us × Candy Shop','not-like-us-candy-shop'],
     ['Macarena × Candy Shop','macarena-candy-shop'],
     ['Levitation to Can’t Stop × Rompe','levitation-cant-stop-rompe'],
-    ['I Know You Want Me × Chandelier','i-know-you-want-me-chandelier']
+    ['I Know You Want Me × Chandelier','i-know-you-want-me-chandelier'],
+    ...newRoutines.map(({title,slug}) => [title,slug])
   ];
   const freeRoutines = [
     ['Work It × Candy Shop','work-it-x-candy-shop'],
@@ -143,6 +149,10 @@
     ['Slick × Love Me Again','slick-love-me-again'],
     ['One More Time','one-more-time']
   ];
+  const tierCounts = {free: freeRoutines.length, standard: 0, pro: 0};
+  for (const id of [...packRoutines.map(([,id]) => id), ...otherRoutines.map(([,slug]) => slug)]) {
+    tierCounts[tierFor(id)]++;
+  }
   const paidPath = slug => '/routines/' + slug + '/';
   const freePath = slug => '/free/' + slug + '/';
   const pages = new Map([
@@ -162,6 +172,7 @@
     'yeah-la-vida-es-un-carnaval','levitation-cant-stop-rompe',
     'one-more-time','i-know-you-want-me-chandelier'
   ];
+  newRoutines.forEach(({slug}, index) => mixedOrder.splice(1 + index * 4, 0, slug));
   const routinePages = mixedOrder.map(slug=>pages.get(slug));
   function addFreeRoutines(grid) {
     for (const [index,[title,slug]] of freeRoutines.entries()) {
@@ -273,7 +284,17 @@
     if (grid) {
       for (const [title,slug] of otherRoutines) {
         const link=grid.querySelector('a.routine-detail-link[href="/routines/'+slug+'/"]');
-        const card=link?.closest('article');
+        let card=link?.closest('article');
+        if(mediaSlugs.has(slug)){
+          const replacement=document.createElement('article');
+          replacement.className='standalone-routine available-routine';
+          replacement.innerHTML='<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" decoding="async" alt=""><div><h2></h2><a class="routine-detail-link">Open Routine</a></div></div>';
+          replacement.querySelector('img').src=previewPath(slug)+'.jpg';
+          replacement.querySelector('h2').textContent=title;
+          replacement.querySelector('a').href=paidPath(slug);
+          if(card)card.replaceWith(replacement);else grid.append(replacement);
+          card=replacement;
+        }
         if(!card||card.querySelector('.rp-routine-tier'))continue;
         card.classList.add('rp-tiered-routine');
         card.insertAdjacentHTML('afterbegin',badgeFor(tierFor(slug)));
@@ -296,12 +317,12 @@
       const main=document.querySelector('main');
       const path=/^\/routines\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
       const entry=packRoutines.findIndex(([,id,name])=>id===path||name===path);
-      if(main&&(entry>=0||path===promotedRoutine[1])){
+      if(main&&(entry>=0||path===promotedRoutine[1]||mediaSlugs.has(path))){
         const number=entry+1;
-        const [title,id,slug]=entry>=0?packRoutines[entry]:[promotedRoutine[0],path,path];
+        const [title,id,slug]=entry>=0?packRoutines[entry]:[pages.get(path)[0],path,path];
         main.dataset.routineSlug=id;
         document.title=title+' — MUKVIK';
-        const media=entry<0||freePackSlugs.has(id)?'/assets/free-videos/'+slug:'/assets/lesson-previews/pack-'+number+'-blurred';
+        const media=mediaSlugs.has(slug)?previewPath(slug):entry<0||freePackSlugs.has(id)?'/assets/free-videos/'+slug:'/assets/lesson-previews/pack-'+number+'-blurred';
         const source='poster="'+media+'.jpg" src="'+media+'.mp4"';
         main.innerHTML='<section class="routine-detail-panel"><p><a href="/routines/">Routines</a></p><h1></h1><video class="routine-detail-video" controls playsinline preload="none" '+source+'></video></section>';
         main.querySelector('h1').textContent=title;

@@ -9,8 +9,10 @@ const fs = require('node:fs');
 const localArchives = new Map([['get-right-x-just-a-lil-bit','Get Right x Just a Lil Bit.zip']]);
 const manifest = require('./config/standard-pack-files.json');
 const routinePaths = require('./config/routine-paths.json');
+const addedRoutines = require('./config/routine-media.json').filter(routine => routine.files);
 const routineNames = new Map([
   ...routinePaths.map(routine => [routine.id, routine.title]),
+  ...addedRoutines.map(routine => [routine.slug, routine.title]),
   ['call-me-maybe-poker-face','Call Me Maybe x Poker Face'],
   ['tell-me-why-trust-me','Tell Me Why x Trust Me'],
   ['calm-down-crazy-in-love','Calm Down x Crazy in Love'],
@@ -23,7 +25,8 @@ const routineNames = new Map([
 
 const PLAN_CENTS = Object.freeze({standard:1500,pro:2500});
 const FREE_PACK_SLUGS = Object.freeze(['routine-04','routine-06']);
-const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval']);
+const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval',
+  ...addedRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
 const allowedTiers = slug => PRO_SLUGS.includes(slug) ? ['legacy','pro'] : ['legacy','standard','pro'];
 const VALIDITY = 3600;
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -65,6 +68,7 @@ function catalogFiles(files, packManifest = manifest) {
   for (const [slug, code] of Object.entries(existingRoutines)) {
     entries.set(slug, Array.isArray(files[code]) ? files[code].map(file => ({fileId:file?.fileId,name:basename(file?.name)})) : null);
   }
+  for (const {slug, files} of addedRoutines) entries.set(slug, files);
   for (const [slug, list] of entries) {
     if (!Array.isArray(list) || !list.length || list.some(f => !/^[-\w]{10,128}$/.test(f?.fileId || '') ||
       typeof f.name !== 'string' || !f.name || f.name.length > 160 || /[\\/\x00-\x1f]/.test(f.name) ||
@@ -253,7 +257,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     res.once('close', () => abort.abort());
     for (const file of list) {
       zip.addReadStreamLazy(file.name, { compress: false }, done => {
-        driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.fileId) + '?alt=media', {
+        driveFetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.fileId) + '?alt=media&supportsAllDrives=true', {
           headers: { Authorization: 'Bearer ' + driveToken },
           signal: abort.signal, redirect: 'error'
         }).then(async result => {

@@ -106,7 +106,7 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  const replay={};await s.download(replay,token);assert.equal(replay.status,410);
 });
 
-test('Pro has its own billing amount and four exclusives; Standard cannot issue a Pro download',async()=>{
+test('Ultra has its own billing amount; Pro cannot issue an Ultra download',async()=>{
  const pro=setup();
  await pro.subscription.checkout({},user,true,'pro');
  assert.equal(pro.state.requests[0].payload.amount,115000);
@@ -121,6 +121,30 @@ test('Pro has its own billing amount and four exclusives; Standard cannot issue 
  const denied={};await standard.subscription.ticket(denied,user,'call-me-maybe-poker-face');assert.equal(denied.status,403);
  standard.state.row.tier='legacy';
  const retained={};await standard.subscription.ticket(retained,user,'call-me-maybe-poker-face');assert.equal(retained.status,200);
+});
+
+test('new routines honor paid tiers and deliver only the matching audio files', async () => {
+ const { state, subscription } = setup();
+ const { slug, files: expected } = require('../config/routine-media.json').find(r => r.slug === 'y-que-fue-low');
+ state.row = { customer_id: user.id, tier: 'standard', paid_until: new Date(Date.now() + 60000) };
+ const denied = {};
+ await subscription.ticket(denied, user, slug);
+ assert.equal(denied.status, 403);
+ const pro = {};
+ await subscription.ticket(pro, user, 'suavemente-y-que-fue');
+ assert.equal(pro.status, 200);
+ state.row.tier = 'pro';
+ const ultra = {};
+ await subscription.ticket(ultra, user, slug);
+ assert.equal(ultra.status, 200);
+ const response = new PassThrough();
+ const chunks = [];
+ response.on('data', chunk => chunks.push(chunk));
+ response.writeHead = status => { response.status = status; };
+ await subscription.download(response, ultra.data.url.split('/').at(-1));
+ assert.equal(response.status, 200);
+ assert.deepEqual(state.events.map(url => new URL(url).pathname.split('/').at(-1)), expected.map(file => file.fileId));
+ assert.ok(expected.every(file => Buffer.concat(chunks).includes(Buffer.from(file.name))));
 });
 
 test('verified admin can audit an archive without a subscription; a matching unverified email cannot',async()=>{
