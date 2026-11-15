@@ -134,6 +134,11 @@ test('new routines honor paid tiers and deliver only the matching audio files', 
  const pro = {};
  await subscription.ticket(pro, user, 'suavemente-y-que-fue');
  assert.equal(pro.status, 200);
+ for (const media of [false, true]) {
+  const moved = {};
+  await subscription.ticket(moved, user, 'yeah-la-vida-es-un-carnaval', media);
+  assert.equal(moved.status, 200);
+ }
  state.row.tier = 'pro';
  const ultra = {};
  await subscription.ticket(ultra, user, slug);

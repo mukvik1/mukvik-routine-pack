@@ -17,7 +17,7 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
   });
   const token = await auth.getAccessToken();
   if (!token) throw Error('Routine media: missing Drive access token.');
-  const destination = path.join(root, 'assets', 'routine-previews');
+  const destination = path.join(root, 'assets', 'routine-previews-v2');
   const privateVideos = path.join(root, '..', 'private-routine-videos');
   await Promise.all([destination, privateVideos].map(directory => fs.mkdir(directory, { recursive: true })));
   const endpoint = id => 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true';
@@ -51,7 +51,12 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           '-vf', "scale=w='min(iw,960)':h='min(ih,960)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v', 'libx264', '-threads', '2', '-preset', 'fast', '-crf', '23',
           '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fullVideo], 180000);
-        await ffmpeg(['-i', fullVideo, '-t', '20', '-c', 'copy', '-movflags', '+faststart', video], 30000);
+        // Encode the mask into the public preview itself, keeping the original audio.
+        // The separate full video is never placed under the web root.
+        await ffmpeg(['-i', fullVideo, '-t', '20', '-filter_complex_threads', '2',
+          '-filter_complex', "[0:v]split[base][top];[top]crop=iw:trunc(ih/4)*2:0:0,boxblur=luma_radius='min(w,h)/9':luma_power=5:chroma_radius='min(cw,ch)/9':chroma_power=5[mask];[base][mask]overlay=0:0[preview]",
+          '-map', '[preview]', '-map', '0:a:0?', '-c:v', 'libx264', '-threads', '2', '-preset', 'fast',
+          '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', video], 120000);
         await ffmpeg(['-i', video, '-frames:v', '1', '-update', '1', path.join(destination, slug + '.jpg')], 30000);
         console.log('Imported routine preview: ' + slug);
       } catch (error) {

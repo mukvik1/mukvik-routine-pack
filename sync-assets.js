@@ -174,7 +174,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261111-price');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=33"><script defer src="/storefront-refresh.js?v=35"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=33"><script defer src="/storefront-refresh.js?v=36"></script></head>');
     bytes=Buffer.from(html);
   }
 

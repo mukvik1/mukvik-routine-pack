@@ -124,9 +124,9 @@
   const routineMedia = /* routine-media:start */[]/* routine-media:end */;
   const newRoutines = routineMedia.filter(routine => routine.title);
   const mediaSlugs = new Set(routineMedia.map(routine => routine.slug));
-  const previewPath = slug => '/assets/routine-previews/' + slug;
+  const previewPath = slug => '/assets/routine-previews-v2/' + slug;
   const freePackSlugs = new Set(['routine-04','routine-06']);
-  const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval', ...newRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
+  const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face', ...newRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
   const tierFor = id => freePackSlugs.has(id)?'free':ultraRoutines.has(id)?'pro':'standard';
   const badgeFor = tier => '<span class="rp-routine-tier rp-routine-tier-'+tier+'">'+({free:'Free',standard:'Pro',pro:'Ultra'})[tier]+'</span>';
   const promotedRoutine=['Get Right × Just a Lil Bit','get-right-x-just-a-lil-bit'];

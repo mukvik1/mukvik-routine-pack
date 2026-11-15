@@ -28,7 +28,7 @@ const routineNames = new Map([
 
 const PLAN_CENTS = Object.freeze({standard:1500,pro:2500});
 const FREE_PACK_SLUGS = Object.freeze(['routine-04','routine-06']);
-const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face','yeah-la-vida-es-un-carnaval',
+const PRO_SLUGS = Object.freeze(['routine-03','routine-05','call-me-maybe-poker-face',
   ...addedRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
 const allowedTiers = slug => PRO_SLUGS.includes(slug) ? ['legacy','pro'] : ['legacy','standard','pro'];
 const VALIDITY = 3600;
