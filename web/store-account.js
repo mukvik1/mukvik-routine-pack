@@ -23,7 +23,7 @@ const error=el('p','','store-error');error.setAttribute('role','alert');
 const authTabs=el('div',undefined,'store-tabs');authTabs.append(button('SIGN IN',()=>{mode='login';challenge=null;renderAuth();}),button('SIGN UP',()=>{mode='register';challenge=null;renderAuth();}));
 const authBody=el('div');auth.append(authTabs,authBody,error);
 function show(d){for(const other of [auth,account])if(other!==d&&other.open)other.close();if(!d.open)d.showModal();}
-async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();}throw Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':''));}return body;}
+async function api(path,method='GET',data){const r=await fetch(API+'/api/v2'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});let body;try{body=await r.json();}catch{throw Error(T('Service temporarily unavailable.'));}if(!r.ok){if(r.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();}throw Object.assign(Error(T(body.error||'Service temporarily unavailable.')+(body.paymentCode?' ['+body.paymentCode+']':'')),{status:r.status});}return body;}
 function renderAuth(){
  error.textContent='';authBody.replaceChildren();
  const registration=mode==='register',reset=mode==='reset';
@@ -60,7 +60,7 @@ function renderAuth(){
  if(!registration&&!reset)authBody.append(button('Forgot password?',()=>{mode='reset';renderAuth();},'store-text-button'));
  if(reset)authBody.append(button('Back to sign in',()=>{mode='login';renderAuth();},'store-text-button'));
 }
-const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');document.querySelector('.free-catalog')?.append(freeStatus);
+const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');(document.querySelector('.free-intro [data-routine-actions]')||document.querySelector('.free-catalog'))?.append(freeStatus);
 async function afterLogin(){
  const routine=pendingRoutine;
  auth.close();
@@ -233,7 +233,6 @@ function renderStandard(){
    player.pause();player.src=player.dataset.blurredSrc;player.load();delete player.dataset.fullVideo;
   }
  };
- document.querySelectorAll('[data-standard-download]').forEach(n=>n.remove());
  if(!standardPlan){
   restorePreview();
   document.querySelectorAll('[data-standard-cta]').forEach(n=>n.remove());
@@ -297,36 +296,11 @@ function renderStandard(){
   offer.append(panel);
  }
  const adminAudit=user?.canAuditRoutineDownloads===true;
- if(!user){
-  restorePreview();
-  const host=document.querySelector('[data-routine-actions]');
-  if(host){
-   const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';
-   wrap.append(button('Sign up to download',()=>openAuth('register'),'store-button primary'));
-   host.append(wrap);
-  }
-  return;
- }
+ if(!user){restorePreview();return;}
  const paidActive=standardAccess?.active&&+new Date(standardAccess.paidUntil)>Date.now();
  const freeSlugs=new Set(standardPlan.freeSlugs||[]);
  const available=new Set(standardPlan.slugs.filter(slug=>freeSlugs.has(slug)||adminAudit||(paidActive&&(standardAccess.tier!=='standard'||!proSlugs.has(slug)))));
- function appendDownload(host,slug){
-  if(!host||!available.has(slug))return;
-  const wrap=el('span',undefined,'rp-standard-download');wrap.dataset.standardDownload='';
-  const message=el('span','');message.setAttribute('role','status');
-  const download=button('Download',async()=>{
-   download.disabled=true;message.textContent='';
-   try{
-    const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/ticket','POST',{});
-    const u=new URL(result.url,API);
-    if(u.origin!==API||!/^\/api\/v2\/standard\/download\/[\w-]{43}$/.test(u.pathname))throw Error('Unexpected download link.');
-    const a=el('a');a.href=u.href;a.referrerPolicy='no-referrer';document.body.append(a);a.click();a.remove();
-   }catch(e){message.textContent=e.message;}finally{download.disabled=false;}
-  },'store-button primary');
-  wrap.append(download,message);host.append(wrap);
- }
- const slug=document.querySelector('main[data-routine-slug]')?.dataset.routineSlug||/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
- if(slug)appendDownload(document.querySelector('[data-routine-actions]'),slug);
+ const slug=document.querySelector('[data-routine-download]')?.dataset.routineDownload;
  if(player&&slug&&available.has(slug)&&/^routine-0[1-6]$/.test(slug)){
   if(!player.dataset.blurredSrc)player.dataset.blurredSrc=player.getAttribute('src');
   if(!player.dataset.fullVideo){
@@ -342,6 +316,54 @@ function renderStandard(){
   }
  }else restorePreview();
 }
+// The action is rendered with the player. Ask the server for the entitlement only on click.
+const pendingDownloads=new WeakSet();
+let freeDownloadAfterFollow=null;
+document.getElementById('confirm-follow')?.addEventListener('click',()=>{
+ const link=freeDownloadAfterFollow;freeDownloadAfterFollow=null;
+ if(link)queueMicrotask(()=>{if(document.getElementById('follow-wall')?.hidden)link.click();});
+});
+function showDownloadPlans(){
+ const plans=document.getElementById('standard-plan');
+ if(plans){plans.scrollIntoView({block:'start'});return;}
+ window.top.location.assign('/price/#standard-plan');
+}
+document.addEventListener('click',async event=>{
+ const link=event.target.closest?.('[data-routine-download]');
+ if(!link||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+ event.preventDefault();
+ if(pendingDownloads.has(link))return;
+ const slug=link.dataset.routineDownload;
+ const status=link.parentElement.querySelector('[data-routine-download-status]');
+ const say=message=>{if(status)status.textContent=message;};
+ if(link.hasAttribute('data-free-routine-download')){
+  const follow=document.getElementById('follow-wall');
+  if(follow&&!follow.hidden){freeDownloadAfterFollow=link;follow.scrollIntoView({block:'start'});return;}
+  pendingDownloads.add(link);link.setAttribute('aria-busy','true');
+  try{await downloadFree(slug);}finally{pendingDownloads.delete(link);link.removeAttribute('aria-busy');}
+  return;
+ }
+ if(!token){
+  if(slug==='routine-04'||slug==='routine-06')openAuth('register');
+  else showDownloadPlans();
+  return;
+ }
+ pendingDownloads.add(link);link.setAttribute('aria-busy','true');say('Checking download access…');
+ try{
+  const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/ticket','POST',{});
+  say('');
+  const url=new URL(result.url,API);
+  if(url.origin!==API||!/^\/api\/v2\/standard\/download\/[\w-]{43}$/.test(url.pathname))throw Error('Unexpected download link.');
+  const file=el('a');file.href=url.href;file.referrerPolicy='no-referrer';document.body.append(file);file.click();file.remove();
+ }catch(e){
+  if(e.status===401||e.status===403){
+   say('');
+   if(e.status===401&&(slug==='routine-04'||slug==='routine-06'))openAuth('register');
+   else if(e.status===403&&(slug==='routine-04'||slug==='routine-06'))say('Confirm your email to download this free routine.');
+   else showDownloadPlans();
+  }else say(e.message);
+ }finally{pendingDownloads.delete(link);link.removeAttribute('aria-busy');}
+},true);
 function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'+provider+'?origin='+encodeURIComponent(location.origin),'mukvik-signin','popup,width=520,height=650');if(!popup){error.textContent=T('Allow pop-ups to continue.');return;}const receive=async event=>{if(event.origin!==API||event.source!==popup||event.data?.type!=='mukvik-auth')return;window.removeEventListener('message',receive);if(event.data.error){error.textContent=T('Social sign-in failed. Please try email.');return;}try{await finishLogin(event.data.accessToken);await afterLogin();}catch(e){error.textContent=e.message;}};window.addEventListener('message',receive);}
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderAccount();});

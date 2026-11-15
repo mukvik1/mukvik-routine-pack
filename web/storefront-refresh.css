@@ -159,3 +159,6 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 .rp-account-pending{display:inline-flex;max-width:200px;align-items:center;gap:6px;white-space:nowrap;font-size:14px}
 .rp-account-pending>.rp-member-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .rp-account-pending>.rp-member-tier{flex:none;padding:2px 5px;border:1px solid #6788bd;border-radius:5px;color:#c0d7ff;font:700 10px/1.2 system-ui,sans-serif}
+
+.rp-detail-controls>[role=status]:empty{display:none}
+.rp-detail-controls>[role=status]{flex-basis:100%;text-align:center;margin:0}

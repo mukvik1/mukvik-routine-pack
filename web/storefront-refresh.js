@@ -196,8 +196,32 @@
     }
     section.after(pager);
   }
+  function addRoutineActions(section,slug,freeSlug=false) {
+    const player=section.querySelector('video');
+    const actions=document.createElement('div');actions.className='rp-detail-controls';actions.dataset.routineActions='';
+    if(player){
+      const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';
+      play.addEventListener('click',()=>player.paused?player.play().catch(()=>{}):player.pause());
+      player.addEventListener('play',()=>play.textContent='Pause');
+      for(const event of ['pause','ended'])player.addEventListener(event,()=>play.textContent='Play');
+      actions.append(play);
+    }
+    const download=document.createElement('a');
+    download.className='store-button primary';
+    download.href=freeSlug?'#follow-wall':'/price/#standard-plan';
+    download.dataset.routineDownload=slug;
+    if(freeSlug)download.dataset.freeRoutineDownload='';
+    download.textContent='Download';
+    const status=document.createElement('span');status.dataset.routineDownloadStatus='';status.setAttribute('role','status');
+    actions.append(download,status);
+    section.append(actions);
+  }
   const freeDetail=document.querySelector('main .free-intro');
-  if(freeDetail && /^\/free\/[a-z0-9-]+\/?$/.test(location.pathname))addRoutinePager(freeDetail);
+  const freeSlug=/^\/free\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
+  if(freeDetail&&freeSlug){
+    addRoutineActions(freeDetail,freeSlug,true);
+    addRoutinePager(freeDetail);
+  }
 
   function addPackRoutines(grid) {
     const fragment = document.createDocumentFragment();
@@ -246,7 +270,7 @@
       document.querySelectorAll('.store-heading').forEach(node => node.remove());
     } else {
       const main=document.querySelector('main');
-      const path=/^\/routines\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1];
+      const path=/^\/routines\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
       const entry=packRoutines.findIndex(([,id,name])=>id===path||name===path);
       if(main&&(entry>=0||path===promotedRoutine[1])){
         const number=entry+1;
@@ -260,16 +284,7 @@
       }
       const section=main?.querySelector('.routine-detail-panel');
       if(section){
-        const player=section.querySelector('video');
-        const actions=document.createElement('div');actions.className='rp-detail-controls';actions.dataset.routineActions='';
-        if(player){
-          const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';
-          play.addEventListener('click',()=>player.paused?player.play().catch(()=>{}):player.pause());
-          player.addEventListener('play',()=>play.textContent='Pause');
-          for(const event of ['pause','ended'])player.addEventListener(event,()=>play.textContent='Play');
-          actions.append(play);
-        }
-        section.append(actions);
+        addRoutineActions(section,main.dataset.routineSlug||path);
         addRoutinePager(section);
       }
       main?.insertAdjacentHTML('beforeend',plan(false));
