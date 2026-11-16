@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 
-const USD_UAH_RATE = 46;
+const USD_UAH_RATE = 47;
 const API = 'https://api.monobank.ua';
 const ORDER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALIDITY_SECONDS = 3600;
