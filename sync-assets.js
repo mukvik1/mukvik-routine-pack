@@ -26,7 +26,7 @@ async function download(relativePath) {
     const html = bytes.toString('utf8');
     const hero = /(<div class="rp-hero-copy"[^>]*>)[\s\S]*?(<div class="rp-actions">)/;
     if (!hero.test(html)) throw new Error('Homepage hero structure changed');
-    bytes = Buffer.from(html.replace(hero, '$1<h1>WATCH.<br>PRACTICE.<br>REPEAT.</h1>$2'));
+    bytes = Buffer.from(html.replace(hero, '$1<h1>WATCH.<br>PRACTICE.<br>PERFORM.</h1>$2'));
   }
   // Keep the hero video, with no package illustration or visible pause control.
   // Retain the hidden button node because the video playback script uses it.
