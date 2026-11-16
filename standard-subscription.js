@@ -142,6 +142,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const parsed = interpretStatus(row, data);
     if (!parsed) throw Object.assign(Error('Unexpected subscription status'), { code: 'STANDARD_STATUS_INVALID' });
     const r = await db.query(`UPDATE standard_subscriptions SET paid_until=$2,provider_status=$3,checked_at=now(),
+      first_paid_at=CASE WHEN $2::timestamptz IS NOT NULL THEN COALESCE(first_paid_at,now()) ELSE first_paid_at END,
       cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END WHERE id=$1 RETURNING *`,
       [row.id, parsed.paidUntil, parsed.status, parsed.cancelled]);
     return r.rows[0];

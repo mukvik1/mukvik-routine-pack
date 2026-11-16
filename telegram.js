@@ -102,11 +102,15 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
     const reply_markup=x.status==='awaiting_manual_review'&&settings.MONOBANK_ENABLED!=='true'?{inline_keyboard:[[{text:'Я проверил оплату · подтвердить',callback_data:'confirm:'+id}]]}:undefined;
     await send('Заказ '+x.id+'\nПокупатель: '+x.email+'\nСтатус: '+statusLabel(x.status)+'\nСумма: '+money(x.total_cents,x.currency)+'\n'+x.items.map(item=>'• '+item.name+' — '+money(item.price_cents,x.currency)).join('\n')+'\nСоздан: '+date(x.created_at),reply_markup?{reply_markup}:{});
   }
+  async function showSubscriptions(period='0',view='all',page=0){
+    const report=await require('./subscription-report').subscriptionDetail(pool,period,view,page);
+    return send(report.text,{reply_markup:report.reply_markup});
+  }
   async function command(text) {
     const shortcuts={'💳 Подписки':'/subscriptions','🛍 История заказов':'/orders','📊 Посещаемость':'/visits','🛍 Заказы':'/orders','⏳ Ожидают оплаты':'/pending','💰 Общая статистика':'/stats','🟢 Состояние':'/status','🧾 События':'/events'};
     text=shortcuts[text]||text;
     const [name,arg]=(text||'').trim().split(/\s+/,2);
-    if(name==='/subscriptions')return send(await require('./subscription-report').subscriptionReport(pool));
+    if(name==='/subscriptions')return showSubscriptions();
     if(name==='/visits'){
       const days=['0','1','7','30'].includes(arg)?Number(arg):0;
       return send(await require('./analytics').report(pool,days),{reply_markup:{inline_keyboard:[[{text:'Сегодня',callback_data:'visits:1'},{text:'7 дней',callback_data:'visits:7'},{text:'30 дней',callback_data:'visits:30'}],[{text:'За всё время',callback_data:'visits:0'}]]}});
@@ -144,7 +148,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
           'За 30 дней: уникальных посетителей — '+(v.month_people||0)+', просмотров — '+(v.month_views||0)+'\n'+
           'За всё время: уникальных посетителей — '+(v.all_people||0)+', просмотров — '+(v.all_views||0);
       }catch(error){console.error('Traffic report unavailable:',error.code||error.name||'error');}
-      return send(traffic+'\n\nПодписки и попытки оплаты: /subscriptions\n\nИстория разовых покупок\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads);
+      return send(traffic+'\n\nПодписки и попытки оплаты: /subscriptions\n\nИстория разовых покупок\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads,{reply_markup:{inline_keyboard:[[{text:'💳 Подписки',callback_data:'subs:0:all:0'}]]}});
     }
     if(name==='/pending'||name==='/orders') {
       const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,c.email FROM orders o JOIN customers c ON c.id=o.customer_id WHERE ($1::boolean=false OR o.status='awaiting_manual_review') ORDER BY o.created_at DESC LIMIT 20",[name==='/pending']);
@@ -177,6 +181,8 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
         await call('answerCallbackQuery',{callback_query_id:callback.id});
         const data=String(callback.data||'');
         const [action,id]=data.split(':');
+        const subs=/^subs:(0|1|7|30):(all|active|cancelled):([0-9]{1,4})$/.exec(data);
+        if(subs)await showSubscriptions(subs[1],subs[2],Number(subs[3]));
         if(action==='visits'&&['0','1','7','30'].includes(id))await command('/visits '+id);
         if(orderIdPattern.test(id||'')&&action==='view')await showOrder(id);
         if(orderIdPattern.test(id||'')&&action==='confirm') {
