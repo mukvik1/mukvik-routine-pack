@@ -148,11 +148,11 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
  {
   const section=el('section',undefined,'store-order');
   const level=memberLevel();
-  section.append(el('h3',level==='Admin'?'Admin access':level+' membership'),el('p',level==='Admin'?'You have administrative access.':level==='Free'?(standardAccess?.pending?'Payment pending. Your Free membership is active.':'Your Free membership is active.'):('Downloads available until '+new Date(standardAccess.paidUntil).toLocaleDateString()),'store-muted'));
+  section.append(el('h3',level==='Admin'?'Admin access':level+' membership'),el('p',level==='Admin'?'You have administrative access.':level==='Free'?(standardAccess?.pending?'Payment pending. Your Free membership is active.':'Your Free membership is active.'):('Paid videos and downloads available until '+new Date(standardAccess.paidUntil).toLocaleString()),'store-muted'));
   if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
   if(standardAccess?.cancellable){
    const cancel=button('Cancel auto-renewal',async()=>{
-    if(!confirm('Cancel auto-renewal? You can still download until the end of your paid period.'))return;
+    if(!confirm('Cancel auto-renewal? You can still watch paid videos and download files until the end of your paid period.'))return;
     cancel.disabled=true;
     try{standardAccess=await api('/standard/cancel','POST',{});renderHeader();renderAccount();}catch(e){accountStatus.textContent=e.message;cancel.disabled=false;}
    });

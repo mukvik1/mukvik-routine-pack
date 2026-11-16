@@ -77,7 +77,7 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  const denied={};await s.checkout(denied,user,false);assert.equal(denied.status,400);assert.equal(state.requests.length,0);
  const start={};await s.checkout(start,user,true);assert.equal(start.status,201);
  const {payload}=state.requests[0];
- assert.equal(payload.amount,69000);assert.equal(payload.interval,'1m');
+ assert.equal(payload.amount,70500);assert.equal(payload.interval,'1m');
  assert.match(payload.redirectUrl,/subscription=return/);
  const retry={};await s.checkout(retry,user,true);assert.deepEqual(retry.data,start.data);
  assert.equal(state.requests.filter(x=>x.path==='create').length,1);
@@ -89,6 +89,8 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  const paid={};await s.status(paid,user);assert.equal(paid.data.active,true);
  const cancel={};await s.cancel(cancel,user);
  assert.equal(cancel.data.cancelled,true);assert.equal(cancel.data.active,true);
+ assert.deepEqual(cancel.data.paidUntil,paid.data.paidUntil);
+ const video={};await s.ticket(video,user,'routine-01',true);assert.equal(video.status,200);
  assert.deepEqual(state.requests.at(-1).payload,{subscriptionId:'s2_test',action:'cancel'});
  const late={};await s.ticket(late,{id:'other'},'routine-01');assert.equal(late.status,403);
  const ticket={};await s.ticket(ticket,user,'routine-01');assert.equal(ticket.status,200);
@@ -105,12 +107,14 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  assert.ok(!zip.includes(Buffer.from('Bonus.mp3')));
  assert.equal(state.events.length,1);
  const replay={};await s.download(replay,token);assert.equal(replay.status,410);
+ state.row.paid_until=new Date(Date.now()-1000);
+ for(const media of [false,true]){const expired={};await s.ticket(expired,user,'routine-01',media);assert.equal(expired.status,403);}
 });
 
 test('Ultra has its own billing amount; Pro cannot issue an Ultra download',async()=>{
  const pro=setup();
  await pro.subscription.checkout({},user,true,'pro');
- assert.equal(pro.state.requests[0].payload.amount,115000);
+ assert.equal(pro.state.requests[0].payload.amount,117500);
  const callback=pro.state.requests[0].payload.webHookUrls.chargeUrl.split('/').at(-1);
  pro.state.bankData={...bank(pro.state.row),summary:{totalPaid:1,totalFailed:0}};
  await pro.subscription.callback({},callback);
