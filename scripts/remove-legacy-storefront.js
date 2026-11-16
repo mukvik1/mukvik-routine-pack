@@ -20,13 +20,18 @@ function useDjToolsBrand(html) {
   .replace('</head>','<link rel="stylesheet" href="/brand-lockup.css?v=2"></head>');
 }
 
+function useDjToolsFavicon(html) {
+ return html.replace(/<link\b[^>]*\brel\s*=\s*["'](?:shortcut\s+)?icon["'][^>]*>/gi,'')
+  .replace(/<\/head\s*>/i,'<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=dj-tools"></head>');
+}
+
 async function cleanStorefrontPages(directory) {
  for (const item of await fs.readdir(directory, { withFileTypes:true })) {
   const file = path.join(directory, item.name);
   if (item.isDirectory() && item.name !== 'assets' && item.name !== 'downloads') await cleanStorefrontPages(file);
   if (!item.isFile() || !item.name.endsWith('.html')) continue;
   const original = await fs.readFile(file, 'utf8');
-  const cleaned = useDjToolsBrand(removeLegacyStorefront(original));
+  const cleaned = useDjToolsFavicon(useDjToolsBrand(removeLegacyStorefront(original)));
   if (original !== cleaned) await fs.writeFile(file, cleaned);
  }
 }
