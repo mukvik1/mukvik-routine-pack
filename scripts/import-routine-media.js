@@ -38,12 +38,22 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           }
         }
         const source = path.join(temp, 'source.mov');
-        const response = await fetch(endpoint(videoId), { headers, signal: AbortSignal.timeout(180000) });
-        if (!response.ok || !response.body || !/^video\//i.test(response.headers.get('content-type') || '')) {
-          await response.body?.cancel();
-          throw Error('Video unavailable: HTTP ' + response.status);
+        for (let attempt=1; ;attempt++) {
+          try {
+            const response = await fetch(endpoint(videoId), { headers, signal: AbortSignal.timeout(300000) });
+            if (!response.ok || !response.body || !/^video\//i.test(response.headers.get('content-type') || '')) {
+              await response.body?.cancel();
+              const retryable=response.status===429||response.status>=500;
+              throw Object.assign(Error('Video unavailable: HTTP ' + response.status), {retryable});
+            }
+            await pipeline(Readable.fromWeb(response.body), createWriteStream(source));
+            break;
+          } catch (error) {
+            if (attempt>=2 || error.retryable===false) throw Error('Drive video download failed: '+error.message);
+            console.warn('Retrying Drive video download: '+slug);
+            await new Promise(resolve=>setTimeout(resolve,3000));
+          }
         }
-        await pipeline(Readable.fromWeb(response.body), createWriteStream(source));
         const video = path.join(destination, slug + '.mp4');
         const ffmpeg = (args, timeout) => exec('ffmpeg', ['-v', 'error', '-y', '-threads', '2', ...args], { timeout });
         const fullVideo = path.join(privateVideos, slug + '.mp4');
