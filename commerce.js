@@ -91,7 +91,12 @@ function createCommerce(settings=process.env,overrides={}){
  });}catch(error){console.error('Standard integration unavailable:',error.code||error.name,error.routine||'');}
  const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED!=='pilot');
  const subscriptionOnly=true;
- if(standard)console.log('Standard subscription integration ready: '+(standardPublic?'public':'admin pilot'));
+ if(standard){
+  console.log('Standard subscription integration ready: '+(standardPublic?'public':'admin pilot'));
+  require('./subscription-report').readSubscriptionReport(pool)
+   .then(({recent,...counts})=>console.log('Subscription overview (7 days/current): '+JSON.stringify(counts)))
+   .catch(e=>console.error('Subscription overview unavailable:',e.code||e.name));
+ }
  else if(!settings.MONOBANK_SUBSCRIPTION_TOKEN)console.log('Standard subscription integration off: token is not available to the service');
  function fileAt(code,index){
   const list=files[code];
@@ -408,6 +413,7 @@ function createCommerce(settings=process.env,overrides={}){
  }
  const telegram=require('./telegram').createTelegramBot(settings,{
   pool,
+  subscriptions:standardPublic?'public':standard?'pilot':'disabled',
   approveOrder:async orderId=>{
    const actor=await pool.query('INSERT INTO customers(id,email) VALUES($1,$2) ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email RETURNING id',[crypto.randomUUID(),adminEmail]);
    return approveResult({id:actor.rows[0].id},orderId);
@@ -491,7 +497,22 @@ function createCommerce(settings=process.env,overrides={}){
     if(!standard){response(res,503,{error:'Standard is not configured on this service.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard/plan'){response(res,200,{...standard.catalog,pilot:!standardPublic});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'));return true;}
-    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){if(user.email===adminEmail){response(res,403,{error:'Subscription checkout is not available for administrator accounts.'});return true;}const request=await body(req);await standard.checkout(res,user,request?.consent,request?.tier);return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){
+     if(user.email===adminEmail){response(res,403,{error:'Subscription checkout is not available for administrator accounts.'});return true;}
+     const request=await body(req), tier=request?.tier===undefined?'standard':request.tier;
+     try{await standard.checkout(res,user,request?.consent,tier);}
+     catch(error){
+      if(tier==='standard'||tier==='pro'){
+       const code=/^STANDARD_(?:MONO_HTTP_[0-9]{3}|CHECKOUT_INVALID|STATUS_INVALID)$/.test(error.code||'')
+         ?error.code:['TimeoutError','AbortError'].includes(error.name)?'CHECKOUT_TIMEOUT':'CHECKOUT_UNAVAILABLE';
+       console.error('Subscription checkout failed:',code);
+       await pool.query('INSERT INTO subscription_checkout_errors(customer_id,tier,error_code) VALUES($1,$2,$3)',[user.id,tier,code])
+        .catch(e=>console.error('Subscription checkout journal unavailable:',e.code||e.name));
+      }
+      throw error;
+     }
+     return true;
+    }
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
     const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
     if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}

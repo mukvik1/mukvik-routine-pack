@@ -10,6 +10,10 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
  const owner=123456789;
  const pool={query:async(sql,args)=>{
   if(sql.includes('telegram_updates')){if(pool.seen.has(args[0]))return {rowCount:0};pool.seen.add(args[0]);return {rowCount:1};}
+  if(sql.includes('WITH subscriptions AS'))return {rows:[{
+   registrations:3,free_users:1,started:2,errors:1,pro:0,ultra:1,legacy:0,pending:1,expired:0,paid_customers:1,
+   recent:[{email:'buyer@example.test',tier:'pro',state:'active',at:'2026-11-16T02:00:00Z'}]
+  }]};
   if(sql.includes('count(*)::int'))return {rows:[{orders:1,pending:1,approved:0,downloads:0}]};
   if(sql.includes('FROM site_traffic'))return {rows:[{today_people:2,today_views:4,yesterday_people:1,yesterday_views:3,week_people:3,week_views:7}]};
   if(sql.includes('json_agg'))return {rowCount:1,rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',created_at:'2026-10-01T12:00:00Z',email:'buyer@example.test',items:[{name:'ROUTINE 03',price_cents:600}]}]};
@@ -51,6 +55,11 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.equal((await textCommand(8,'/order '+order)).status,200);
   assert.equal((await textCommand(9,'/events')).status,200);
   assert.equal((await textCommand(10,'/status')).status,200);
+  assert.equal((await textCommand(11,'💳 Подписки')).status,200);
+  const report=calls.at(-1).body;
+  assert.match(report.text,/Сейчас активны: Pro — 0, Ultra — 1/);
+  assert.match(report.text,/Ultra · оплачено · доступ активен · buyer@example.test/);
+  assert.equal(report.reply_markup.keyboard[0][0].text,'💳 Подписки');
   const messages=calls.filter(x=>x.method==='sendMessage').map(x=>x.body.text);
   assert.ok(messages.some(x=>x.includes('Панель владельца Routine Pack')));
   assert.ok(messages.some(x=>x.includes('ожидает проверки оплаты')));
