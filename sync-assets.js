@@ -22,6 +22,12 @@ async function download(relativePath) {
   const destination = path.join(__dirname, 'web', relativePath);
   await fs.mkdir(path.dirname(destination), { recursive: true });
   let bytes = Buffer.from(await response.arrayBuffer());
+  if (relativePath === 'index.html') {
+    const html = bytes.toString('utf8');
+    const hero = /(<div class="rp-hero-copy"[^>]*>)[\s\S]*?(<div class="rp-actions">)/;
+    if (!hero.test(html)) throw new Error('Homepage hero structure changed');
+    bytes = Buffer.from(html.replace(hero, '$1<h1>WATCH.<br>PRACTICE.<br>REPEAT.</h1>$2'));
+  }
   // Keep the hero video, with no package illustration or visible pause control.
   // Retain the hidden button node because the video playback script uses it.
   if (relativePath === 'depth.css') {
