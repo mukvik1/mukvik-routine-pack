@@ -119,9 +119,12 @@
   if (hero) {
     const actions = hero.querySelector('.rp-actions');
     document.querySelector('#lessons')?.remove();
-    const performances=document.querySelector('.rp-promo-wrap,.home-video-section');
-    if(performances)performances.id='performances';
-    if (actions) actions.innerHTML = '<a class="rp-get-started" href="'+(performances?'#performances':'/routines/')+'">Get Started</a>';
+    const preview=document.querySelector('.home-video-section');
+    if(preview){
+      preview.id='watch-routines';
+      preview.style.scrollMarginTop='96px';
+    }
+    if(actions) actions.innerHTML='<a class="rp-get-started" href="'+(preview?'#watch-routines':'/routines/')+'">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
       ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],
