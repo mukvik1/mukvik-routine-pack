@@ -54,7 +54,7 @@ async function download(relativePath) {
   if (relativePath.endsWith('.html')) {
     bytes = Buffer.from(bytes.toString('utf8').replace(
       /href="\/(catalog|depth|video-background)\.css(?:\?[^"]*)?"/g,
-      'href="/$1.css?v=20261024-routine-cards"'
+      'href="/$1.css?v=20261116-desktop-grid"'
     ));
   }
   if (relativePath.endsWith('.html')) {
@@ -229,6 +229,36 @@ body[data-page="routines"] .individual-grid>.bundle-card h2{font-size:20px!impor
 body[data-page="routines"] .individual-grid .routine-includes{font-size:13px;margin:0 auto}
 body[data-page="routines"] .individual-grid .routine-offer,
 body[data-page="routines"] .individual-grid .bundle-offer{margin-top:auto;justify-content:center!important}
+@media(min-width:1024px){
+ body[data-page="routines"] .coming-grid.individual-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:clamp(18px,2vw,32px)!important;width:min(1440px,100%)!important;
+  max-width:1440px!important;margin-inline:auto!important;
+ }
+ body[data-page="routines"] .coming-grid.individual-grid>.standalone-routine{
+  display:flex!important;flex-direction:column;align-items:stretch;justify-content:flex-start;
+  gap:0;padding:0!important;overflow:hidden;border-radius:14px!important;
+  border-color:#394767!important;background:#101520!important;
+ }
+ body[data-page="routines"] .individual-grid .individual-card-layout{
+  flex:1;align-items:stretch;text-align:left;gap:0;min-width:0;
+ }
+ body[data-page="routines"] .individual-grid .individual-performance-video{
+  width:100%!important;height:auto!important;aspect-ratio:16/9;
+  object-fit:contain;background:#090d16;margin:0;
+ }
+ body[data-page="routines"] .individual-grid .individual-card-layout>div{
+  flex:1;display:flex;flex-direction:column;box-sizing:border-box;padding:18px 20px 20px;
+ }
+ body[data-page="routines"] .individual-grid .individual-card-layout h2{margin:0 0 16px}
+ body[data-page="routines"] .individual-grid .routine-detail-link{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  min-height:46px;margin-top:auto;padding:10px 14px;border:1px solid #365fae;
+  border-radius:8px;background:#173e85;color:white;text-decoration:none;
+ }
+ body[data-page="routines"] .individual-grid .routine-detail-link::after{content:'→';font-size:1.15em}
+ body[data-page="routines"] .individual-grid .routine-detail-link:is(:hover,:focus-visible){background:#2457ae;color:white}
+}
 @media(max-width:600px){
  body[data-page="routines"] .coming-grid.individual-grid{grid-template-columns:minmax(0,1fr)!important}
  body[data-page="routines"] .individual-grid h2,body[data-page="routines"] .individual-grid>.bundle-card h2{font-size:16px!important}
