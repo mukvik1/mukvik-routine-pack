@@ -17,7 +17,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
   const menu={keyboard:[[{text:'💳 Подписки'},{text:'📊 Посещаемость'}],[{text:'🛍 История заказов'},{text:'💰 Общая статистика'}],[{text:'🟢 Состояние'},{text:'🧾 События'}]],resize_keyboard:true,is_persistent:true};
   const send = (text, options = {}) => call('sendMessage',{chat_id:ownerId,text,disable_web_page_preview:true,reply_markup:menu,...options});
   const statusLabels=Object.freeze({awaiting_manual_review:'ожидает проверки оплаты',approved:'подтверждён',cancelled:'отменён',refunded:'возврат'});
-  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',monobank_paid:'Monobank подтвердил оплату, доступ открыт',monobank_reversed:'Monobank сообщил о возврате, доступ закрыт',download_started:'начата загрузка',registered:'подтверждена регистрация',cart_updated:'изменена корзина'});
+  const eventLabels=Object.freeze({order_created:'создан заказ',manual_approved:'открыт доступ',monobank_paid:'Monobank подтвердил оплату, доступ открыт',monobank_reversed:'Monobank сообщил о возврате, доступ закрыт',download_started:'начата загрузка',registered:'подтверждена регистрация',subscription_paid:'оплачена подписка',cart_updated:'изменена корзина'});
   const statusLabel=value=>statusLabels[value]||'неизвестен';
   const eventLabel=value=>eventLabels[value]||'другое событие';
   const money=(cents,currency)=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:currency||'USD'}).format(cents/100);
@@ -78,6 +78,13 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
         try {
           const lines=[a.kind==='registered'?'👤 Новый зарегистрированный покупатель':'🛒 Изменение корзины','Покупатель: '+a.email];
           if(a.kind==='registered')lines.push('Email подтверждён.');
+          else if(a.kind==='subscription_paid'){
+            const {tier,amount_kop,paid_until}=a.payload;
+            lines.splice(0,lines.length,'💳 Новая подписка Routine Pack','✅ Оплата подтверждена','',
+              'Тариф: '+(tier==='pro'?'Ultra':tier==='standard'?'Pro':'Прежний тариф'),
+              'Покупатель: '+a.email,'Сумма: '+money(amount_kop,'UAH'),
+              'Доступ до: '+new Date(paid_until).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv'})+' (Киев)');
+          }
           else {
             for(const item of a.payload.added||[])lines.push('Добавлено: '+item.name);
             for(const item of a.payload.removed||[])lines.push('Убрано: '+item.name);

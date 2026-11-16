@@ -24,6 +24,7 @@ function setup(adminEmail, manifest=packManifest){
    state.row={id,customer_id,provider_id,callback_hash,checkout_url,amount_kop,created_at,checkout_expires_at,tier};
    return {rows:[]};
   }
+  if(sql.startsWith('INSERT INTO customer_activity')){(state.notices??=[]).push(JSON.parse(p[1]));return {rowCount:1};}
   if(sql.startsWith('UPDATE standard_subscriptions SET paid_until')){
    Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date()});
    return {rows:[state.row]};
@@ -86,6 +87,9 @@ test('checkout requires consent, is reused, grants access only after bank paymen
  const pending={};await s.ticket(pending,user,'routine-01');assert.equal(pending.status,403);
  state.bankData={...bank(state.row),summary:{totalPaid:1,totalFailed:0}};
  await s.callback({},callback);
+ await s.callback({},callback);
+ assert.equal(state.notices.length,1);
+ assert.equal(state.notices[0].amount_kop,70500);
  const paid={};await s.status(paid,user);assert.equal(paid.data.active,true);
  const cancel={};await s.cancel(cancel,user);
  assert.equal(cancel.data.cancelled,true);assert.equal(cancel.data.active,true);

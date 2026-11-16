@@ -141,10 +141,19 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const data = await api('status', { subscriptionId: row.provider_id });
     const parsed = interpretStatus(row, data);
     if (!parsed) throw Object.assign(Error('Unexpected subscription status'), { code: 'STANDARD_STATUS_INVALID' });
+    const firstPurchase = parsed.paidUntil && !row.first_paid_at && !row.paid_until;
     const r = await db.query(`UPDATE standard_subscriptions SET paid_until=$2,provider_status=$3,checked_at=now(),
       first_paid_at=CASE WHEN $2::timestamptz IS NOT NULL THEN COALESCE(first_paid_at,now()) ELSE first_paid_at END,
       cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END WHERE id=$1 RETURNING *`,
       [row.id, parsed.paidUntil, parsed.status, parsed.cancelled]);
+    if (firstPurchase) {
+      await db.query(`INSERT INTO customer_activity(customer_id,kind,payload)
+        VALUES ($1,'subscription_paid',$2::jsonb) ON CONFLICT DO NOTHING`, [
+        row.customer_id, JSON.stringify({
+          subscription_id:row.id, tier:row.tier, amount_kop:row.amount_kop, paid_until:parsed.paidUntil
+        })
+      ]);
+    }
     return r.rows[0];
   }
   async function status(res, user, refresh = false) {
