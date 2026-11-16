@@ -165,13 +165,18 @@ body[data-page="routines"] .rp-plan{margin-top:20px;margin-bottom:40px}
 #store-auth button.store-close{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;padding:0;border:0;background:transparent;color:#fff;box-shadow:none;font:400 28px/1 Arial,sans-serif;border-radius:8px}
 #store-auth button.store-close:hover,#store-auth button.store-close:focus-visible{background:#26334d}
 #store-auth .rp-watch-guest:not([hidden]){display:block;margin:12px auto 0;text-decoration:underline}
-.rp-main-menu>.rp-menu-heading,.rp-main-menu>.rp-menu-legal{display:none}
 @media(max-width:1240px){
- .site-header.menu-open nav.rp-main-menu,.site-header nav.rp-main-menu.open{gap:0;background:#111622;border:1px solid #323d52;border-radius:14px;padding:16px;max-height:min(65dvh,540px);overflow:auto;overscroll-behavior:contain}
- .site-header nav.rp-main-menu>.rp-menu-heading,.site-header nav.rp-main-menu .rp-menu-heading{display:block;padding:8px 10px;font:700 12px/1.4 system-ui,sans-serif;color:#a7bcdf;border-bottom:1px solid #38455f}
- .site-header nav.rp-main-menu>.rp-menu-legal{display:grid;margin-top:12px}
- .site-header nav.rp-main-menu :is(a,button){display:block;min-height:44px;padding:12px 10px;border:0;border-radius:6px;background:transparent;text-align:left;font:600 14px/1.35 system-ui,sans-serif;color:#eef3ff}
- .site-header nav.rp-main-menu :is(a,button):is(:hover,:focus-visible,.active){background:#223252;color:#fff}
+ .site-header.menu-open nav.rp-main-menu,.site-header nav.rp-main-menu.open{
+  display:grid;grid-template-columns:minmax(0,1fr)!important;gap:4px;background:#111622;
+  border:1px solid #323d52;border-radius:14px;padding:8px;max-height:min(58dvh,420px);
+  overflow:auto;overscroll-behavior:contain
+ }
+ .site-header nav.rp-main-menu>a{
+  display:block;min-width:0;min-height:44px;padding:12px 14px;border:0;border-radius:8px;
+  background:transparent;text-align:left;font:600 15px/1.35 system-ui,sans-serif;color:#eef3ff
+ }
+ .site-header nav.rp-main-menu>a:is(:hover,:focus-visible,.active){background:#223252;color:#fff}
+ .site-header nav.rp-main-menu>a.active{box-shadow:inset 3px 0 #597fff}
 }
 
 /* The original guest buttons never paint before the session bootstrap. */

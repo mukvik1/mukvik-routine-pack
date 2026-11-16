@@ -78,11 +78,31 @@
     const routines=nav.querySelector('a[href="/routines/"]');
     if(routines)routines.after(price);else nav.append(price);
     nav.classList.add('rp-main-menu');
-    const label=document.createElement('span');label.className='rp-menu-heading';label.textContent='Quick links';nav.prepend(label);
-    const legal=document.createElement('div');legal.className='rp-menu-legal';
-    legal.innerHTML='<span class="rp-menu-heading">Legal</span><a href="/legal/terms/">Terms &amp; Conditions</a><a href="/legal/privacy/">Privacy Policy</a><button type="button" data-cookie-settings>Cookie settings</button>';
-    nav.append(legal);
-    price.addEventListener('click', () => nav.closest('.site-header')?.classList.remove('menu-open'));
+    const header=nav.closest('.site-header');
+    const menu=header.querySelector('[data-menu]');
+    const normalize=path=>path.replace(/\/$/,'')||'/';
+    for(const link of nav.querySelectorAll('a[href]')){
+      const path=normalize(new URL(link.href).pathname);
+      const here=normalize(location.pathname);
+      const active=here===path||(path!=='/'&&here.startsWith(path+'/'));
+      link.classList.toggle('active',active);
+      if(active)link.setAttribute('aria-current',here===path?'page':'true');
+      else link.removeAttribute('aria-current');
+    }
+    if(menu){
+      nav.id=nav.id||'rp-main-navigation';
+      menu.setAttribute('aria-controls',nav.id);
+      const sync=()=>menu.setAttribute('aria-expanded',String(header.classList.contains('menu-open')||nav.classList.contains('open')));
+      const close=()=>{header.classList.remove('menu-open');nav.classList.remove('open');sync();};
+      const observer=new MutationObserver(sync);
+      for(const node of [header,nav])observer.observe(node,{attributes:true,attributeFilter:['class']});
+      sync();
+      nav.addEventListener('click',event=>{if(event.target.closest('a'))close();});
+      document.addEventListener('click',event=>{if(!header.contains(event.target))close();});
+      document.addEventListener('keydown',event=>{
+        if(event.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){close();menu.focus();}
+      });
+    }
   }
 
   document.querySelectorAll('main a[href="/free/"]').forEach(node => node.href='/routines/#free-routines');
