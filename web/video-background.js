@@ -3,7 +3,7 @@
    document.documentElement.classList.add('rp-embedded-page');
    document.body.classList.add('rp-video-wide','rp-video-pages');
    document.querySelectorAll('.rp-hero-background').forEach(v=>{v.pause();v.removeAttribute('src');v.remove();});
-   document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a||a.target==='_blank'||a.hasAttribute('download'))return;const u=new URL(a.href,location.href);if(/^https?:$/.test(u.protocol)&&u.origin!==location.origin){event.preventDefault();window.top.location.assign(u.href);}else if(u.origin===location.origin&&u.pathname!==location.pathname&&!a.hasAttribute('data-direct-download')){event.preventDefault();event.stopImmediatePropagation();window.parent.RPBackgroundNavigate(u.href);}},true);
+   document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a||a.target==='_blank'||a.matches('[download],[data-routine-download],[data-direct-download]'))return;const u=new URL(a.href,location.href);if(/^https?:$/.test(u.protocol)&&u.origin!==location.origin){event.preventDefault();window.top.location.assign(u.href);}else if(u.origin===location.origin&&u.pathname!==location.pathname&&!a.hasAttribute('data-direct-download')){event.preventDefault();event.stopImmediatePropagation();window.parent.RPBackgroundNavigate(u.href);}},true);
    return;
  }
  const home=!!document.querySelector('.rp-home');
@@ -45,7 +45,7 @@
  window.RPBackgroundNavigate=url=>{const u=new URL(url,location.href);if(u.origin===location.origin)showFrame(u.href);};
  document.addEventListener('click',event=>{
    if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
-   const a=event.target.closest?.('a[href]');if(!a||a.target||a.hasAttribute('download'))return;
+   const a=event.target.closest?.('a[href]');if(!a||a.target||a.matches('[download],[data-routine-download],[data-direct-download]'))return;
    const url=new URL(a.href,location.href);if(!allowed(url)||url.href===location.href||(url.pathname===location.pathname&&url.hash))return;
    event.preventDefault();event.stopImmediatePropagation();showFrame(url.href);
  },true);

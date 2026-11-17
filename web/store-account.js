@@ -351,15 +351,25 @@ document.addEventListener('click',async event=>{
  pendingDownloads.add(link);link.setAttribute('aria-busy','true');say('Checking download access…');
  try{
   const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/ticket','POST',{});
-  say('');
   const url=new URL(result.url,API);
   if(url.origin!==API||!/^\/api\/v2\/standard\/download\/[\w-]{43}$/.test(url.pathname))throw Error('Unexpected download link.');
-  const file=el('a');file.href=url.href;file.referrerPolicy='no-referrer';document.body.append(file);file.click();file.remove();
+  say('Preparing your ZIP…');
+  const response=await fetch(url.href,{cache:'no-store',referrerPolicy:'no-referrer',redirect:'error'});
+  if(!response.ok||!response.headers.get('content-type')?.startsWith('application/zip')){
+   throw Error('The ZIP could not be downloaded. Please try again.');
+  }
+  const href=URL.createObjectURL(await response.blob()), file=el('a');
+  file.href=href;
+  file.download=slug+'.zip';
+  document.body.append(file);file.click();file.remove();
+  setTimeout(()=>URL.revokeObjectURL(href),60000);
+  say(T('Download started. Save the ZIP file.'));
  }catch(e){
   if(e.status===401||e.status===403){
    say('');
-   if(e.status===401&&(slug==='routine-04'||slug==='routine-06'))openAuth('register');
+   if(e.status===401)openAuth('login');
    else if(e.status===403&&(slug==='routine-04'||slug==='routine-06'))say('Confirm your email to download this free routine.');
+   else if(memberLevel()==='Ultra'||(memberLevel()==='Pro'&&!standardPlan?.proSlugs?.includes(slug)))say('Download access could not be verified. Please refresh and try again.');
    else showDownloadPlans();
   }else say(e.message);
  }finally{pendingDownloads.delete(link);link.removeAttribute('aria-busy');}

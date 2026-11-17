@@ -242,9 +242,9 @@
       for(const event of ['pause','ended'])player.addEventListener(event,()=>play.textContent='Play');
       actions.append(play);
     }
-    const download=document.createElement('a');
+    const download=document.createElement('button');
+    download.type='button';
     download.className='store-button primary';
-    download.href=freeSlug?'#follow-wall':'/price/#standard-plan';
     download.dataset.routineDownload=slug;
     if(freeSlug)download.dataset.freeRoutineDownload='';
     download.textContent='Download';
