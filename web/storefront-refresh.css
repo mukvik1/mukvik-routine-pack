@@ -193,3 +193,11 @@ body main.routine-detail-main>.routine-detail-panel.rp-unified-detail>h1{
   line-height:1.11!important;text-align:center;text-wrap:balance;overflow-wrap:anywhere
 }
 body main.routine-detail-main>.rp-unified-detail>.routine-detail-video{margin:0 auto}
+
+.rp-news-prompt{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:9500;width:min(420px,calc(100% - 32px));box-sizing:border-box;padding:18px;background:#111725;color:#f5f8ff;border:1px solid #3c527d;border-radius:14px;box-shadow:0 12px 45px #0008;font:15px/1.45 system-ui,sans-serif}
+.rp-news-prompt strong{font-size:18px}
+.rp-news-prompt p{margin:8px 0 12px}
+.rp-news-prompt p:empty{display:none}
+.rp-news-actions{display:flex;gap:8px;flex-wrap:wrap}
+.rp-news-actions button{min-height:44px}
+body.rp-navigation-shell>.rp-news-prompt{display:none}

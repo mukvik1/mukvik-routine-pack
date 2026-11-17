@@ -112,6 +112,7 @@ window.addEventListener('click',event=>{
 },true);
 function renderHeader(){
  renderStandard();
+ renderNewsPrompt();
  if(user&&(user.admin||standardAccess||!standardPlan))window.RPAccountHeader?.save(token,user.nickname,memberLevel());
  document.querySelectorAll('[data-store-auth]').forEach(box=>{
   if(!user&&token)return;
@@ -121,6 +122,40 @@ function renderHeader(){
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
   else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
  });
+}
+let newsPrompt=null,newsSaving=false;
+function newsControls(container,initial){
+ const title=el(initial?'strong':'h3','Routine Pack email updates');
+ const copy=el('p','Get occasional emails about new routines, video lessons, and Routine Pack offers. This is optional. You can unsubscribe in Your account.');
+ const state=el('p',initial?'':user.newsOptIn===true?'Subscribed to email updates.':'Not subscribed to email updates.','store-muted');
+ state.setAttribute('role','status');
+ const actions=el('div',undefined,'rp-news-actions');
+ const choose=async optedIn=>{
+  if(newsSaving||!user)return;
+  newsSaving=true;const session=token;
+  for(const b of actions.children)b.disabled=true;
+  try{
+   const result=await api('/me/news-preference','PUT',{optedIn});
+   if(!user||token!==session)return;
+   user.newsOptIn=result.newsOptIn;
+   renderNewsPrompt();
+   if(account.open)renderAccount();
+  }catch(e){state.textContent=e.message;}
+  finally{newsSaving=false;for(const b of actions.children)b.disabled=false;}
+ };
+ if(initial||user.newsOptIn!==true)actions.append(button('Subscribe to updates',()=>choose(true),'store-button primary'));
+ if(initial||user.newsOptIn!==false)actions.append(button(initial?'No thanks':'Unsubscribe',()=>choose(false)));
+ container.append(title,copy,state,actions);
+}
+function renderNewsPrompt(){
+ const showPrompt=user?.newsOptIn===null&&!user.admin;
+ if(!showPrompt){newsPrompt?.remove();newsPrompt=null;return;}
+ if(!newsPrompt){
+  newsPrompt=el('aside',undefined,'rp-news-prompt');
+  newsPrompt.setAttribute('aria-label','Routine Pack email updates');
+  newsControls(newsPrompt,true);
+  document.body.append(newsPrompt);
+ }
 }
 async function finishLogin(access){
  window.RPAccountHeader?.clear();
@@ -171,6 +206,9 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
   }accountBody.append(block);
  }
  accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
+ if(!user.admin&&user.newsOptIn!==undefined){
+  const news=el('section',undefined,'store-order');newsControls(news,false);accountBody.append(news);
+ }
  if(user.admin){
   const report=el('div');
   const load=button('Free downloads',async()=>{
@@ -185,19 +223,22 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
     }
    }catch(e){accountStatus.textContent=e.message;}finally{load.disabled=false;}
   });
-  const exportEmails=button('Export emails without a paid plan',async()=>{
+  const makeExport=(label,endpoint,filename)=>{
+   const exportEmails=button(label,async()=>{
    exportEmails.disabled=true;accountStatus.textContent='';
    try{
-    const {emails}=await api('/admin/customer-emails');
+    const {emails}=await api(endpoint);
     const safe=emails.filter(email=>typeof email==='string'&&/^[^\s@]+@[^\s@]+$/.test(email));
     const href=URL.createObjectURL(new Blob([safe.join('\n')+(safe.length?'\n':'')],{type:'text/plain;charset=utf-8'}));
-    const file=el('a');file.href=href;file.download='routine-pack-emails.txt';
+    const file=el('a');file.href=href;file.download=filename;
     document.body.append(file);file.click();file.remove();
     setTimeout(()=>URL.revokeObjectURL(href),60000);
     accountStatus.textContent='Exported emails: '+safe.length;
    }catch(e){accountStatus.textContent=e.message;}finally{exportEmails.disabled=false;}
   });
-  accountBody.append(exportEmails,load,report);
+  return exportEmails;
+  };
+  accountBody.append(makeExport('Export opted-in emails without a paid plan','/admin/news-emails','routine-pack-news-opt-in.txt'),makeExport('Export emails without a paid plan','/admin/customer-emails','routine-pack-emails.txt'),load,report);
  }
 }
 async function refreshStandard(force=false){

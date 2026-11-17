@@ -58,7 +58,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=customer-export-20261117"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=news-preference-20261117"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -181,7 +181,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261117-download');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=34"><script defer src="/storefront-refresh.js?v=39"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=35"><script defer src="/storefront-refresh.js?v=39"></script></head>');
     bytes=Buffer.from(html);
   }
 

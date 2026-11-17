@@ -376,7 +376,8 @@ function createCommerce(settings=process.env,overrides={}){
    if(!orders.has(row.id))orders.set(row.id,{id:row.id,status:row.status,totalCents:row.total_cents,currency:row.currency,createdAt:row.created_at,items:[]});
    orders.get(row.id).items.push({code:row.product_code,name:row.name,priceCents:row.price_cents,accessible:row.accessible,files:row.accessible?(files[row.product_code]||[]).flatMap((file,index)=>fileAt(row.product_code,index)?[{index,name:file.name}]:[]):[]});
   }
-  response(res,200,{email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:false,orders:[...orders.values()]});
+  const news=await pool.query('SELECT opted_in FROM customer_news_preferences WHERE customer_id=$1',[user.id]);
+  response(res,200,{newsOptIn:news.rows[0]?.opted_in??null,email:user.email,nickname:user.nickname||null,admin:user.email===adminEmail,canAuditRoutineDownloads:user.email===adminEmail&&Boolean(user.email_verified_at),welcomePackEligible:false,orders:[...orders.values()]});
  }
  async function hideUnpaidOrder(res,user,orderId){
   const result=await pool.query(`UPDATE orders SET hidden_by_customer_at=COALESCE(hidden_by_customer_at,now())
@@ -549,18 +550,31 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&monoCheckout&&uuidPattern.test(monoCheckout[1])&&monobank){const request=await body(req);await monobank.checkout(res,monoCheckout[1],user,request.acceptDigitalDelivery);return true;}
    const monoStatus=/^\/api\/v2\/orders\/([0-9a-f-]{36})\/monobank\/status$/.exec(url.pathname);
    if(req.method==='GET'&&monoStatus&&uuidPattern.test(monoStatus[1])&&monobank){await monobank.reconcile(res,monoStatus[1],user);return true;}
+   if(req.method==='PUT'&&url.pathname==='/api/v2/me/news-preference'){
+    if(!user.email_verified_at){response(res,403,{error:'Confirm your email first.'});return true;}
+    const request=await body(req);
+    if(typeof request?.optedIn!=='boolean'){response(res,400,{error:'Choose whether to receive email updates.'});return true;}
+    await pool.query(`INSERT INTO customer_news_preferences(customer_id,opted_in,consent_version)
+      VALUES($1,$2,'routine-pack-news-v1') ON CONFLICT(customer_id) DO UPDATE
+      SET opted_in=EXCLUDED.opted_in,consent_version=EXCLUDED.consent_version,updated_at=now()
+      WHERE customer_news_preferences.opted_in IS DISTINCT FROM EXCLUDED.opted_in
+         OR customer_news_preferences.consent_version<>EXCLUDED.consent_version`,[user.id,request.optedIn]);
+    response(res,200,{newsOptIn:request.optedIn});return true;
+   }
    if(url.pathname.startsWith('/api/v2/admin/')){
     if(user.email!==adminEmail){response(res,403,{error:'Admin access required.'});return true;}
-    if(req.method==='GET'&&url.pathname==='/api/v2/admin/customer-emails'){
+    if(req.method==='GET'&&['/api/v2/admin/customer-emails','/api/v2/admin/news-emails'].includes(url.pathname)){
      if(!user.email_verified_at){response(res,403,{error:'Confirmed admin email required.'});return true;}
      const result=await pool.query(`SELECT DISTINCT lower(c.email) AS email
        FROM customers c
        WHERE c.email_verified_at IS NOT NULL AND lower(c.email)<>$1
+         AND (NOT $2::boolean OR EXISTS (SELECT 1 FROM customer_news_preferences n
+           WHERE n.customer_id=c.id AND n.opted_in=true))
          AND NOT EXISTS (
            SELECT 1 FROM standard_subscriptions s
            WHERE s.customer_id=c.id AND s.paid_until>now()
          )
-       ORDER BY email`,[adminEmail]);
+       ORDER BY email`,[adminEmail,url.pathname==='/api/v2/admin/news-emails']);
      response(res,200,{emails:result.rows.map(row=>row.email)});return true;
     }
     if(req.method==='GET'&&url.pathname==='/api/v2/admin/free-downloads'){
