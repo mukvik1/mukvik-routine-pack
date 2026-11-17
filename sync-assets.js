@@ -58,7 +58,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=routine-download-20261117"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=customer-export-20261117"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));

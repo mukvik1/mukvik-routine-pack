@@ -185,7 +185,19 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
     }
    }catch(e){accountStatus.textContent=e.message;}finally{load.disabled=false;}
   });
-  accountBody.append(load,report);
+  const exportEmails=button('Export emails without a paid plan',async()=>{
+   exportEmails.disabled=true;accountStatus.textContent='';
+   try{
+    const {emails}=await api('/admin/customer-emails');
+    const safe=emails.filter(email=>typeof email==='string'&&/^[^\s@]+@[^\s@]+$/.test(email));
+    const href=URL.createObjectURL(new Blob([safe.join('\n')+(safe.length?'\n':'')],{type:'text/plain;charset=utf-8'}));
+    const file=el('a');file.href=href;file.download='routine-pack-emails.txt';
+    document.body.append(file);file.click();file.remove();
+    setTimeout(()=>URL.revokeObjectURL(href),60000);
+    accountStatus.textContent='Exported emails: '+safe.length;
+   }catch(e){accountStatus.textContent=e.message;}finally{exportEmails.disabled=false;}
+  });
+  accountBody.append(exportEmails,load,report);
  }
 }
 async function refreshStandard(force=false){

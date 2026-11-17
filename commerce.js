@@ -551,6 +551,18 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='GET'&&monoStatus&&uuidPattern.test(monoStatus[1])&&monobank){await monobank.reconcile(res,monoStatus[1],user);return true;}
    if(url.pathname.startsWith('/api/v2/admin/')){
     if(user.email!==adminEmail){response(res,403,{error:'Admin access required.'});return true;}
+    if(req.method==='GET'&&url.pathname==='/api/v2/admin/customer-emails'){
+     if(!user.email_verified_at){response(res,403,{error:'Confirmed admin email required.'});return true;}
+     const result=await pool.query(`SELECT DISTINCT lower(c.email) AS email
+       FROM customers c
+       WHERE c.email_verified_at IS NOT NULL AND lower(c.email)<>$1
+         AND NOT EXISTS (
+           SELECT 1 FROM standard_subscriptions s
+           WHERE s.customer_id=c.id AND s.paid_until>now()
+         )
+       ORDER BY email`,[adminEmail]);
+     response(res,200,{emails:result.rows.map(row=>row.email)});return true;
+    }
     if(req.method==='GET'&&url.pathname==='/api/v2/admin/free-downloads'){
      const totals=await pool.query("SELECT email,routine_slug,routine_name,count(*)::int AS downloads,count(*) FILTER(WHERE status='completed')::int AS completed_downloads,max(started_at) AS last_download_at FROM free_downloads GROUP BY email,routine_slug,routine_name ORDER BY last_download_at DESC LIMIT 100");
      const events=await pool.query('SELECT email,routine_slug,routine_name,started_at,finished_at,status FROM free_downloads ORDER BY id DESC LIMIT 100');
