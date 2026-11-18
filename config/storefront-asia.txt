@@ -1,0 +1,66 @@
+HOME|홈|Trang chủ|首页
+ABOUT|소개|Giới thiệu|关于
+ROUTINES|DJ 루틴|Bài DJ|DJ 套路
+Price|요금|Bảng giá|价格
+MENU|메뉴|Menu|菜单
+Get Started|시작하기|Bắt đầu|开始
+Watch.|보고.|Xem.|观看。
+Practice.|연습하고.|Luyện tập.|练习。
+Perform.|공연하세요.|Biểu diễn.|演出。
+Individual Routines|개별 DJ 루틴|Các bài DJ riêng lẻ|单套 DJ 套路
+OPEN ROUTINE|루틴 열기|Mở bài DJ|打开套路
+Play|재생|Phát|播放
+Pause|일시 정지|Tạm dừng|暂停
+Download|다운로드|Tải xuống|下载
+← Previous|← 이전|← Trước|← 上一个
+Next →|다음 →|Tiếp theo →|下一个 →
+Subscribe to unlock full video|구독하고 전체 영상 보기|Đăng ký để xem video đầy đủ|订阅以观看完整视频
+Pro routine|Pro 루틴|Bài DJ Pro|Pro 套路
+Ultra routine|Ultra 루틴|Bài DJ Ultra|Ultra 套路
+SIGN IN|로그인|Đăng nhập|登录
+SIGN UP|가입하기|Tạo tài khoản|注册
+LOGIN|로그인|Đăng nhập|登录
+SIGN IN OR SIGN UP|로그인 또는 가입|Đăng nhập hoặc tạo tài khoản|登录或注册
+Your account|내 계정|Tài khoản của bạn|您的账户
+Sign out|로그아웃|Đăng xuất|退出登录
+Close|닫기|Đóng|关闭
+PRIVACY|개인정보|Quyền riêng tư|隐私
+COOKIE SETTINGS|쿠키 설정|Cài đặt cookie|Cookie 设置
+SELLER & CONTACTS|판매자 및 연락처|Người bán và liên hệ|卖家与联系方式
+PRIVACY POLICY|개인정보 처리방침|Chính sách quyền riêng tư|隐私政策
+TERMS / PUBLIC OFFER|이용약관|Điều khoản|服务条款
+REFUNDS|환불|Hoàn tiền|退款
+DIGITAL DELIVERY|디지털 콘텐츠 제공|Cung cấp nội dung số|数字内容交付
+PRIVACY & COOKIES|개인정보 및 쿠키|Quyền riêng tư và cookie|隐私与 Cookie
+ACCEPT|수락|Chấp nhận|接受
+DECLINE|거부|Từ chối|拒绝
+THE ROUTINE LIBRARY|DJ 루틴 라이브러리|Thư viện bài DJ|DJ 套路库
+Choose your plan.|요금제를 선택하세요.|Chọn gói của bạn.|选择您的套餐。
+Choose the access that fits your sets. Watch previews anytime.|내 세트에 맞는 요금제를 선택하세요. 미리보기는 언제든 볼 수 있습니다.|Chọn gói phù hợp với set DJ của bạn. Xem trước bất cứ lúc nào.|选择适合您演出风格的套餐。预览可随时观看。
+FULL LIBRARY|전체 라이브러리|Toàn bộ thư viện|完整曲库
+ESSENTIALS|기본 구성|Nội dung thiết yếu|基础内容
+FREE ROUTINES|무료 루틴|Bài DJ miễn phí|免费套路
+/ month|/ 월|/ tháng|/ 月
+Same price on renewal.|갱신 시에도 같은 요금이 적용됩니다.|Giá không đổi khi gia hạn.|续订价格不变。
+The essentials for your next set.|다음 세트에 필요한 기본 루틴입니다.|Những bài DJ thiết yếu cho set tiếp theo.|为下一场演出准备的基础套路。
+The full library, including Ultra exclusives.|Ultra 전용 루틴을 포함한 전체 라이브러리입니다.|Toàn bộ thư viện, bao gồm các bài độc quyền Ultra.|完整曲库，包含 Ultra 专享套路。
+Video previews|영상 미리보기|Video xem trước|视频预览
+Downloads with an active subscription|구독 기간 중 다운로드|Tải xuống khi gói đăng ký còn hiệu lực|订阅有效期间可下载
+Audio downloads with an active subscription|구독 기간 중 오디오 다운로드|Tải tệp âm thanh khi gói còn hiệu lực|订阅有效期间可下载音频
+{count} Pro routines|Pro 루틴 {count}개|{count} bài DJ Pro|{count} 套 Pro 套路
+All Pro routines plus {count} Ultra routines|모든 Pro 루틴과 Ultra 루틴 {count}개|Tất cả bài Pro và {count} bài Ultra|全部 Pro 套路及 {count} 套 Ultra 套路
+{count} free routines|무료 루틴 {count}개|{count} bài DJ miễn phí|{count} 套免费套路
+Browse free routines|무료 루틴 둘러보기|Xem các bài DJ miễn phí|浏览免费套路
+Activated when you create an account.|계정을 만들면 활성화됩니다.|Được kích hoạt khi bạn tạo tài khoản.|创建账户后即可启用。
+Get started with the free routines.|무료 루틴으로 시작하세요.|Bắt đầu với các bài DJ miễn phí.|从免费套路开始。
+Downloads with a free account|무료 계정으로 다운로드|Tải xuống bằng tài khoản miễn phí|使用免费账户下载
+Choose Pro|Pro 선택|Chọn Pro|选择 Pro
+Choose Ultra|Ultra 선택|Chọn Ultra|选择 Ultra
+Create your Pro account|Pro 계정 만들기|Tạo tài khoản Pro|创建 Pro 账户
+Create your Ultra account|Ultra 계정 만들기|Tạo tài khoản Ultra|创建 Ultra 账户
+SEE IT IN ACTION|실전 영상 보기|Xem biểu diễn thực tế|观看实战演示
+Watch the performances|공연 영상 보기|Xem các màn biểu diễn|观看演出
+ABOUT MUKVIK|MUKVIK 소개|Giới thiệu MUKVIK|关于 MUKVIK
+BEHIND THE ROUTINES|루틴을 만드는 사람|Người đứng sau các bài DJ|套路背后的创作者
+Meet Mukvik.|Mukvik을 만나보세요.|Làm quen với Mukvik.|认识 Mukvik。
+More about Mukvik →|Mukvik 더 알아보기 →|Tìm hiểu thêm về Mukvik →|了解更多关于 Mukvik →

@@ -1,5 +1,5 @@
 (() => {
- const supported=['en','uk','de','es','th','id','ar','hi','it','pt-BR'];
+ const supported=['en','uk','de','es','th','id','ar','hi','it','pt-BR','ko','vi','zh-CN'];
  const stored=()=>{try{return localStorage.getItem('routinepack_language');}catch{return null;}};
  const requested=new URLSearchParams(location.search).get('lang');
  let language=supported.includes(requested)?requested:(supported.includes(stored())?stored():'en');
@@ -39,8 +39,16 @@
    language=event.newValue;apply();
   }
  });
- const ready=fetch('/messages.json?v=14').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{messages=data;}).catch(()=>{}).then(()=>apply());
+ const ready=fetch('/messages.json?v=15').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{messages=data;}).catch(()=>{}).then(()=>apply());
  window.RP_I18N={t,set,ready,apply:()=>apply(false),get language(){return language;}};
+ for(const select of document.querySelectorAll('[data-language-select]')){
+  for(const [locale,label] of [['ko','🇰🇷 한국어'],['vi','🇻🇳 Tiếng Việt'],['zh-CN','🇨🇳 简体中文']]){
+   if(!Array.from(select.options).some(option=>option.value===locale)){
+    const option=document.createElement('option');option.value=locale;option.lang=locale;option.textContent=label;select.append(option);
+   }
+  }
+  select.value=language;
+ }
  document.querySelectorAll('[data-language-select]').forEach(select=>select.addEventListener('change',()=>set(select.value)));
  document.querySelectorAll('[data-language]').forEach(b=>b.addEventListener('click',()=>set(b.dataset.language)));
 })();

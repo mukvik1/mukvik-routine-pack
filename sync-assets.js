@@ -26,10 +26,16 @@ async function download(relativePath) {
   if(relativePath==='messages.json'){
     const messages=JSON.parse(bytes);
     Object.assign(messages.uk,require('./config/storefront-uk.json'));
+    const rows=(await fs.readFile(path.join(__dirname,'config/storefront-asia.txt'),'utf8')).trim().split(/\r?\n/);
+    for(const row of rows){
+      const [key,...translations]=row.split('|');
+      if(translations.length!==3||translations.some(value=>!value))throw Error('Invalid storefront translation: '+key);
+      for(const [i,locale] of ['ko','vi','zh-CN'].entries())(messages[locale]??={})[key]=translations[i];
+    }
     bytes=Buffer.from(JSON.stringify(messages));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=14"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=15"'));
   }
   if (relativePath === 'index.html') {
     const html = bytes.toString('utf8');
@@ -296,7 +302,7 @@ async function updatePricePage() {
   let html=await fs.readFile(filename,'utf8');
   html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=38')
     .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=44')
-    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=14')
+    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=15')
     .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=pro-preview-cta-20261118');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');
