@@ -32,10 +32,14 @@ async function download(relativePath) {
       if(translations.length!==3||translations.some(value=>!value))throw Error('Invalid storefront translation: '+key);
       for(const [i,locale] of ['ko','vi','zh-CN'].entries())(messages[locale]??={})[key]=translations[i];
     }
+    const european=require('./config/storefront-extra-languages.json');
+    for(const [key,values] of Object.entries(european)){
+      for(const [i,locale] of ['ja','nl','pl'].entries())(messages[locale]??={})[key]=values[i];
+    }
     bytes=Buffer.from(JSON.stringify(messages));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=15"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=16"'));
   }
   if (relativePath === 'index.html') {
     const html = bytes.toString('utf8');
@@ -199,7 +203,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261117-download');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=38"><script defer src="/storefront-refresh.js?v=44"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=39"><script defer src="/storefront-refresh.js?v=44"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -300,9 +304,9 @@ async function updatePricePage() {
   const homepage=await fs.readFile(path.join(__dirname,'web','index.html'),'utf8');
   const filename=path.join(__dirname,'web','price','index.html');
   let html=await fs.readFile(filename,'utf8');
-  html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=38')
+  html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=39')
     .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=44')
-    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=15')
+    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=16')
     .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=pro-preview-cta-20261118');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');

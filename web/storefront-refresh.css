@@ -257,3 +257,10 @@ body > footer :is(.footer-privacy button, .social-links a, .legal-links a) {
   text-align: center;
 }
 body > footer > .legal-links { padding-top: 12px; }
+
+.rp-language-trigger{width:100%;min-height:40px;padding:7px 12px;color:#fff;background:#171f30;border:1px solid #445372;border-radius:6px;font:inherit;cursor:pointer}
+.rp-language-trigger::after{content:" ▾"}
+[data-language-select][hidden]{display:none!important}
+.rp-language-panel{position:fixed;inset:auto;margin:0;box-sizing:border-box;overflow:auto;overscroll-behavior:contain;padding:5px;background:#151c2b;color:white;border:1px solid #495979;border-radius:9px;box-shadow:0 8px 28px #0008}
+.rp-language-panel button{display:block;width:100%;padding:9px 12px;min-height:38px;text-align:start;background:none;color:inherit;border:0;border-radius:5px;font:inherit;cursor:pointer}
+.rp-language-panel button:is(:hover,:focus-visible,[aria-pressed="true"]){background:#274573}
