@@ -139,6 +139,14 @@ test('new routines honor paid tiers and deliver only the matching audio files', 
  const denied = {};
  await subscription.ticket(denied, user, slug);
  assert.equal(denied.status, 403);
+ const video = {};
+ await subscription.ticket(video, user, slug, true);
+ assert.equal(video.status, 200, 'Pro can watch an Ultra routine without unlocking its download');
+ state.row.paid_until = new Date(Date.now() - 1000);
+ const expired = {};
+ await subscription.ticket(expired, user, slug, true);
+ assert.equal(expired.status, 403);
+ state.row.paid_until = new Date(Date.now() + 60000);
  const pro = {};
  await subscription.ticket(pro, user, 'suavemente-y-que-fue');
  assert.equal(pro.status, 200);

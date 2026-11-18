@@ -477,7 +477,7 @@ function createCommerce(settings=process.env,overrides={}){
     const download=/^\/api\/v2\/standard\/download\/([\w-]{43})$/.exec(url.pathname);
     if(req.method==='GET'&&download){await standard.download(res,download[1]);return true;}
     const media=/^\/api\/v2\/standard\/video\/([\w-]{43})$/.exec(url.pathname);
-    if((req.method==='GET'||req.method==='HEAD')&&media){await standard.video(req,res,media[1]);return true;}
+    if((req.method==='GET'||req.method==='HEAD')&&media){await standard.video(req,res,media[1],url.searchParams.get('poster')==='1');return true;}
 
    }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);

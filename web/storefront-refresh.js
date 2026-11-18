@@ -314,6 +314,7 @@
           replacement.className='standalone-routine available-routine';
           replacement.innerHTML='<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" decoding="async" alt=""><div><h2></h2><a class="routine-detail-link">Open Routine</a></div></div>';
           replacement.querySelector('img').src=previewPath(slug)+'.jpg';
+          replacement.querySelector('img').dataset.fullPosterSlug=slug;
           replacement.querySelector('h2').textContent=title;
           replacement.querySelector('a').href=paidPath(slug);
           if(card)card.replaceWith(replacement);else grid.append(replacement);

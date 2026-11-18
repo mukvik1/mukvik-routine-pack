@@ -61,6 +61,8 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           '-vf', "scale=w='min(iw,960)':h='min(ih,960)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v', 'libx264', '-threads', '2', '-preset', 'fast', '-crf', '23',
           '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fullVideo], 180000);
+        await ffmpeg(['-i', fullVideo, '-frames:v', '1', '-vf', 'scale=360:-2',
+          '-update', '1', path.join(privateVideos, slug + '.jpg')], 30000);
         // Encode the mask into the public preview itself, keeping the original audio.
         // The separate full video is never placed under the web root.
         await ffmpeg(['-i', fullVideo, '-t', '20', '-filter_complex_threads', '2',

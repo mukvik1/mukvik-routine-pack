@@ -241,7 +241,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
       SELECT $1,$2,$3,now()+($6::integer*interval '1 second')
       WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[]))) RETURNING token_hash`,
-    [sha(secret), user.id, media?'video:'+slug:slug, allowedTiers(slug), Boolean(user.email_verified_at && (FREE_PACK_SLUGS.includes(slug) || (adminEmail && user.email===adminEmail))), media?1800:60]);
+    [sha(secret), user.id, media?'video:'+slug:slug, media?['legacy','standard','pro']:allowedTiers(slug), Boolean(user.email_verified_at && (FREE_PACK_SLUGS.includes(slug) || (adminEmail && user.email===adminEmail))), media?1800:60]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/'+(media?'video/':'download/')+secret });
   }
@@ -291,7 +291,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     zip.end();
     try { await pipeline(zip.outputStream, res); } catch { res.destroy(); }
   }
-  async function video(req, res, secret) {
+  async function video(req, res, secret, poster = false) {
     if (!secretPattern.test(secret)) return reply(res,404,{error:'Not found.'});
     const range = req.headers.range;
     if (range && !/^bytes=(?:[0-9]{1,15}-[0-9]{0,15}|-[0-9]{1,15})$/.test(range)) {
@@ -301,12 +301,21 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const r = await pool.query(`SELECT substring(t.routine_slug from 7) AS slug
       FROM standard_download_tickets t
       WHERE t.token_hash=$1 AND t.expires_at>now() AND t.routine_slug LIKE 'video:%'
-      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$3 OR substring(t.routine_slug from 7)=ANY($4::text[])) AND c.email_verified_at IS NOT NULL)
+      AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$2 OR substring(t.routine_slug from 7)=ANY($3::text[])) AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
-          AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (substring(t.routine_slug from 7)=ANY($2::text[]))))))`,
-    [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
+          AND tier IN ('legacy','standard','pro')))`,
+    [sha(secret),adminEmail||null,FREE_PACK_SLUGS]);
     const file = r.rows[0] && fullVideo(r.rows[0].slug);
     if (!file) return reply(res,404,{error:'Video unavailable.'});
+    if (poster) {
+      const filename = file.local && file.local.replace(/\.mp4$/, '.jpg');
+      const stat = filename && await fs.promises.stat(filename).catch(() => null);
+      if (!stat?.isFile()) return reply(res,404,{error:'Poster unavailable.'});
+      res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':stat.size,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
+      if(req.method==='HEAD')return res.end();
+      try { await pipeline(fs.createReadStream(filename),res); } catch { res.destroy(); }
+      return;
+    }
     if (file.local) {
       const stat = await fs.promises.stat(file.local).catch(() => null);
       if (!stat?.isFile() || !stat.size) return reply(res,404,{error:'Video unavailable.'});
@@ -354,6 +363,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     slugs: [...entries.keys(), ...localArchives.keys()],
     freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
     videoSlugs: [...entries.keys()].filter(slug => fullVideo(slug)),
+    posterSlugs: [...privateVideoSlugs].filter(slug=>entries.has(slug)),
     proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
   } };
