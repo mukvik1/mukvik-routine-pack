@@ -3,7 +3,7 @@
    document.documentElement.classList.add('rp-embedded-page');
    document.body.classList.add('rp-video-wide','rp-video-pages');
    document.querySelectorAll('.rp-hero-background').forEach(v=>{v.pause();v.removeAttribute('src');v.remove();});
-   document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(!a||a.target==='_blank'||a.matches('[download],[data-routine-download],[data-direct-download]'))return;const u=new URL(a.href,location.href);if(/^https?:$/.test(u.protocol)&&u.origin!==location.origin){event.preventDefault();window.top.location.assign(u.href);}else if(u.origin===location.origin&&u.pathname!==location.pathname&&!a.hasAttribute('data-direct-download')){event.preventDefault();event.stopImmediatePropagation();window.parent.RPBackgroundNavigate(u.href);}},true);
+   document.addEventListener('click',event=>{const a=event.target.closest?.('a[href]');if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||!a||a.target==='_blank'||a.matches('[download],[data-routine-download],[data-direct-download]'))return;const u=new URL(a.href,location.href);if(/^https?:$/.test(u.protocol)&&u.origin!==location.origin){event.preventDefault();window.top.location.assign(u.href);}else if(u.origin===location.origin&&u.pathname!==location.pathname&&!a.hasAttribute('data-direct-download')){event.preventDefault();event.stopImmediatePropagation();window.parent.RPBackgroundNavigate(u.href);}},true);
    return;
  }
  const home=!!document.querySelector('.rp-home');
@@ -25,22 +25,42 @@
  if('IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;sync();});observer.observe(layer);}
  sync();
  // Keep the video document alive while each page retains its own scripts and account flow.
- const initialURL=location.href,initialTitle=document.title;let frame=null,historyNavigation=false,initialScroll=0;
+ const initialURL=location.href,initialTitle=document.title;let frame=null,pending=null,initialScroll=0;
  const allowed=url=>url.origin===location.origin && /^\/(?:price|routines|free|about)?\/?$/.test(url.pathname);
- function showFrame(url){
-   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
-   if(!frame){
-     initialScroll=scrollY;frame=document.createElement('iframe');frame.name='rp-content-frame';frame.className='rp-content-frame';frame.title='Routine Pack';frame.setAttribute('allow','autoplay; fullscreen');
-     frame.addEventListener('load',()=>{
-       let href,title;try{href=frame.contentWindow.location.href;title=frame.contentDocument.title;}catch{return;}
-       if(href==='about:blank')return;
-       if(!historyNavigation&&href!==location.href)history.pushState({rpPage:true},'',href);
-       historyNavigation=false;document.title=title||initialTitle;
-     });
-     document.body.append(frame);
-   }
-   document.body.classList.add('rp-navigation-shell');
-   window.scrollTo(0,0);if(frame.getAttribute('src'))frame.contentWindow.location.replace(url);else frame.src=url;sync();
+ function showFrame(url,fromHistory=false){
+   pending?.remove();
+   if(!frame)initialScroll=scrollY;
+   const next=document.createElement('iframe');
+   pending=next;next.name='rp-content-frame';next.className='rp-content-frame rp-frame-pending';
+   next.title='Routine Pack';next.setAttribute('allow','autoplay; fullscreen');
+   next.setAttribute('aria-hidden','true');next.inert=true;
+   next.addEventListener('load',async()=>{
+     if(pending!==next)return;
+     let href,title;
+     try{
+       const child=next.contentWindow;
+       if(child.location.href==='about:blank')return;
+       await child.RP_I18N?.ready;
+       child.RP_I18N?.apply?.();
+       href=child.location.href;title=child.document.title;
+     }catch{
+       if(pending===next){next.remove();pending=null;}
+       return;
+     }
+     if(pending!==next)return;
+     document.querySelectorAll('dialog[open]').forEach(d=>d.close());
+     const previous=frame;
+     frame=next;pending=null;
+     document.body.classList.add('rp-navigation-shell');
+     window.scrollTo(0,0);
+     next.classList.remove('rp-frame-pending');next.removeAttribute('aria-hidden');next.inert=false;
+     previous?.remove();
+     if(!fromHistory&&href!==location.href)history.pushState({rpPage:true},'',href);
+     document.title=title||initialTitle;
+     sync();
+   });
+   next.src=url;
+   document.body.append(next);
  }
  window.RPBackgroundNavigate=url=>{const u=new URL(url,location.href);if(u.origin===location.origin)showFrame(u.href);};
  document.addEventListener('click',event=>{
@@ -50,9 +70,12 @@
    event.preventDefault();event.stopImmediatePropagation();showFrame(url.href);
  },true);
  window.addEventListener('popstate',()=>{
-   if(!frame)return;
+   if(!frame&&!pending)return;
    if(location.href===initialURL){
-     document.body.classList.remove('rp-navigation-shell');frame.remove();frame=null;document.title=initialTitle;window.scrollTo(0,initialScroll);resize();sync();
-   }else{historyNavigation=true;showFrame(location.href);}
+     pending?.remove();pending=null;
+     frame?.remove();frame=null;
+     document.body.classList.remove('rp-navigation-shell');document.title=initialTitle;
+     window.scrollTo(0,initialScroll);resize();sync();
+   }else showFrame(location.href,true);
  });
 })();
