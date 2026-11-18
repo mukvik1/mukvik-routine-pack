@@ -124,7 +124,7 @@
       preview.id='watch-routines';
       preview.style.scrollMarginTop='96px';
     }
-    if(actions) actions.innerHTML='<a class="rp-get-started" href="'+(preview?'#watch-routines':'/routines/')+'">Get Started</a>';
+    if(actions) actions.innerHTML='<a class="rp-get-started" href="/routines/">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
       ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],

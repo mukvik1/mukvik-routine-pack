@@ -58,7 +58,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=news-preference-20261117"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=guest-routines-20261118"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -82,7 +82,7 @@ async function download(relativePath) {
     html = html.replace(/<section class="rp-section">(?:(?!<section)[\s\S])*?One pack\. Six big moments\.(?:(?!<\/section>)[\s\S])*?<\/section>/, '');
     html = html.replace(/<section class="rp-section rp-showcase" id="lessons">[\s\S]*?(?=<section class="rp-promo-wrap">)/, '');
     html = html.replace(/<section class="video-section home-video-section rp-promo">/, '<section class="video-section home-video-section rp-promo" id="watch-routines" style="scroll-margin-top:96px">');
-    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="#watch-routines">Get Started</a></div>');
+    html = html.replace(/<div class="rp-actions">[\s\S]*?<\/div>/, '<div class="rp-actions"><a class="rp-get-started" href="/routines/">Get Started</a></div>');
     bytes = Buffer.from(html);
   }
   if (relativePath === 'packs/index.html') {
@@ -181,7 +181,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261117-download');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=35"><script defer src="/storefront-refresh.js?v=39"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=35"><script defer src="/storefront-refresh.js?v=40"></script></head>');
     bytes=Buffer.from(html);
   }
 

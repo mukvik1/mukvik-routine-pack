@@ -14,7 +14,7 @@ const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
 const returnedOrder=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(orderId||'')?orderId:null;
 let accountRequested=accountQuery.get('account')==='1';
-let pendingFree=null,pendingRoutine=null;
+let pendingFree=null;
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
 function dialog(id,title){const d=el('dialog',undefined,'store-dialog');d.id=id;const head=el('div',undefined,'store-dialog-head'),h=el('h2',T(title));h.dataset.title=title;const close=button('Close',()=>d.close(),'store-close');close.textContent='×';close.setAttribute('aria-label',T('Close'));head.append(h,close);d.append(head);d.setAttribute('aria-labelledby',id+'-title');h.id=id+'-title';d.addEventListener('click',e=>{if(e.target===d)d.close();});document.body.append(d);return d;}
@@ -62,11 +62,9 @@ function renderAuth(){
 }
 const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');(document.querySelector('[data-routine-actions]:has([data-free-routine-download])')||document.querySelector('.free-catalog'))?.append(freeStatus);
 async function afterLogin(){
- const routine=pendingRoutine;
  auth.close();
  if(pendingFree){const slug=pendingFree;pendingFree=null;await downloadFree(slug);return;}
  if(accountRequested){await openRequestedAccount();return;}
- if(routine){pendingRoutine=null;location.assign(routine);return;}
  renderAccount();
  show(account);
 }
@@ -95,21 +93,6 @@ function memberLevel(){
  if(!standardAccess?.active||+new Date(standardAccess.paidUntil)<=Date.now())return 'Free';
  return standardAccess.tier==='standard'?'Pro':'Ultra';
 }
-const watchWithoutAccount=button('Continue watching',()=>{
- const href=pendingRoutine;pendingRoutine=null;auth.close();
- if(href)location.assign(href);
-},'store-text-button rp-watch-guest');
-watchWithoutAccount.hidden=true;auth.append(watchWithoutAccount);
-auth.addEventListener('close',()=>{pendingRoutine=null;watchWithoutAccount.hidden=true;});
-window.addEventListener('click',event=>{
- if(user||token||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
- const link=event.target.closest?.('a.routine-detail-link[href]');
- if(!link)return;
- const target=new URL(link.href,location.href);
- if(target.origin!==location.origin||!/^\/(routines|free)\/[a-z0-9-]+\/?$/.test(target.pathname))return;
- event.preventDefault();event.stopImmediatePropagation();
- pendingRoutine=target.href;watchWithoutAccount.hidden=false;openAuth('register');
-},true);
 function renderHeader(){
  renderStandard();
  renderNewsPrompt();
@@ -396,11 +379,7 @@ document.addEventListener('click',async event=>{
   try{await downloadFree(slug);}finally{pendingDownloads.delete(link);link.removeAttribute('aria-busy');}
   return;
  }
- if(!token){
-  if(slug==='routine-04'||slug==='routine-06')openAuth('register');
-  else showDownloadPlans();
-  return;
- }
+ if(!token){openAuth('register');return;}
  pendingDownloads.add(link);link.setAttribute('aria-busy','true');say('Checking download access…');
  try{
   const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/ticket','POST',{});
