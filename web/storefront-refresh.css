@@ -201,3 +201,27 @@ body main.routine-detail-main>.rp-unified-detail>.routine-detail-video{margin:0 
 .rp-news-actions{display:flex;gap:8px;flex-wrap:wrap}
 .rp-news-actions button{min-height:44px}
 body.rp-navigation-shell>.rp-news-prompt{display:none}
+
+/* Keep faces and decks in the homepage thumbnails without cropping playback. */
+body[data-page="home"] #watch-routines .video-choice img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center 48%;
+}
+body[data-page="home"] #watch-routines .video-choice[data-video="6"] img {
+  object-position: center 38%;
+}
+body[data-page="home"] #watch-routines .video-frame video {
+  object-fit: contain;
+  object-position: center;
+}
+@media (min-width: 761px) {
+  body[data-page="home"] #watch-routines .video-layout {
+    max-width: 1060px;
+    margin-inline: auto;
+  }
+}
