@@ -67,7 +67,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=locale-20261118"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=pro-preview-cta-20261118"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -193,7 +193,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261117-download');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=38"><script defer src="/storefront-refresh.js?v=43"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=38"><script defer src="/storefront-refresh.js?v=44"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -295,9 +295,9 @@ async function updatePricePage() {
   const filename=path.join(__dirname,'web','price','index.html');
   let html=await fs.readFile(filename,'utf8');
   html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=38')
-    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=43')
+    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=44')
     .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=14')
-    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=locale-20261118');
+    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=pro-preview-cta-20261118');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');
   await fs.writeFile(filename,html);

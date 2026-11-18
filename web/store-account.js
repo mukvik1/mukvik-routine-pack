@@ -379,6 +379,10 @@ function renderStandard(){
   return url;
  };
  const posterSlugs=new Set(standardPlan.posterSlugs||[]);
+ if(unblur){
+  for(const image of document.querySelectorAll('.rp-lock-media > img:not([data-full-poster-slug])'))setMediaLock(image,true);
+ }
+
  for(const image of document.querySelectorAll('.individual-grid .individual-performance-video[data-full-poster-slug]')){
   const slug=image.dataset.fullPosterSlug;
   if(!unblur||!posterSlugs.has(slug)){
@@ -415,7 +419,7 @@ function renderStandard(){
     if(playing)player.play().catch(()=>{});
    }).catch(()=>{if(playbackEpoch===videoGeneration)setMediaLock(player,false);});
   }
- }else restorePreview();
+ }else {restorePreview();if(unblur)setMediaLock(player,true);}
 }
 // The action is rendered with the player. Ask the server for the entitlement only on click.
 const pendingDownloads=new WeakSet();

@@ -371,9 +371,18 @@
     media.before(wrap);wrap.append(media,link);
     try{if(localStorage.getItem('mukvik_store_session'))wrap.dataset.unlockPending='';}catch{}
   }
-  for(const image of document.querySelectorAll('.individual-grid [data-full-poster-slug]'))markLockedMedia(image,tierFor(image.dataset.fullPosterSlug));
-  const detailVideo=document.querySelector('.routine-detail-panel video[data-routine-lesson],.routine-detail-panel video[src*="-blurred.mp4"]');
-  if(detailVideo)markLockedMedia(detailVideo,tierFor(document.querySelector('[data-routine-download]')?.dataset.routineDownload));
+  for(const image of document.querySelectorAll('.individual-grid .individual-performance-video')){
+    const tier=image.dataset.fullPosterSlug?tierFor(image.dataset.fullPosterSlug):
+      image.closest('article')?.querySelector('.rp-routine-tier-standard')?'standard':null;
+    if(tier&&tier!=='free')markLockedMedia(image,tier);
+  }
+  const detailVideo=document.querySelector('.routine-detail-panel video');
+  const detailTier=tierFor(document.querySelector('[data-routine-download]')?.dataset.routineDownload);
+  if(detailVideo&&!detailVideo.closest('[data-page="free"]')&&
+     !document.querySelector('[data-free-routine-download]')&&detailTier!=='free'&&
+     (detailTier==='standard'||detailVideo.matches('[data-routine-lesson],[src*="-blurred.mp4"]'))){
+    markLockedMedia(detailVideo,detailTier);
+  }
 
   // These controls are constructed after the static page has been read.
   const localize=(node,key=node.textContent.trim())=>{node.dataset.i18n=key;};
