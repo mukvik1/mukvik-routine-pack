@@ -253,8 +253,8 @@ function renderMembershipOffers(){
   }
   section.dataset.visiblePlans=String(visible);
   const title=section.querySelector('.rp-plan-copy h2'),copy=section.querySelector('.rp-plan-copy>p:last-child');
-  if(title)title.textContent=!level?(token?'Checking membership…':'Choose your plan.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.';
-  if(copy)copy.textContent=!level?(token?'Please wait.':'Choose the access that fits your sets. Watch previews anytime.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
+  if(title)title.textContent=T(!level?(token?'Checking membership…':'Choose your plan.'):level==='Free'?'Upgrade your plan.':level==='Pro'?'Upgrade to Ultra.':level==='Ultra'?'You’re on Ultra.':'Admin access.');
+  if(copy)copy.textContent=T(!level?(token?'Please wait.':'Choose the access that fits your sets. Watch previews anytime.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.');
  }
 }
 let libraryGrant=null,libraryPending=null,membershipLoaded=!token;
@@ -325,7 +325,7 @@ function renderStandard(){
   if(!plan){const pending=offer.querySelector('.rp-plan-pending');if(pending)pending.textContent='This plan is not available yet.';continue;}
   offer.querySelector('.rp-plan-name span')?.remove();
   const benefit=offer.querySelector('.rp-plan-features li:last-child');
-  if(benefit)benefit.textContent='Audio downloads with an active subscription';
+  if(benefit){benefit.dataset.i18n='Audio downloads with an active subscription';benefit.textContent=T(benefit.dataset.i18n);}
   offer.querySelector('.rp-plan-pending')?.remove();
   offer.querySelector('[data-standard-cta]')?.remove();
   const panel=el('div',undefined,'rp-standard-cta');

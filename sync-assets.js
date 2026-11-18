@@ -4,7 +4,7 @@ const { importHomePerformance, name: homePerformance } = require('./scripts/impo
 
 const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
 const token = process.env.SITES_BYPASS_TOKEN;
-const files = require('./config/site-assets.json').filter(file => !['store-account.js','video-background.js','video-background.css'].includes(file));
+const files = require('./config/site-assets.json').filter(file => !['i18n.js','store-account.js','video-background.js','video-background.css'].includes(file));
 // Checkout and password-account logic is kept in GitHub; do not overwrite it from the Sites snapshot.
 const storefrontRevision = `sites-v81-video-only-hero-${Date.now()}`;
 
@@ -23,11 +23,19 @@ async function download(relativePath) {
   const destination = path.join(__dirname, 'web', relativePath);
   await fs.mkdir(path.dirname(destination), { recursive: true });
   let bytes = Buffer.from(await response.arrayBuffer());
+  if(relativePath==='messages.json'){
+    const messages=JSON.parse(bytes);
+    Object.assign(messages.uk,require('./config/storefront-uk.json'));
+    bytes=Buffer.from(JSON.stringify(messages));
+  }
+  if(relativePath.endsWith('.html')){
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=14"'));
+  }
   if (relativePath === 'index.html') {
     const html = bytes.toString('utf8');
     const hero = /(<div class="rp-hero-copy"[^>]*>)[\s\S]*?(<div class="rp-actions">)/;
     if (!hero.test(html)) throw new Error('Homepage hero structure changed');
-    bytes = Buffer.from(html.replace(hero, '$1<h1>WATCH.<br>PRACTICE.<br>PERFORM.</h1>$2'));
+    bytes = Buffer.from(html.replace(hero, '$1<h1><span data-i18n="Watch.">WATCH.</span><br><span data-i18n="Practice.">PRACTICE.</span><br><span data-i18n="Perform.">PERFORM.</span></h1>$2'));
   }
   // Keep the hero video, with no package illustration or visible pause control.
   // Retain the hidden button node because the video playback script uses it.
@@ -59,7 +67,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=fast-library-20261118"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=locale-20261118"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -185,7 +193,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261117-download');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=38"><script defer src="/storefront-refresh.js?v=42"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=38"><script defer src="/storefront-refresh.js?v=43"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -282,7 +290,20 @@ body[data-page="routines"] .individual-grid .bundle-offer{margin-top:auto;justif
   console.log(`Downloaded ${relativePath}`);
 }
 
-(async()=>{let next=0;await Promise.all([importHomePerformance(path.join(__dirname,"web","assets","videos")), ...Array.from({length:6},async()=>{while(next<files.length){const file=files[next++];await download(file);}})]);await require('./scripts/download-drive-preview').downloadDrivePreview(process.env,{save:async(name,bytes)=>{const destination=path.join(__dirname,'web','assets','videos',name);await fs.mkdir(path.dirname(destination),{recursive:true});await fs.writeFile(destination,bytes);console.log('Downloaded public preview asset: '+name);}});await require('./scripts/import-free-routines').importFreeRoutines(process.env);await require('./scripts/import-call-me-maybe').importCallMeMaybe(process.env);await require('./scripts/import-free-pack-previews').importFreePackPreviews(process.env);await require('./scripts/sanitize-routine-archives').sanitizeRoutineArchives();await require('./scripts/import-routine-media').importRoutineMedia(process.env);await require('./scripts/remove-legacy-storefront').cleanStorefrontPages(path.join(__dirname,'web'));})().catch((error) => {
+async function updatePricePage() {
+  const homepage=await fs.readFile(path.join(__dirname,'web','index.html'),'utf8');
+  const filename=path.join(__dirname,'web','price','index.html');
+  let html=await fs.readFile(filename,'utf8');
+  html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=38')
+    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=43')
+    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=14')
+    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=locale-20261118');
+  const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
+  if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');
+  await fs.writeFile(filename,html);
+}
+
+(async()=>{let next=0;await Promise.all([importHomePerformance(path.join(__dirname,"web","assets","videos")), ...Array.from({length:6},async()=>{while(next<files.length){const file=files[next++];await download(file);}})]);await updatePricePage();await require('./scripts/download-drive-preview').downloadDrivePreview(process.env,{save:async(name,bytes)=>{const destination=path.join(__dirname,'web','assets','videos',name);await fs.mkdir(path.dirname(destination),{recursive:true});await fs.writeFile(destination,bytes);console.log('Downloaded public preview asset: '+name);}});await require('./scripts/import-free-routines').importFreeRoutines(process.env);await require('./scripts/import-call-me-maybe').importCallMeMaybe(process.env);await require('./scripts/import-free-pack-previews').importFreePackPreviews(process.env);await require('./scripts/sanitize-routine-archives').sanitizeRoutineArchives();await require('./scripts/import-routine-media').importRoutineMedia(process.env);await require('./scripts/remove-legacy-storefront').cleanStorefrontPages(path.join(__dirname,'web'));})().catch((error) => {
   console.error(error.message);
   process.exit(1);
 });

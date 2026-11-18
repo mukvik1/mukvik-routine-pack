@@ -236,10 +236,10 @@
     const actions=document.createElement('div');actions.className='rp-detail-controls';actions.dataset.routineActions='';
     if(player){
       actions.classList.add('rp-detail-controls-pair');
-      const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';
+      const play=document.createElement('button');play.type='button';play.className='store-button';play.textContent='Play';play.dataset.i18n='Play';
       play.addEventListener('click',()=>player.paused?player.play().catch(()=>{}):player.pause());
-      player.addEventListener('play',()=>play.textContent='Pause');
-      for(const event of ['pause','ended'])player.addEventListener(event,()=>play.textContent='Play');
+      player.addEventListener('play',()=>{play.dataset.i18n='Pause';play.textContent=window.RP_I18N?.t('Pause')||'Pause';});
+      for(const event of ['pause','ended'])player.addEventListener(event,()=>{play.dataset.i18n='Play';play.textContent=window.RP_I18N?.t('Play')||'Play';});
       actions.append(play);
     }
     const download=document.createElement('button');
@@ -247,7 +247,7 @@
     download.className='store-button primary';
     download.dataset.routineDownload=slug;
     if(freeSlug)download.dataset.freeRoutineDownload='';
-    download.textContent='Download';
+    download.textContent='Download';download.dataset.i18n='Download';
     const status=document.createElement('span');status.dataset.routineDownloadStatus='';status.setAttribute('role','status');
     actions.append(download,status);
     section.append(actions);
@@ -374,6 +374,20 @@
   for(const image of document.querySelectorAll('.individual-grid [data-full-poster-slug]'))markLockedMedia(image,tierFor(image.dataset.fullPosterSlug));
   const detailVideo=document.querySelector('.routine-detail-panel video[data-routine-lesson],.routine-detail-panel video[src*="-blurred.mp4"]');
   if(detailVideo)markLockedMedia(detailVideo,tierFor(document.querySelector('[data-routine-download]')?.dataset.routineDownload));
+
+  // These controls are constructed after the static page has been read.
+  const localize=(node,key=node.textContent.trim())=>{node.dataset.i18n=key;};
+  for(const [selector,key] of [
+    ['.rp-price-link','Price'],['.rp-get-started','Get Started'],['.rp-routine-intro h1','Individual Routines'],
+    ['.routine-detail-link','OPEN ROUTINE'],['.routine-detail-panel > p a','ROUTINES']
+  ])for(const node of document.querySelectorAll(selector))localize(node,key);
+  for(const node of document.querySelectorAll('.rp-plan-kicker,.rp-plan-edition,.rp-plan-price small,.rp-plan-rate-note,.rp-plan-offer > p:not(.rp-plan-name,.rp-plan-price),.rp-plan-features li,.rp-plan-pending,.rp-offer-free a,.rp-pager-direction,.rp-author h2,.rp-author p,.rp-author a'))localize(node);
+  for(const node of document.querySelectorAll('.rp-video-unlock')){
+    const text=document.createElement('span');
+    text.textContent=node.firstChild.textContent;node.firstChild.replaceWith(text);
+    localize(text);localize(node.querySelector('small'));
+  }
+  window.RP_I18N?.ready.then(()=>window.RP_I18N.apply());
 
   // The plan is inserted by this script, so restore a direct link even when
   // the browser looked for the fragment before the section existed.
