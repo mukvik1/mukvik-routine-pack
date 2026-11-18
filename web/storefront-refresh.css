@@ -225,3 +225,10 @@ body[data-page="home"] #watch-routines .video-frame video {
     margin-inline: auto;
   }
 }
+
+.rp-lock-media{position:relative;width:100%;display:grid;justify-items:center}
+.rp-video-unlock{position:absolute;top:14%;left:50%;transform:translateX(-50%);z-index:1;max-width:92%;width:max-content;padding:8px 12px;border-radius:8px;background:#10192bee;border:1px solid #687bad;color:#fff!important;font-size:clamp(11px,2.6vw,14px);line-height:1.25;text-align:center;text-decoration:none}
+.rp-video-unlock small{display:block;margin-top:3px;color:#bcccff}
+.rp-lock-media[data-unlocked] .rp-video-unlock,.rp-lock-media[data-unlock-pending] .rp-video-unlock{display:none}
+.rp-lock-media[data-unlock-pending]>img{visibility:hidden}
+body[data-page="routines"] .individual-grid .individual-card-layout>.rp-lock-media{padding:0;flex:none;display:grid;justify-items:center}

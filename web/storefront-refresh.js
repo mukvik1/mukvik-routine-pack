@@ -294,6 +294,7 @@
       card.classList.add('rp-tiered-routine');
       const image=isFree?'/assets/free-videos/'+path+'.jpg':'/assets/lesson-previews/pack-'+number+'-blurred.jpg';
       card.innerHTML = badgeFor(tierFor(slug))+'<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="'+image+'"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
+      if(!isFree)card.querySelector('img').dataset.fullPosterSlug=slug;
       card.querySelector('h2').textContent = title;
       fragment.append(card);
     }
@@ -361,6 +362,18 @@
       main?.insertAdjacentHTML('beforeend',plan(false));
     }
   }
+
+  function markLockedMedia(media,tier){
+    const wrap=document.createElement('div');wrap.className='rp-lock-media';
+    const link=document.createElement('a');link.className='rp-video-unlock';link.href='/price/';
+    link.textContent='Subscribe to unlock full video';
+    const label=document.createElement('small');label.textContent=tier==='pro'?'Ultra routine':'Pro routine';link.append(label);
+    media.before(wrap);wrap.append(media,link);
+    try{if(localStorage.getItem('mukvik_store_session'))wrap.dataset.unlockPending='';}catch{}
+  }
+  for(const image of document.querySelectorAll('.individual-grid [data-full-poster-slug]'))markLockedMedia(image,tierFor(image.dataset.fullPosterSlug));
+  const detailVideo=document.querySelector('.routine-detail-panel video[data-routine-lesson],.routine-detail-panel video[src*="-blurred.mp4"]');
+  if(detailVideo)markLockedMedia(detailVideo,tierFor(document.querySelector('[data-routine-download]')?.dataset.routineDownload));
 
   // The plan is inserted by this script, so restore a direct link even when
   // the browser looked for the fragment before the section existed.

@@ -33,6 +33,10 @@ function setup(adminEmail, manifest=packManifest){
    state.row.cancelled_at=new Date();return {rows:[]};
   }
   if(sql.startsWith('INSERT INTO standard_download_tickets')){
+   if(sql.includes("'video:library'")){
+    if(!p[2]&&!(state.row?.customer_id===p[1]&&state.row.paid_until>new Date()))return {rows:[]};
+    return {rows:[{expires_at:new Date(Date.now()+60000)}]};
+   }
    if(!p[4]&&!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.tier)))return {rowCount:0};
    state.tickets.set(p[0],{slug:p[2],admin:p[4]});return {rowCount:1};
   }
@@ -190,4 +194,17 @@ test('verified Free members can download and request original video for the recl
  const response=new PassThrough();response.resume();response.writeHead=status=>{response.status=status;};
  await s.download(response,archive.data.url.split('/').at(-1));
  assert.equal(response.status,200);
+});
+
+test('library grants require an active subscription or a verified administrator',async()=>{
+ const admin='owner@example.test';
+ const {subscription,state}=setup(admin);
+ const request=async who=>{const result={};await subscription.libraryTicket(result,who);return result;};
+ assert.equal((await request(user)).status,403);
+ assert.equal((await request({email:admin,id:'admin'})).status,403);
+ assert.equal((await request({email:admin,id:'admin',email_verified_at:new Date()})).status,200);
+ state.row={customer_id:user.id,tier:'standard',paid_until:new Date(Date.now()+60000)};
+ assert.match((await request(user)).data.url,/^\/api\/v2\/standard\/video\/[\w-]{43}$/);
+ state.row.paid_until=new Date(Date.now()-1000);
+ assert.equal((await request(user)).status,403);
 });

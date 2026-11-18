@@ -156,9 +156,9 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     }
     return r.rows[0];
   }
-  async function status(res, user, refresh = false) {
+  async function status(res, user, refresh = false, cached = false) {
     let row = await latest(pool, user.id);
-    if (row && (!row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
+    if (!cached && row && (!row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
       row = await locked(user.id, async db => {
         const current = await latest(db, user.id);
         if (current.checked_at && Date.now() - +new Date(current.checked_at) < (refresh ? 5000 : 60000)) return current;
@@ -245,6 +245,16 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/'+(media?'video/':'download/')+secret });
   }
+  async function libraryTicket(res, user) {
+    const secret = random();
+    const {rows} = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
+      SELECT $1,$2,'video:library',now()+interval '25 minutes'
+      WHERE $3::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions
+        WHERE customer_id=$2 AND paid_until>now() AND tier IN ('legacy','standard','pro'))
+      RETURNING expires_at`,[sha(secret),user.id,Boolean(user.email_verified_at && adminEmail && user.email===adminEmail)]);
+    if (!rows.length) return reply(res,403,{error:'An active subscription is required.'});
+    return reply(res,200,{url:'/api/v2/standard/video/'+secret,expiresAt:rows[0].expires_at});
+  }
   async function download(res, secret) {
     if (!secretPattern.test(secret)) return reply(res, 404, { error: 'Not found.' });
     const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now() AND t.routine_slug NOT LIKE 'video:%'
@@ -291,24 +301,25 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     zip.end();
     try { await pipeline(zip.outputStream, res); } catch { res.destroy(); }
   }
-  async function video(req, res, secret, poster = false) {
+  async function video(req, res, secret, poster = false, librarySlug = null) {
     if (!secretPattern.test(secret)) return reply(res,404,{error:'Not found.'});
     const range = req.headers.range;
     if (range && !/^bytes=(?:[0-9]{1,15}-[0-9]{0,15}|-[0-9]{1,15})$/.test(range)) {
       return reply(res,416,{error:'Invalid video range.'});
     }
     // Video tickets can serve multiple byte ranges, but each request rechecks access.
-    const r = await pool.query(`SELECT substring(t.routine_slug from 7) AS slug
+    const r = await pool.query(`SELECT CASE WHEN t.routine_slug='video:library' THEN $4 ELSE substring(t.routine_slug from 7) END AS slug
       FROM standard_download_tickets t
       WHERE t.token_hash=$1 AND t.expires_at>now() AND t.routine_slug LIKE 'video:%'
+      AND ((t.routine_slug='video:library')=($4::text IS NOT NULL))
       AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$2 OR substring(t.routine_slug from 7)=ANY($3::text[])) AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
           AND tier IN ('legacy','standard','pro')))`,
-    [sha(secret),adminEmail||null,FREE_PACK_SLUGS]);
+    [sha(secret),adminEmail||null,FREE_PACK_SLUGS,librarySlug]);
     const file = r.rows[0] && fullVideo(r.rows[0].slug);
     if (!file) return reply(res,404,{error:'Video unavailable.'});
     if (poster) {
-      const filename = file.local && file.local.replace(/\.mp4$/, '.jpg');
+      const filename = file.local ? file.local.replace(/\.mp4$/, '.jpg') : /^routine-0[1-6]$/.test(r.rows[0].slug) ? path.join(privateVideoRoot,r.rows[0].slug+'.jpg') : null;
       const stat = filename && await fs.promises.stat(filename).catch(() => null);
       if (!stat?.isFile()) return reply(res,404,{error:'Poster unavailable.'});
       res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':stat.size,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'});
@@ -359,11 +370,11 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   function cleanup() {
     return pool.query('DELETE FROM standard_download_tickets WHERE expires_at <= now()');
   }
-  return { status, checkout, cancel, callback, ticket, download, video, cleanup, catalog: {
+  return { status, checkout, cancel, callback, ticket, libraryTicket, download, video, cleanup, catalog: {
     slugs: [...entries.keys(), ...localArchives.keys()],
     freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
     videoSlugs: [...entries.keys()].filter(slug => fullVideo(slug)),
-    posterSlugs: [...privateVideoSlugs].filter(slug=>entries.has(slug)),
+    posterSlugs: [...entries.keys()].filter(slug=>privateVideoSlugs.has(slug)||(/^routine-0[1-6]$/.test(slug)&&fullVideo(slug))),
     proSlugs: PRO_SLUGS.filter(slug=>entries.has(slug)),
     plans: Object.fromEntries(Object.entries(PLAN_CENTS).map(([tier,priceCents])=>[tier,{priceCents,amountKop:uahKopiykas(priceCents,USD_UAH_RATE)}]))
   } };

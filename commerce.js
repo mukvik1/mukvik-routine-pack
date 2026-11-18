@@ -477,7 +477,7 @@ function createCommerce(settings=process.env,overrides={}){
     const download=/^\/api\/v2\/standard\/download\/([\w-]{43})$/.exec(url.pathname);
     if(req.method==='GET'&&download){await standard.download(res,download[1]);return true;}
     const media=/^\/api\/v2\/standard\/video\/([\w-]{43})$/.exec(url.pathname);
-    if((req.method==='GET'||req.method==='HEAD')&&media){await standard.video(req,res,media[1],url.searchParams.get('poster')==='1');return true;}
+    if((req.method==='GET'||req.method==='HEAD')&&media){await standard.video(req,res,media[1],url.searchParams.get('poster')==='1',url.searchParams.get('routine'));return true;}
 
    }
    const oauthRoute=/^\/api\/v2\/auth\/oauth\/(google|facebook|apple)(\/callback)?$/.exec(url.pathname);
@@ -497,7 +497,7 @@ function createCommerce(settings=process.env,overrides={}){
     if(!standardPublic&&user.email!==adminEmail){response(res,404,{error:'Not found.'});return true;}
     if(!standard){response(res,503,{error:'Standard is not configured on this service.'});return true;}
     if(req.method==='GET'&&url.pathname==='/api/v2/standard/plan'){response(res,200,{...standard.catalog,pilot:!standardPublic});return true;}
-    if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'));return true;}
+    if(req.method==='GET'&&url.pathname==='/api/v2/standard'){await standard.status(res,user,url.searchParams.has('refresh'),url.searchParams.has('cached'));return true;}
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/checkout'){
      if(user.email===adminEmail){response(res,403,{error:'Subscription checkout is not available for administrator accounts.'});return true;}
      const request=await body(req), tier=request?.tier===undefined?'standard':request.tier;
@@ -517,6 +517,7 @@ function createCommerce(settings=process.env,overrides={}){
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}
     const match=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/ticket$/.exec(url.pathname);
     if(req.method==='POST'&&match){await standard.ticket(res,user,match[1]);return true;}
+    if(req.method==='POST'&&url.pathname==='/api/v2/standard/video-library-ticket'){await standard.libraryTicket(res,user);return true;}
     const media=/^\/api\/v2\/standard\/routines\/([a-z0-9-]+)\/video-ticket$/.exec(url.pathname);
     if(req.method==='POST'&&media){await standard.ticket(res,user,media[1],true);return true;}
 

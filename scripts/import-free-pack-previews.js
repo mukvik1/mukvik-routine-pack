@@ -17,6 +17,21 @@ async function importFreePackPreviews(settings, { root = path.join(__dirname, '.
  const token = await auth.getAccessToken();
  const destination = path.join(root, 'assets', 'free-videos');
  await fs.mkdir(destination, { recursive: true });
+ const privateRoot=path.join(root,'..','private-routine-videos');
+ await fs.mkdir(privateRoot,{recursive:true});
+ await Promise.all(require('../config/routine-paths.json').filter(({id})=>!FREE_PACK_SLUGS.includes(id)).map(async ({id})=>{
+  const file=entries.get(id)?.find(entry=>/\.mp4$/i.test(entry.name));
+  if(!file)throw Error('Missing pack video: '+id);
+  const endpoint='https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(file.fileId);
+  const info=await fetch(endpoint+'?fields=thumbnailLink&supportsAllDrives=true',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(30000)});
+  const thumbnail=info.ok&&(await info.json()).thumbnailLink;
+  if(!thumbnail)throw Error('Pack thumbnail unavailable: '+id);
+  const url=new URL(thumbnail);
+  if(url.protocol!=='https:'||!url.hostname.endsWith('.googleusercontent.com'))throw Error('Unexpected pack thumbnail host');
+  const response=await fetch(url,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(30000),redirect:'error'});
+  if(!response.ok||!response.body||!response.headers.get('content-type')?.startsWith('image/'))throw Error('Pack thumbnail download failed: '+id);
+  await pipeline(Readable.fromWeb(response.body),createWriteStream(path.join(privateRoot,id+'.jpg')));
+ }));
  for (const { id, slug } of require('../config/routine-paths.json').filter(routine => FREE_PACK_SLUGS.includes(routine.id))) {
   const file = entries.get(id)?.find(entry => /\.mp4$/i.test(entry.name));
   if (!file) throw Error('Missing Free pack source: ' + id);
@@ -31,6 +46,7 @@ async function importFreePackPreviews(settings, { root = path.join(__dirname, '.
    const output = path.join(destination, slug + '.mp4');
    await exec('ffmpeg', ['-v','error','-y','-i',source,'-map','0:v:0','-map','0:a:0?','-vf','scale=trunc(iw*min(1\\,1280/ih)/2)*2:trunc(ih*min(1\\,1280/ih)/2)*2','-c:v','libx264','-preset','fast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-movflags','+faststart',output], { timeout: 240000 });
    await exec('ffmpeg', ['-v','error','-y','-ss','1','-i',output,'-frames:v','1','-vf','scale=420:-2','-update','1',path.join(destination,slug+'.jpg')], { timeout: 30000 });
+   await fs.copyFile(path.join(destination,slug+'.jpg'),path.join(privateRoot,id+'.jpg'));
    console.log('Imported Free pack preview: ' + slug);
   } finally {
    await fs.rm(temp, { recursive: true, force: true });

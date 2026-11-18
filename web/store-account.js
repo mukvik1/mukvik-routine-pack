@@ -257,6 +257,32 @@ function renderMembershipOffers(){
   if(copy)copy.textContent=!level?(token?'Please wait.':'Choose the access that fits your sets. Watch previews anytime.'):level==='Free'?'Free is active. Choose Pro or Ultra for more downloads.':level==='Pro'?'Ultra is the next level and includes the full library.':level==='Ultra'?'You already have the highest membership level.':'Subscription purchases are not offered to administrators.';
  }
 }
+let libraryGrant=null,libraryPending=null,membershipLoaded=!token;
+function libraryUrl(slug){
+  let saved=libraryGrant;
+  if(!saved)try{saved=JSON.parse(sessionStorage.getItem('rp-video-library'));}catch{}
+  if(saved?.session===token&&Date.parse(saved.expiresAt)>Date.now()+30000)return withSlug(saved.url);
+  if(!libraryPending){
+   const session=token;
+   libraryPending=api('/standard/video-library-ticket','POST',{}).then(grant=>{
+    libraryGrant={...grant,session};
+    try{sessionStorage.setItem('rp-video-library',JSON.stringify(libraryGrant));}catch{}
+    return grant.url;
+   }).finally(()=>{libraryPending=null;});
+  }
+  return libraryPending.then(withSlug);
+  function withSlug(value){
+   const url=new URL(value,API);
+   if(url.origin!==API||!/^\/api\/v2\/standard\/video\/[\w-]{43}$/.test(url.pathname))throw Error('Invalid video URL.');
+   url.searchParams.set('routine',slug);return url;
+  }
+}
+function setMediaLock(media,unlocked){
+ const wrap=media?.closest('.rp-lock-media');
+ if(!wrap)return;
+ delete wrap.dataset.unlockPending;
+ wrap.toggleAttribute('data-unlocked',unlocked);
+}
 function renderStandard(){
  renderMembershipOffers();
  const playbackEpoch=++videoGeneration;
@@ -335,12 +361,18 @@ function renderStandard(){
  const paidUntil=+new Date(standardAccess?.paidUntil);
  const paidActive=standardAccess?.active&&paidUntil>Date.now();
  const unblur=user?.canAuditRoutineDownloads===true||paidActive;
+ if(!unblur&&(membershipLoaded||!token)){
+  try{sessionStorage.removeItem('rp-video-library');}catch{}
+  libraryGrant=null;
+  for(const media of document.querySelectorAll('.rp-lock-media > :is(img,video)'))setMediaLock(media,false);
+ }
  clearTimeout(videoExpiryTimer);
  if(paidActive)videoExpiryTimer=setTimeout(()=>{
   if(+new Date(standardAccess?.paidUntil)<=Date.now()){renderHeader();refreshStandard().then(renderHeader);}
   else renderStandard();
  },Math.min(paidUntil-Date.now()+25,2147483647));
  const ticketUrl=async slug=>{
+  if(unblur)return libraryUrl(slug);
   const result=await api('/standard/routines/'+encodeURIComponent(slug)+'/video-ticket','POST',{});
   const url=new URL(result.url,API);
   if(url.origin!==API||!/^\/api\/v2\/standard\/video\/[\w-]{43}$/.test(url.pathname))throw Error('Invalid video URL.');
@@ -359,9 +391,11 @@ function renderStandard(){
    image.dataset.previewPoster=image.getAttribute('src')||'';
    url.searchParams.set('poster','1');
    image.addEventListener('error',()=>{
-    if(image.src===url.href&&image.dataset.previewPoster){image.src=image.dataset.previewPoster;delete image.dataset.previewPoster;}
+    if(image.src===url.href&&image.dataset.previewPoster){image.src=image.dataset.previewPoster;delete image.dataset.previewPoster;setMediaLock(image,false);}
    },{once:true});
+   image.loading='eager';
    image.src=url.href;
+   setMediaLock(image,true);
   }).catch(()=>{});
  }
  const slug=document.querySelector('[data-routine-download]')?.dataset.routineDownload;
@@ -374,10 +408,12 @@ function renderStandard(){
     player.dataset.previewPoster=player.getAttribute('poster')||'';
     player.dataset.fullVideo='true';
     player.src=url.href;
+    setMediaLock(player,true);
     if(posterSlugs.has(slug)){url.searchParams.set('poster','1');player.poster=url.href;}
     else player.removeAttribute('poster');
+    player.addEventListener('error',()=>{if(player.getAttribute('src')===url.href||player.getAttribute('src')===url.href.replace(/&poster=1$/, '')){restorePreview();setMediaLock(player,false);}},{once:true});
     if(playing)player.play().catch(()=>{});
-   }).catch(()=>{});
+   }).catch(()=>{if(playbackEpoch===videoGeneration)setMediaLock(player,false);});
   }
  }else restorePreview();
 }
@@ -441,9 +477,16 @@ document.addEventListener('languagechange',()=>{renderHeader();renderAuth();rend
 renderHeader();renderAuth();
 async function loadCatalog(){const data=await api('/catalog');publicStandardPlan=standardPlan=data.standard;}
 try{
- await Promise.all([loadCatalog(),token?api('/me').then(value=>{user=value;}).catch(()=>{}):null]);
- await refreshStandard(accountQuery.get('subscription')==='return');renderHeader();
-}catch(e){accountStatus.textContent=e.message;renderHeader();}
+ const returning=accountQuery.get('subscription')==='return';
+ const [, , access]=await Promise.all([
+  loadCatalog(),
+  token?api('/me').then(value=>{user=value;}).catch(()=>{}):null,
+  token&&!returning?api('/standard?cached=1').catch(()=>null):null
+ ]);
+ if(returning||(user?.admin&&!standardPlan))await refreshStandard(returning);
+ else if(user)standardAccess=access;
+ membershipLoaded=true;renderHeader();
+}catch(e){membershipLoaded=true;accountStatus.textContent=e.message;renderHeader();}
 if(accountRequested)await openRequestedAccount();
 if(accountQuery.get('subscription')==='return'&&user&&standardPlan&&!standardAccess?.active){
  let attempts=0;
