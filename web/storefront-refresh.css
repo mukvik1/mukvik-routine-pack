@@ -17,13 +17,6 @@ body.rp-navigation-shell>.rp-snow:not([hidden]){display:block!important}
   .rp-home .rp-hero>.rp-hero-copy h1{max-width:12ch;margin:0 auto 16px;text-align:center;text-wrap:balance}
   .rp-home .rp-hero>.rp-hero-copy .rp-lead{max-width:43ch;margin-inline:auto;text-align:center;text-wrap:pretty}
   .rp-home .rp-hero>.rp-hero-copy .rp-actions,.rp-home .rp-hero>.rp-hero-copy .rp-hero-facts{justify-content:center;margin-inline:auto}
-  body[data-page="home"]>footer{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);grid-template-areas:"brand social" "copy social" "legal legal" "seller seller";column-gap:clamp(36px,5vw,90px);row-gap:14px;padding-inline:max(32px,calc((100vw - 1376px)/2));justify-items:center;text-align:center}
-  body[data-page="home"]>footer>a:first-child{grid-area:brand}
-  body[data-page="home"]>footer>.footer-copy{grid-area:copy;justify-items:center}
-  body[data-page="home"]>footer>.social-links{grid-area:social;justify-content:center}
-  body[data-page="home"]>footer>.legal-links{grid-area:legal;justify-content:center;margin-top:10px}
-  body[data-page="home"]>footer>.seller-line{grid-area:seller}
-  body[data-page="home"]>footer .footer-privacy{justify-content:center}
   .rp-home .rp-hero .rp-ticker{width:100%;overflow:visible;justify-content:center}
   .rp-home .rp-hero .rp-logo-group{width:100%;min-width:0;padding:0;gap:clamp(14px,2vw,24px);flex-direction:column;justify-content:center;animation:none}
   .rp-home .rp-hero .rp-logo-group img{width:auto;max-width:min(100%,240px);height:clamp(32px,3.4vw,46px);object-fit:contain}
@@ -232,3 +225,35 @@ body[data-page="home"] #watch-routines .video-frame video {
 .rp-lock-media[data-unlocked] .rp-video-unlock,.rp-lock-media[data-unlock-pending] .rp-video-unlock{display:none}
 .rp-lock-media[data-unlock-pending]>img{visibility:hidden}
 body[data-page="routines"] .individual-grid .individual-card-layout>.rp-lock-media{padding:0;flex:none;display:grid;justify-items:center}
+
+/* Give every footer group the same center line on every page. */
+body > footer {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+body > footer > :is(a, .footer-copy, .social-links, .legal-links, .seller-line) {
+  grid-column: 1 / -1;
+}
+body > footer > a:first-child { width: auto; }
+body > footer .footer-copy { width: 100%; justify-items: center; }
+body > footer :is(.footer-privacy, .social-links, .legal-links) {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px clamp(14px, 3vw, 28px);
+}
+body > footer :is(.footer-privacy button, .social-links a, .legal-links a) {
+  box-sizing: border-box;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+body > footer > .legal-links { padding-top: 12px; }
