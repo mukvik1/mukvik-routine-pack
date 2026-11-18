@@ -1,5 +1,5 @@
 /* One continuous moving backdrop: navigation, hero and preview heading. */
-body.rp-video-wide{position:relative;isolation:isolate;background:#0c0f18}
+html body.rp-video-wide{position:relative;isolation:isolate;background:#0c0f18}
 .rp-wide-background{position:absolute;top:0;inset-inline:0;width:100%;overflow:hidden;pointer-events:none;z-index:0;background:#0c0f18 url('/assets/videos/poster-1.jpg') center 35%/cover no-repeat}
 .rp-wide-background>.rp-hero-background{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 35%;pointer-events:none}
 .rp-wide-background:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#080c16a8 0%,#0a0e1880 35%,#0c0f1899 78%,#0e1118 100%)}
@@ -28,7 +28,7 @@ body.rp-navigation-shell{overflow:hidden!important;height:100dvh}
 body.rp-navigation-shell>.rp-wide-background{position:fixed!important;height:100vh!important;height:100dvh!important}
 body.rp-navigation-shell>:not(.rp-wide-background):not(.rp-content-frame){display:none!important}
 .rp-content-frame{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;border:0;z-index:2;background:transparent;color-scheme:normal}
-html.rp-embedded-page,html.rp-embedded-page body{background:transparent!important}
+html.rp-embedded-page,html.rp-embedded-page body.rp-video-wide{background:transparent!important}
 html.rp-embedded-page .rp-wide-background,html.rp-embedded-page .rp-hero-background{display:none!important}
 
 .rp-content-frame.rp-frame-pending{visibility:hidden;pointer-events:none}

@@ -7,7 +7,7 @@
    return;
  }
  const home=!!document.querySelector('.rp-home');
- if(!home&&!/^\/(price|routines|free|about)(\/|$)/.test(location.pathname))return;
+ if(!home&&!/^\/(price|routines|free|about|legal)(\/|$)/.test(location.pathname))return;
  let video=document.querySelector('.rp-hero-background');
  if(!video){video=document.createElement('video');video.className='rp-hero-background';video.muted=true;video.loop=true;video.autoplay=true;video.playsInline=true;video.preload='none';video.poster='/assets/videos/poster-1.jpg';video.dataset.backgroundSrc='/assets/videos/hero-background.mp4';video.setAttribute('playsinline','');video.setAttribute('aria-hidden','true');video.tabIndex=-1;}
  const heading=document.querySelector('.rp-software');
@@ -26,7 +26,7 @@
  sync();
  // Keep the video document alive while each page retains its own scripts and account flow.
  const initialURL=location.href,initialTitle=document.title;let frame=null,pending=null,initialScroll=0;
- const allowed=url=>url.origin===location.origin && /^\/(?:price|routines|free|about)?\/?$/.test(url.pathname);
+ const allowed=url=>url.origin===location.origin && /^\/(?:price|routines|free|about|legal\/(?:seller|privacy|terms|refunds|delivery))?\/?$/.test(url.pathname);
  function showFrame(url,fromHistory=false){
    pending?.remove();
    if(!frame)initialScroll=scrollY;
