@@ -265,3 +265,6 @@ body > footer > .legal-links { padding-top: 12px; }
 .rp-language-panel button:is(:hover,:focus-visible,[aria-pressed="true"]){background:#274573}
 
 [data-language-select]{appearance:none;-webkit-appearance:none;background-image:none!important}
+
+/* The catalogue stylesheet also draws a chevron on the wrapper. */
+.site-header .language-switch::after{content:none!important;display:none!important}
