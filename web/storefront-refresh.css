@@ -268,3 +268,30 @@ body > footer > .legal-links { padding-top: 12px; }
 
 /* The catalogue stylesheet also draws a chevron on the wrapper. */
 .site-header .language-switch::after{content:none!important;display:none!important}
+
+@media (min-width:1000px){
+  body .rp-home .rp-hero{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:auto auto;
+    column-gap:clamp(36px,5vw,90px);
+    row-gap:clamp(20px,3vw,42px);
+    align-content:center;
+  }
+  .rp-home .rp-hero>.rp-hero-copy{display:contents}
+  .rp-home .rp-hero>.rp-hero-copy h1{
+    grid-area:1 / 1;
+    align-self:center;
+    justify-self:center;
+    margin:0;
+    max-width:100%;
+  }
+  .rp-home .rp-hero>.rp-hero-copy .rp-actions{
+    grid-area:2 / 1;
+    justify-self:center;
+    margin:0;
+  }
+  .rp-home .rp-hero>.rp-software{
+    align-self:center;
+    justify-self:center;
+  }
+}
