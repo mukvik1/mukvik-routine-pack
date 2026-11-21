@@ -295,3 +295,45 @@ body > footer > .legal-links { padding-top: 12px; }
     justify-self:center;
   }
 }
+
+/* One card treatment for Free, Pro and Ultra. */
+body[data-page="routines"] .coming-grid.individual-grid > article.rp-tiered-routine{
+  position:relative;isolation:isolate;overflow:hidden;
+  padding:0!important;gap:0;border-radius:18px!important;
+  border-color:#34415c!important;
+  background:linear-gradient(155deg,#192337,#101520 72%)!important;
+  box-shadow:0 12px 28px #0508124d!important;
+}
+body[data-page="routines"] .coming-grid.individual-grid > article.rp-tiered-routine > .rp-routine-tier{
+  position:absolute;z-index:2;inset:12px 12px auto auto;border-radius:999px;
+  box-shadow:0 2px 8px #0006;
+}
+body[data-page="routines"] .individual-grid .individual-card-layout{
+  display:flex;flex-direction:column;align-items:stretch;gap:0;height:100%;
+}
+body[data-page="routines"] .individual-grid .individual-card-layout > .rp-card-media{
+  display:grid;place-items:center;position:relative;flex:none;width:100%;
+  aspect-ratio:4 / 3;padding:0;overflow:hidden;
+  border-bottom:1px solid #35415a;
+  background:radial-gradient(ellipse at 50% 44%,#39496b 0%,#202b41 42%,#151d2d 82%);
+}
+body[data-page="routines"] .individual-grid .rp-card-media > .individual-performance-video{
+  width:100%!important;height:100%!important;min-height:0;max-width:none;
+  aspect-ratio:auto;object-fit:contain;border:0;border-radius:0;background:transparent;
+}
+body[data-page="routines"] .individual-grid .individual-card-layout > div:not(.rp-card-media){
+  display:flex;flex:1;flex-direction:column;box-sizing:border-box;width:100%;
+  padding:16px clamp(14px,1.6vw,22px) 18px;
+}
+body[data-page="routines"] .individual-grid .individual-card-layout h2{
+  margin:0 0 12px;text-align:start;text-wrap:balance;
+}
+body[data-page="routines"] .individual-grid .routine-detail-link{
+  display:flex;justify-content:space-between;align-items:center;min-height:44px;
+  margin-top:auto;padding:8px 12px;box-sizing:border-box;
+  border:1px solid #395584;border-radius:9px;background:#1a3054;color:#f4f7ff;
+  text-align:start;text-decoration:none;
+}
+body[data-page="routines"] .individual-grid .routine-detail-link:is(:hover,:focus-visible){
+  background:#254d87;border-color:#789fe1;color:white;
+}

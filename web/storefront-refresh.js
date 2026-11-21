@@ -375,6 +375,12 @@
     const tier=image.dataset.fullPosterSlug?tierFor(image.dataset.fullPosterSlug):
       image.closest('article')?.querySelector('.rp-routine-tier-standard')?'standard':null;
     if(tier&&tier!=='free')markLockedMedia(image,tier);
+    const existing=image.closest('.rp-lock-media');
+    if(existing)existing.classList.add('rp-card-media');
+    else{
+      const media=document.createElement('div');
+      media.className='rp-card-media';image.before(media);media.append(image);
+    }
   }
   const detailVideo=document.querySelector('.routine-detail-panel video');
   const detailTier=tierFor(document.querySelector('[data-routine-download]')?.dataset.routineDownload);
