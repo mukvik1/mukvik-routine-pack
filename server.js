@@ -181,6 +181,10 @@ function serveStatic(req, res, pathname) {
     const compressible = size >= 1024 && /^(?:text\/|image\/svg\+xml)/.test(contentType);
     const etag = `W/"${size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
     const headers = { 'Accept-Ranges': 'bytes', 'Cache-Control': isHtml ? 'public, no-cache' : relativePath.startsWith('assets/') ? 'public, max-age=3600' : 'public, max-age=300', 'Content-Type': contentType, 'X-Content-Type-Options': 'nosniff', ETag: etag };
+    if (['legal/seller/index.html','merchant-config.json'].includes(path.relative(root,filePath))) {
+      headers['X-Robots-Tag'] = 'noindex';
+      headers['Cache-Control'] = 'no-store';
+    }
     if (compressible) headers.Vary = [res.getHeader('Vary'), 'Accept-Encoding'].filter(Boolean).join(', ');
     const validators = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim().replace(/^W\//, ''));
     if (validators.includes('*') || validators.includes(etag.slice(2))) return res.writeHead(304, headers).end();

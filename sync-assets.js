@@ -23,6 +23,16 @@ async function download(relativePath) {
   const destination = path.join(__dirname, 'web', relativePath);
   await fs.mkdir(path.dirname(destination), { recursive: true });
   let bytes = Buffer.from(await response.arrayBuffer());
+  if(relativePath==='merchant-config.json'){
+    const config=JSON.parse(bytes);
+    delete config.supportPhone;
+    bytes=Buffer.from(JSON.stringify(config));
+  }
+  if(relativePath==='legal/seller/index.html'){
+    bytes=Buffer.from(bytes.toString('utf8').replace(
+      /<dt\b[^>]*>[^<]*<\/dt>\s*<dd\b[^>]*\bdata-merchant="supportPhone"[^>]*>[\s\S]*?<\/dd>/g,''));
+  }
+
   if(relativePath==='messages.json'){
     const messages=JSON.parse(bytes);
     Object.assign(messages.uk,require('./config/storefront-uk.json'));
