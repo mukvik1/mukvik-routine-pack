@@ -337,3 +337,8 @@ body[data-page="routines"] .individual-grid .routine-detail-link{
 body[data-page="routines"] .individual-grid .routine-detail-link:is(:hover,:focus-visible){
   background:#254d87;border-color:#789fe1;color:white;
 }
+
+body[data-page="routines"] .individual-grid .routine-includes{display:none}
+@media (min-width:1024px) and (hover:hover) and (pointer:fine){
+  body[data-page="routines"] .individual-grid > article:has(a.routine-detail-link[href]){cursor:pointer}
+}

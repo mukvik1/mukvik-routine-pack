@@ -335,6 +335,15 @@
       addFreeRoutines(grid);
       grid.insertAdjacentHTML('beforebegin','<div class="rp-routine-intro"><h1>Individual Routines</h1></div>');
       for(const link of grid.querySelectorAll('a.routine-detail-link'))link.textContent='Open Routine';
+      grid.querySelectorAll('.routine-includes').forEach(node=>node.remove());
+      const desktopCards=matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)');
+      grid.addEventListener('click',event=>{
+        if(!desktopCards.matches||event.defaultPrevented||event.button!==0||
+           event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||
+           event.target.closest('a,button,input,select,textarea,summary,video[controls]'))return;
+        const card=event.target.closest('article');
+        if(card?.parentElement===grid)card.querySelector('a.routine-detail-link[href]')?.click();
+      });
       for(const video of grid.querySelectorAll('video[poster]')){
         const poster=document.createElement('img');poster.className=video.className;poster.src=video.poster;poster.alt='';poster.loading='lazy';video.replaceWith(poster);
       }
