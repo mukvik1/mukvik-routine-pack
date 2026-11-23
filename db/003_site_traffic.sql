@@ -7,3 +7,16 @@ CREATE TABLE IF NOT EXISTS site_traffic (
   PRIMARY KEY (visit_day, visitor_hash, section)
 );
 CREATE INDEX IF NOT EXISTS site_traffic_day_idx ON site_traffic(visit_day);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'site_traffic'::regclass AND conname = 'site_traffic_storefront_section_check'
+  ) THEN
+    ALTER TABLE site_traffic DROP CONSTRAINT IF EXISTS site_traffic_section_check;
+    ALTER TABLE site_traffic ADD CONSTRAINT site_traffic_storefront_section_check
+      CHECK (section IN ('home','packs','routines','free','about','legal','price'));
+  END IF;
+END
+$$;

@@ -10,6 +10,7 @@ const kyivDate=()=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:
 function today(){const parts=kyivDate();return `${parts.year}-${parts.month}-${parts.day}`;}
 function sectionFor(raw){
  if(raw==='/')return 'home';
+ if(/^\/price(?:\/index\.html|\/)?$/.test(raw))return 'price';
  if(raw==='/about/')return 'about';
  for(const section of ['packs','routines','free','legal'])if(raw===`/${section}/`||raw.startsWith(`/${section}/`))return section;
  return null;
@@ -58,9 +59,9 @@ async function summary(pool){
 async function report(pool,days=0){
  if(![0,1,7,30].includes(days))days=7;
  const r=await pool.query(`SELECT COUNT(DISTINCT visitor_hash)::int AS people,COALESCE(SUM(views),0)::int AS views FROM site_traffic WHERE ($1::int=0 OR visit_day >= (now() AT TIME ZONE 'Europe/Kyiv')::date-($1::int-1)) AND visit_day <= (now() AT TIME ZONE 'Europe/Kyiv')::date`,[days]);
- const pages=await pool.query(`SELECT section,SUM(views)::int AS views FROM site_traffic WHERE ($1::int=0 OR visit_day >= (now() AT TIME ZONE 'Europe/Kyiv')::date-($1::int-1)) AND visit_day <= (now() AT TIME ZONE 'Europe/Kyiv')::date GROUP BY section ORDER BY views DESC,section LIMIT 6`,[days]);
+ const pages=await pool.query(`SELECT section,SUM(views)::int AS views FROM site_traffic WHERE ($1::int=0 OR visit_day >= (now() AT TIME ZONE 'Europe/Kyiv')::date-($1::int-1)) AND visit_day <= (now() AT TIME ZONE 'Europe/Kyiv')::date GROUP BY section ORDER BY views DESC,section LIMIT 7`,[days]);
  const first=await pool.query('SELECT min(visit_day)::text AS first FROM site_traffic');
- const labels={home:'Главная',packs:'Паки',routines:'Рутины',free:'Бесплатные рутины',about:'Об авторе',legal:'Документы'};
+ const labels={home:'Главная',packs:'Паки',routines:'Рутины',price:'Тарифы',free:'Бесплатные рутины',about:'Об авторе',legal:'Документы'};
  const x=r.rows[0];
  return ['📊 Routine Pack · посещаемость',days===0?'📅 За всё время':days===1?'📅 Сегодня · Киев':`📅 Последние ${days} дней · Киев`,'',`👥 Посетители: ${x.people} (приблизительно)`,`👁 Просмотры: ${x.views}`,'','📄 Разделы сайта',...pages.rows.map(p=>`${labels[p.section]||p.section} — ${p.views}`),'',first.rows[0]?.first?'📍 Данные с '+first.rows[0].first:'⏳ Посещений пока нет.','Один человек с разных устройств может учитываться несколько раз.'].join('\n');
 }

@@ -491,6 +491,21 @@ function createCommerce(settings=process.env,overrides={}){
    if(req.method==='POST'&&['/api/v2/auth/code/start','/api/v2/auth/code/verify','/api/v2/auth/start','/api/v2/auth/redeem'].includes(url.pathname)){response(res,410,{error:'Use password sign-in or password recovery.'});return true;}
    if(req.method==='GET'&&url.pathname==='/api/v2/auth/providers'){response(res,200,Object.fromEntries(Object.entries(providerConfig).map(([key,c])=>[key,Boolean(c.client&&c.secret)])));return true;}
    if(req.method==='GET'&&url.pathname.startsWith('/api/v2/download/')){await download(req,res,url.pathname.split('/')[4]);return true;}
+   const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
+   if(req.method==='GET'&&freeDownload){
+    const slug=freeDownload[1];
+    if(!freeRoutines.has(slug)){
+     if(standard?.catalog.freeSlugs.includes(slug))await standard.downloadFreePack(res,slug);
+     else response(res,404,{error:'File unavailable.'});
+     return true;
+    }
+    const filename=freePath.join(overrides.freeDownloadsRoot||freePath.join(__dirname,'web','downloads'),slug+'.zip');
+    const stat=await freeFiles.promises.stat(filename).catch(()=>null);
+    if(!stat?.isFile()){response(res,503,{error:'File unavailable.'});return true;}
+    res.writeHead(200,{'Content-Type':'application/zip','Content-Length':stat.size,'Content-Disposition':'attachment; filename="'+slug+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+    try{await pipeline(freeFiles.createReadStream(filename),res);}catch{res.destroy();}
+    return true;
+   }
    const user=await session(req);
    if(!user){response(res,401,{error:'Sign in required.'});return true;}
    if(url.pathname.startsWith('/api/v2/standard/')||url.pathname==='/api/v2/standard'){
@@ -525,7 +540,6 @@ function createCommerce(settings=process.env,overrides={}){
    if(subscriptionOnly&&req.method==='POST'&&(url.pathname==='/api/v2/orders'||/^\/api\/v2\/orders\/[a-f0-9-]+\/monobank$/.test(url.pathname))){
     response(res,410,{error:'New one-time purchases are closed. Choose a subscription to access the routine library.'});return true;
    }
-   const freeDownload=/^\/api\/v2\/free\/([a-z0-9-]+)\/download$/.exec(url.pathname);
    if(req.method==='POST'&&freeDownload){
     if(!user.email_verified_at){response(res,403,{error:'Confirm your email before downloading. Register or reset your password to confirm it.',code:'EMAIL_VERIFICATION_REQUIRED'});return true;}
     const slug=freeDownload[1];

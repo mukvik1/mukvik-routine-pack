@@ -35,7 +35,16 @@ async function download(relativePath) {
 
   if(relativePath==='messages.json'){
     const messages=JSON.parse(bytes);
-    Object.assign(messages.uk,require('./config/storefront-uk.json'));
+    Object.assign(messages.uk,require('./config/storefront-uk.json'),{
+      'Downloads without an account':'Завантаження без акаунта',
+      'Watch previews and download Free routines without an account.':'Дивіться прев’ю та завантажуйте Free-рутини без акаунта.',
+      'Routine Pack is Mukvik’s library of DJ routines for practicing wordplay, tone play and transitions.':'Routine Pack — бібліотека DJ-рутин Mukvik для практики вордплею, тонплею та переходів.',
+      'Unlock Pro routines with audio downloads and full videos where available.':'Відкрийте Pro-рутини з аудіофайлами та повними відео, де вони доступні.',
+      'Get the full library, including Ultra exclusives.':'Отримайте всю бібліотеку разом з ексклюзивами Ultra.',
+      'Could not check plan availability.':'Не вдалося перевірити доступність тарифів.',
+      'Subscription checkout is temporarily unavailable.':'Оформлення підписки тимчасово недоступне.',
+      'Try again':'Спробувати ще раз'
+    });
     const rows=(await fs.readFile(path.join(__dirname,'config/storefront-asia.txt'),'utf8')).trim().split(/\r?\n/);
     for(const row of rows){
       const [key,...translations]=row.split('|');
@@ -49,7 +58,7 @@ async function download(relativePath) {
     bytes=Buffer.from(JSON.stringify(messages));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=16"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=17"'));
   }
   if (relativePath === 'index.html') {
     const html = bytes.toString('utf8');
@@ -87,7 +96,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=pro-preview-cta-20261118"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=plan-return-20261123"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -213,7 +222,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261118-legal-nav');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=44"><script defer src="/storefront-refresh.js?v=46"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=44"><script defer src="/storefront-refresh.js?v=47"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -315,10 +324,10 @@ async function updatePricePage() {
   const filename=path.join(__dirname,'web','price','index.html');
   let html=await fs.readFile(filename,'utf8');
   html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=44')
-    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=46')
+    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=47')
     .replace(/(video-background\.(?:js|css))\?[^"]+/g,'$1?v=20261118-legal-nav')
-    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=16')
-    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=pro-preview-cta-20261118');
+    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=17')
+    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=plan-return-20261123');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');
   await fs.writeFile(filename,html);

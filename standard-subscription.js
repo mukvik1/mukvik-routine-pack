@@ -263,7 +263,14 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
         AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
       RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
-    const slug = r.rows[0].routine_slug, list = entries.get(slug)?.filter(file => isRoutineAudio(file.name));
+    return streamRoutine(res, r.rows[0].routine_slug);
+  }
+  async function downloadFreePack(res, slug) {
+    if (!FREE_PACK_SLUGS.includes(slug)) return reply(res,404,{error:'Routine not found.'});
+    return streamRoutine(res, slug);
+  }
+  async function streamRoutine(res, slug) {
+    const list = entries.get(slug)?.filter(file => isRoutineAudio(file.name));
     if (localArchives.has(slug)) {
       const filename=path.join(archiveRoot,slug+'.zip');
       let stat;
@@ -370,7 +377,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   function cleanup() {
     return pool.query('DELETE FROM standard_download_tickets WHERE expires_at <= now()');
   }
-  return { status, checkout, cancel, callback, ticket, libraryTicket, download, video, cleanup, catalog: {
+  return { status, checkout, cancel, callback, ticket, libraryTicket, download, downloadFreePack, video, cleanup, catalog: {
     slugs: [...entries.keys(), ...localArchives.keys()],
     freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
     videoSlugs: [...entries.keys()].filter(slug => fullVideo(slug)),

@@ -15,7 +15,8 @@ const accountQuery=new URLSearchParams(location.search);
 const orderId=accountQuery.get('orderId');
 const returnedOrder=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(orderId||'')?orderId:null;
 let accountRequested=accountQuery.get('account')==='1';
-let pendingFree=null;
+let intendedTier=null;
+let catalogState='loading';
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(label,fn,cls='store-button')=>{const b=el('button',T(label),cls);b.type='button';b.addEventListener('click',fn);return b;};
 function dialog(id,title){const d=el('dialog',undefined,'store-dialog');d.id=id;const head=el('div',undefined,'store-dialog-head'),h=el('h2',T(title));h.dataset.title=title;const close=button('Close',()=>d.close(),'store-close');close.textContent='×';close.setAttribute('aria-label',T('Close'));head.append(h,close);d.append(head);d.setAttribute('aria-labelledby',id+'-title');h.id=id+'-title';d.addEventListener('click',e=>{if(e.target===d)d.close();});document.body.append(d);return d;}
@@ -61,33 +62,20 @@ function renderAuth(){
  if(!registration&&!reset)authBody.append(button('Forgot password?',()=>{mode='reset';renderAuth();},'store-text-button'));
  if(reset)authBody.append(button('Back to sign in',()=>{mode='login';renderAuth();},'store-text-button'));
 }
-const freeStatus=el('p','','store-muted');freeStatus.setAttribute('role','status');(document.querySelector('[data-routine-actions]:has([data-free-routine-download])')||document.querySelector('.free-catalog'))?.append(freeStatus);
 async function afterLogin(){
  auth.close();
- if(pendingFree){const slug=pendingFree;pendingFree=null;await downloadFree(slug);return;}
+ if(intendedTier){
+  const tier=intendedTier;intendedTier=null;
+  const section=document.querySelector('.rp-plan-tiers');
+  const offer=section?.querySelector('.rp-plan-offer[data-plan-tier="'+tier+'"]:not([hidden])');
+  const action=offer?.querySelector('[data-standard-cta] button');
+  if(offer||section){(offer||section).scrollIntoView({block:'center'});action?.focus({preventScroll:true});return;}
+ }
  if(accountRequested){await openRequestedAccount();return;}
  renderAccount();
  show(account);
 }
-async function downloadFree(slug){
- if(!user){pendingFree=slug;openAuth('register');return;}
- freeStatus.textContent=T('Please wait…');
- try{
-  const response=await fetch(API+'/api/v2/free/'+encodeURIComponent(slug)+'/download',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
-  if(response.status===401){token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();pendingFree=slug;openAuth('login');freeStatus.textContent='';return;}
-  if(response.status===403){const result=await response.json();if(result.code==='EMAIL_VERIFICATION_REQUIRED'){pendingFree=slug;openAuth('register');error.textContent=T(result.error);freeStatus.textContent='';return;}}
-  if(!response.ok||!String(response.headers.get('content-type')).startsWith('application/zip'))throw Error(T('Service temporarily unavailable.'));
-  const blob=await response.blob(),href=URL.createObjectURL(blob),a=el('a');a.href=href;a.download=slug+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),60000);
-  freeStatus.textContent=T('Download started. Save the ZIP file.');
- }catch(e){freeStatus.textContent=e.message;}
-}
-document.addEventListener('click',event=>{
- const link=event.target.closest?.('a[data-direct-download]');if(!link)return;
- event.preventDefault();event.stopImmediatePropagation();
- const url=new URL(link.href),match=/^\/downloads\/([a-z0-9-]+)\.zip$/.exec(url.pathname);
- if(match)downloadFree(match[1]);
-},true);
-function openAuth(value='login'){mode=value;challenge=null;renderAuth();show(auth);}
+function openAuth(value='login',tier=null){intendedTier=tier;mode=value;challenge=null;renderAuth();show(auth);}
 function memberLevel(){
  if(!user)return null;
  if(user.admin)return 'Admin';
@@ -246,10 +234,6 @@ function renderMembershipOffers(){
    const showOffer=!level?!token:level==='Free'?Boolean(tier):level==='Pro'&&tier==='pro';
    offer.hidden=!showOffer;
    if(showOffer)visible++;
-   if(!tier&&!offer.querySelector('[data-free-join]')){
-    const join=button('Create your Free account',()=>openAuth('register'),'store-button primary');
-    join.dataset.freeJoin='';offer.querySelector('a')?.replaceWith(join);
-   }
   }
   section.dataset.visiblePlans=String(visible);
   const title=section.querySelector('.rp-plan-copy h2'),copy=section.querySelector('.rp-plan-copy>p:last-child');
@@ -300,9 +284,10 @@ function renderStandard(){
   restorePreview();
   document.querySelectorAll('[data-standard-cta]').forEach(n=>n.remove());
   for(const offer of document.querySelectorAll('.rp-plan-offer:not(.rp-offer-free)')){
-   const name=offer.querySelector('.rp-plan-name');
-   if(name&&!name.querySelector('span'))name.append(' ',el('span','COMING SOON'));
-   if(!offer.querySelector('a,.rp-plan-pending'))offer.append(el('span','Subscription checkout is not open yet.','rp-plan-pending'));
+   let pending=offer.querySelector('.rp-plan-pending');
+   if(!pending){pending=el('div',undefined,'rp-plan-pending');pending.setAttribute('role','status');offer.append(pending);}
+   pending.replaceChildren(el('span',T(catalogState==='loading'?'Checking availability…':catalogState==='error'?'Could not check plan availability.':'Subscription checkout is temporarily unavailable.')));
+   if(catalogState==='error')pending.append(button('Try again',retryCatalog));
   }
   return;
  }
@@ -331,7 +316,7 @@ function renderStandard(){
   const panel=el('div',undefined,'rp-standard-cta');
   panel.dataset.standardCta='';
   if(!user){
-   panel.append(button('Create your '+(tier==='pro'?'Ultra':'Pro')+' account',()=>openAuth('register'),'store-button primary'));
+   panel.append(button('Create your '+(tier==='pro'?'Ultra':'Pro')+' account',()=>openAuth('register',tier),'store-button primary'));
    offer.append(panel);continue;
   }
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
@@ -423,11 +408,6 @@ function renderStandard(){
 }
 // The action is rendered with the player. Ask the server for the entitlement only on click.
 const pendingDownloads=new WeakSet();
-let freeDownloadAfterFollow=null;
-document.getElementById('confirm-follow')?.addEventListener('click',()=>{
- const link=freeDownloadAfterFollow;freeDownloadAfterFollow=null;
- if(link)queueMicrotask(()=>{if(document.getElementById('follow-wall')?.hidden)link.click();});
-});
 function showDownloadPlans(){
  const plans=document.getElementById('standard-plan');
  if(plans){plans.scrollIntoView({block:'start'});return;}
@@ -435,19 +415,12 @@ function showDownloadPlans(){
 }
 document.addEventListener('click',async event=>{
  const link=event.target.closest?.('[data-routine-download]');
- if(!link||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+ if(!link||link.hasAttribute('data-free-routine-download')||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
  event.preventDefault();
  if(pendingDownloads.has(link))return;
  const slug=link.dataset.routineDownload;
  const status=link.parentElement.querySelector('[data-routine-download-status]');
  const say=message=>{if(status)status.textContent=message;};
- if(link.hasAttribute('data-free-routine-download')){
-  const follow=document.getElementById('follow-wall');
-  if(follow&&!follow.hidden){freeDownloadAfterFollow=link;follow.scrollIntoView({block:'start'});return;}
-  pendingDownloads.add(link);link.setAttribute('aria-busy','true');
-  try{await downloadFree(slug);}finally{pendingDownloads.delete(link);link.removeAttribute('aria-busy');}
-  return;
- }
  if(!token){openAuth('register');return;}
  pendingDownloads.add(link);link.setAttribute('aria-busy','true');say('Checking download access…');
  try{
@@ -479,7 +452,17 @@ function socialLogin(provider){const popup=window.open(API+'/api/v2/auth/oauth/'
 document.querySelectorAll('[data-auth-open]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();openAuth(b.dataset.authOpen);}));
 document.addEventListener('languagechange',()=>{renderHeader();renderAuth();renderAccount();});
 renderHeader();renderAuth();
-async function loadCatalog(){const data=await api('/catalog');publicStandardPlan=standardPlan=data.standard;}
+async function loadCatalog(){
+ catalogState='loading';
+ try{const data=await api('/catalog');publicStandardPlan=standardPlan=data.standard;catalogState='loaded';}
+ catch(error){catalogState='error';throw error;}
+}
+async function retryCatalog(){
+ const pending=loadCatalog();
+ renderHeader();
+ try{await pending;if(user)await refreshStandard();}catch{}
+ renderHeader();
+}
 try{
  const returning=accountQuery.get('subscription')==='return';
  const [, , access]=await Promise.all([

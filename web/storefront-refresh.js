@@ -56,10 +56,10 @@
       '<p class="rp-plan-price">$' + price + ' <small>/ month</small></p><p class="rp-plan-rate-note">Same price on renewal.</p><p>' + description + '</p>' +
       '<ul class="rp-plan-features"><li>' + (tier === 'pro' ? 'All Pro routines plus ' + tierCounts.pro + ' Ultra routines' : tierCounts.standard + ' Pro routines') +
       '</li><li>Video previews</li><li>Downloads with an active subscription</li></ul>' +
-      '<span class="rp-plan-pending">Checking availability…</span></div>';
+      '<div class="rp-plan-pending" role="status">Checking availability…</div></div>';
     const free = '<div class="rp-plan-offer rp-offer-free" hidden><p class="rp-plan-name">Free</p><span class="rp-plan-edition">FREE ROUTINES</span>' +
-      '<p class="rp-plan-price">$0</p><p class="rp-plan-rate-note">Activated when you create an account.</p><p>Get started with the free routines.</p>' +
-      '<ul class="rp-plan-features"><li>' + tierCounts.free + ' free routines</li><li>Video previews</li><li>Downloads with a free account</li></ul>' +
+      '<p class="rp-plan-price">$0</p><p>Get started with the free routines.</p>' +
+      '<ul class="rp-plan-features"><li>' + tierCounts.free + ' free routines</li><li>Video previews</li><li>Downloads without an account</li></ul>' +
       '<a class="store-button" href="/routines/#free-routines">Browse free routines</a></div>';
     return '<section class="rp-plan rp-plan-tiers' + (home ? ' rp-plan-home' : '') + '" id="standard-plan" aria-labelledby="rp-plan-title">' +
       '<div class="rp-plan-copy"><p class="rp-plan-kicker">THE ROUTINE LIBRARY</p><h2 id="rp-plan-title">Choose your plan.</h2>' +
@@ -124,7 +124,7 @@
       preview.id='watch-routines';
       preview.style.scrollMarginTop='96px';
     }
-    if(actions) actions.innerHTML='<a class="rp-get-started" href="/routines/">Get Started</a>';
+    if(actions) actions.innerHTML='<a class="rp-get-started" href="/price/">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
       ['VirtualDJ', 'virtualdj-white.svg'], ['TRAKTOR', 'traktor.svg'],
@@ -242,8 +242,11 @@
       for(const event of ['pause','ended'])player.addEventListener(event,()=>{play.dataset.i18n='Play';play.textContent=window.RP_I18N?.t('Play')||'Play';});
       actions.append(play);
     }
-    const download=document.createElement('button');
-    download.type='button';
+    const download=document.createElement(freeSlug?'a':'button');
+    if(freeSlug){
+      download.href='/api/v2/free/'+encodeURIComponent(slug)+'/download';
+      download.download=slug+'.zip';
+    }else download.type='button';
     download.className='store-button primary';
     download.dataset.routineDownload=slug;
     if(freeSlug)download.dataset.freeRoutineDownload='';
@@ -272,12 +275,7 @@
   const freeSlug=/^\/free\/([a-z0-9-]+)(?:\/index\.html|\/)?$/.exec(location.pathname)?.[1];
   if(freeDetail&&freeSlug){
     normalizeRoutineDetail(freeDetail,'free');
-    const instructions=document.querySelector('#follow-wall p:not(.eyebrow)');
-    if(instructions){
-      instructions.removeAttribute('data-i18n');
-      instructions.removeAttribute('data-follow-question');
-      instructions.textContent='To get your free download, follow @mukvik.ofc on Instagram and sign in or create a free account.';
-    }
+    document.getElementById('follow-wall')?.remove();
     addRoutineActions(freeDetail,freeSlug,true);
     addRoutinePager(freeDetail);
   }
@@ -300,8 +298,23 @@
     }
     grid.prepend(fragment);
   }
-  if (/^\/price\/?$/.test(location.pathname)) {
+  if (/^\/price(?:\/index\.html|\/)?$/.test(location.pathname)) {
     document.querySelector('main')?.insertAdjacentHTML('beforeend',plan(false));
+    const path='/price/';
+    if(!navigator.sendBeacon?.('/api/v2/traffic',path)){
+      fetch('/api/v2/traffic',{method:'POST',body:path,keepalive:true}).catch(()=>{});
+    }
+  }
+  if (/^\/about(?:\/index\.html|\/)?$/.test(location.pathname)) {
+    const lead=document.querySelector('.about-hero .lead');
+    const grid=document.querySelector('.about-grid');
+    if(lead){
+      lead.textContent='Routine Pack is Mukvik’s library of DJ routines for practicing wordplay, tone play and transitions.';
+      lead.dataset.i18n=lead.textContent;
+    }
+    if(grid)grid.innerHTML='<article><h2 data-i18n="FREE">Free</h2><p data-i18n="Watch previews and download Free routines without an account.">Watch previews and download Free routines without an account.</p></article>'+
+      '<article><h2>Pro</h2><p data-i18n="Unlock Pro routines with audio downloads and full videos where available.">Unlock Pro routines with audio downloads and full videos where available.</p></article>'+
+      '<article><h2>Ultra</h2><p data-i18n="Get the full library, including Ultra exclusives.">Get the full library, including Ultra exclusives.</p></article>';
   }
   if (document.body.dataset.page === 'routines' || location.pathname.startsWith('/routines/')) {
     document.querySelectorAll('.bundle-card,.cross-sell,.routine-offer,.bundle-offer,.routine-detail-actions').forEach(node => node.remove());
@@ -364,8 +377,10 @@
       }
       const section=main?.querySelector('.routine-detail-panel');
       if(section){
-        normalizeRoutineDetail(section,tierFor(main.dataset.routineSlug||path));
-        addRoutineActions(section,main.dataset.routineSlug||path);
+        const slug=main.dataset.routineSlug||path;
+        const tier=tierFor(slug);
+        normalizeRoutineDetail(section,tier);
+        addRoutineActions(section,slug,tier==='free');
         addRoutinePager(section);
       }
       main?.insertAdjacentHTML('beforeend',plan(false));
