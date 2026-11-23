@@ -15,7 +15,9 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
    items:[{email:'buyer@example.test',tier:'pro',state:'active',created_at:'2026-11-16T02:00:00Z'}]
   }]};
   if(sql.includes('count(*)::int'))return {rows:[{orders:1,pending:1,approved:0,downloads:0}]};
-  if(sql.includes('FROM site_traffic'))return {rows:[{today_people:2,today_views:4,yesterday_people:1,yesterday_views:3,week_people:3,week_views:7}]};
+  if(sql.includes('GROUP BY section'))return {rows:[{section:'price',views:4}]};
+  if(sql.includes('min(visit_day)'))return {rows:[{first:'2026-11-16'}]};
+  if(sql.includes('FROM site_traffic'))return {rows:[{people:2,views:4}]};
   if(sql.includes('json_agg'))return {rowCount:1,rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',created_at:'2026-10-01T12:00:00Z',email:'buyer@example.test',items:[{name:'ROUTINE 03',price_cents:600}]}]};
   if(sql.includes('FROM orders o JOIN customers c'))return {rows:[{id:order,status:'awaiting_manual_review',total_cents:600,currency:'USD',email:'buyer@example.test'}]};
   if(sql.includes('FROM order_events e'))return {rows:[{order_id:order,event_type:'order_created',created_at:'2026-10-01T12:00:00Z'}]};
@@ -46,7 +48,12 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.deepEqual(granted,[order]);
   assert.equal(calls.filter(x=>x.method==='answerCallbackQuery').length,2);
   assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Заказов: 1/);
-  assert.match(calls.find(x=>x.method==='sendMessage').body.text,/Сегодня: уникальных посетителей — 2, просмотров — 4/);
+  const stats=calls.find(x=>x.method==='sendMessage').body;
+  assert.match(stats.text,/^💳 Подписки Routine Pack · 7 дней/);
+  assert.match(stats.text,/Первые оплаты: 1 · Ошибки оформления: 1/);
+  assert.match(stats.text,/Посетители: 2 \(приблизительно\)/);
+  assert.match(stats.text,/Просмотры: 4/);
+  assert.equal(stats.reply_markup.inline_keyboard[0][1].text,'✓ 7 дней');
   async function textCommand(id,value){
    return send({update_id:id,message:{from:{id:owner},chat:{id:owner},text:value}});
   }
@@ -61,16 +68,20 @@ test('Telegram owner-only webhook, duplicate update, confirmation and approval',
   assert.match(report.text,/buyer@example.test · Ultra · оплачено · доступ активен/);
   assert.equal(report.reply_markup.inline_keyboard[0][3].text,'✓ Всё время');
   assert.equal((await send(callback(12,'subs:30:cancelled:2'))).status,200);
-  assert.match(calls.at(-1).body.text,/Без продления · 30 дней · стр. 3/);
+  assert.match(calls.at(-1).body.text,/Отмены · 30 дней · стр. 3/);
   const messages=calls.filter(x=>x.method==='sendMessage').map(x=>x.body.text);
   assert.ok(messages.some(x=>x.includes('Панель владельца Routine Pack')));
   assert.ok(messages.some(x=>x.includes('ожидает проверки оплаты')));
   assert.ok(messages.some(x=>x.includes('Покупатель: buyer@example.test')));
   assert.ok(messages.some(x=>x.includes('создан заказ')));
-  assert.ok(messages.some(x=>x.includes('Почта: нет серверных учётных данных')&&x.includes('Защищённая выдача: нет доступа сервера')));
+  assert.ok(messages.some(x=>x.includes('Почта: не хватает настроек отправки')&&x.includes('Защищённая выдача: не хватает настроек доступа к файлам')));
   assert.ok(messages.some(x=>x.includes('Вы лично проверили оплату заказа')));
   assert.ok(messages.some(x=>x.includes('Доступ по заказу')));
   assert.ok(!messages.some(x=>/Order approved|Final check|No orders|Access granted|Buyer:|Status:|Orders:/.test(x)));
+
+  assert.equal((await send(callback(13,'stats:30'))).status,200);
+  assert.match(calls.at(-1).body.text,/^💳 Подписки Routine Pack · 30 дней/);
+  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0][2].text,'✓ 30 дней');
 
   await bot.installWebhook();
   assert.equal(calls.find(x=>x.method==='getMe').method,'getMe');
