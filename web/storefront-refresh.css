@@ -366,7 +366,7 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
   .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy {
     display:flex;grid-area:1 / 1;align-items:flex-start;text-align:start;
   }
-  .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy h1 {text-align:start;font-size:clamp(42px,5.2vw,83px)!important}
+  .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy h1 {align-self:flex-start;text-align:start;font-size:clamp(42px,5.2vw,83px)!important}
   .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy :is(.rp-featured-lead,.rp-actions) {margin-inline:0}
   .rp-home .rp-hero.rp-hero-featured > .rp-featured-routine {grid-area:1 / 2}
   .rp-home .rp-hero.rp-hero-featured > .rp-software {grid-area:1 / 3}
@@ -374,6 +374,13 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
 }
 @media (max-width:999px) {
   .rp-home .rp-hero.rp-hero-featured > .rp-software {order:3}
+}
+@media (max-width:680px) {
+  .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy h1 {
+    font-size:clamp(40px,12vw,56px)!important;
+  }
+  .rp-home .rp-hero.rp-hero-featured .rp-featured-lead {margin-block:6px 8px}
+  .rp-home .rp-hero.rp-hero-featured .rp-actions {margin-block:12px 20px}
 }
 .rp-more-performances {width:min(1200px,100%);margin:0 auto 36px}
 .rp-more-performances summary {width:fit-content;padding-block:12px;cursor:pointer;color:#d2daea}
