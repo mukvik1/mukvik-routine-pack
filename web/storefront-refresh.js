@@ -122,7 +122,20 @@
     const preview=document.querySelector('.home-video-section');
     if(preview){
       preview.id='watch-routines';
-      preview.style.scrollMarginTop='96px';
+      const performances=document.createElement('details');
+      performances.className='rp-more-performances';
+      performances.innerHTML='<summary data-i18n="More performances">More performances</summary>';
+      preview.before(performances);
+      performances.append(preview);
+      const featuredMedia='/assets/free-videos/work-it-x-candy-shop';
+      hero.insertAdjacentHTML('afterend', `<section class="rp-featured-routine" aria-labelledby="rp-featured-title">
+        <div class="rp-featured-copy">
+          <h2 id="rp-featured-title">Work It × Candy Shop</h2>
+          <p data-i18n="DJ routines with video lessons and downloadable MP3s.">DJ routines with video lessons and downloadable MP3s.</p>
+          <a href="/free/work-it-x-candy-shop/" data-i18n="Open free routine">Open free routine</a>
+        </div>
+        <video controls playsinline preload="none" poster="${featuredMedia}.jpg" src="${featuredMedia}.mp4" aria-labelledby="rp-featured-title"></video>
+      </section>`);
     }
     if(actions) actions.innerHTML='<a class="rp-get-started" href="/price/">Get Started</a>';
     const brands = [
@@ -316,6 +329,70 @@
       '<article><h2>Pro</h2><p data-i18n="Unlock Pro routines with audio downloads and full videos where available.">Unlock Pro routines with audio downloads and full videos where available.</p></article>'+
       '<article><h2>Ultra</h2><p data-i18n="Get the full library, including Ultra exclusives.">Get the full library, including Ultra exclusives.</p></article>';
   }
+  function addCatalogueFilters(grid) {
+    grid.insertAdjacentHTML('beforebegin', `<div class="rp-catalog-controls">
+      <label class="rp-catalog-search">
+        <span class="rp-screen-reader" data-i18n="Search tracks">Search tracks</span>
+        <input type="search" data-i18n-placeholder="Search tracks" placeholder="Search tracks">
+      </label>
+      <div class="rp-catalog-filters" role="group" data-i18n-aria-label="Filter by plan" aria-label="Filter by plan">
+        <button type="button" data-tier="all" data-i18n="All">All</button>
+        <button type="button" data-tier="free">Free</button>
+        <button type="button" data-tier="standard">Pro</button>
+        <button type="button" data-tier="pro">Ultra</button>
+      </div>
+    </div>`);
+    grid.insertAdjacentHTML('afterend','<p class="rp-catalog-empty" data-i18n="No routines found." role="status" hidden>No routines found.</p>');
+    const controls=grid.previousElementSibling;
+    const empty=grid.nextElementSibling;
+    const search=controls.querySelector('input');
+    const buttons=[...controls.querySelectorAll('[data-tier]')];
+    const key='rp_catalogue_view_v1';
+    let saved={};
+    try { saved=JSON.parse(sessionStorage.getItem(key))||{}; } catch {}
+    let tier=buttons.some(button=>button.dataset.tier===saved.tier)?saved.tier:'all';
+    search.value=typeof saved.search==='string'?saved.search:'';
+    const normalize=value=>value.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+    const cards=[...grid.children].filter(card=>card.matches('article')).map(card=>({
+      card,title:normalize(card.querySelector('h2')?.textContent||''),
+      tier:['free','standard','pro'].find(value=>card.querySelector('.rp-routine-tier-'+value))
+    }));
+    const remember=()=>{
+      try { sessionStorage.setItem(key,JSON.stringify({tier,search:search.value,scroll:window.scrollY})); } catch {}
+    };
+    const render=()=>{
+      const words=normalize(search.value).split(' ').filter(Boolean);
+      let matches=0;
+      for(const entry of cards){
+        const visible=(tier==='all'||entry.tier===tier)&&words.every(word=>entry.title.includes(word));
+        entry.card.hidden=!visible;
+        if(visible)matches++;
+      }
+      for(const button of buttons)button.setAttribute('aria-pressed',String(button.dataset.tier===tier));
+      empty.hidden=matches>0;
+    };
+    for(const button of buttons)button.addEventListener('click',()=>{
+      tier=button.dataset.tier;
+      render();
+      remember();
+    });
+    search.addEventListener('input',()=>{render();remember();});
+    render();
+    window.addEventListener('scroll',remember,{passive:true});
+    if(Number.isFinite(saved.scroll)&&saved.scroll>0&&!location.hash){
+      const restore=()=>requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo(0,saved.scroll)));
+      if(window.frameElement?.classList.contains('rp-frame-pending')){
+        const observer=new MutationObserver(()=>{
+          if(window.frameElement?.classList.contains('rp-frame-pending'))return;
+          observer.disconnect();
+          restore();
+        });
+        observer.observe(window.frameElement,{attributes:true,attributeFilter:['class']});
+      }else restore();
+    }
+  }
+
   if (document.body.dataset.page === 'routines' || location.pathname.startsWith('/routines/')) {
     document.querySelectorAll('.bundle-card,.cross-sell,.routine-offer,.bundle-offer,.routine-detail-actions').forEach(node => node.remove());
     const grid = document.querySelector('.coming-grid.individual-grid');
@@ -349,6 +426,7 @@
       grid.insertAdjacentHTML('beforebegin','<div class="rp-routine-intro"><h1>Individual Routines</h1></div>');
       for(const link of grid.querySelectorAll('a.routine-detail-link'))link.textContent='Open Routine';
       grid.querySelectorAll('.routine-includes').forEach(node=>node.remove());
+      addCatalogueFilters(grid);
       const desktopCards=matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)');
       grid.addEventListener('click',event=>{
         if(!desktopCards.matches||event.defaultPrevented||event.button!==0||
@@ -387,18 +465,19 @@
     }
   }
 
-  function markLockedMedia(media,tier){
+  function markLockedMedia(media,tier,showOffer=true){
     const wrap=document.createElement('div');wrap.className='rp-lock-media';
     const link=document.createElement('a');link.className='rp-video-unlock';link.href='/price/';
     link.textContent='Subscribe to unlock full video';
     const label=document.createElement('small');label.textContent=tier==='pro'?'Ultra routine':'Pro routine';link.append(label);
-    media.before(wrap);wrap.append(media,link);
+    media.before(wrap);wrap.append(media);
+    if(showOffer)wrap.append(link);
     try{if(localStorage.getItem('mukvik_store_session'))wrap.dataset.unlockPending='';}catch{}
   }
   for(const image of document.querySelectorAll('.individual-grid .individual-performance-video')){
     const tier=image.dataset.fullPosterSlug?tierFor(image.dataset.fullPosterSlug):
       image.closest('article')?.querySelector('.rp-routine-tier-standard')?'standard':null;
-    if(tier&&tier!=='free')markLockedMedia(image,tier);
+    if(tier&&tier!=='free')markLockedMedia(image,tier,false);
     const existing=image.closest('.rp-lock-media');
     if(existing)existing.classList.add('rp-card-media');
     else{

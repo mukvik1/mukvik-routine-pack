@@ -75,7 +75,7 @@ async function subscriptionReport(pool) {
 module.exports = { readSubscriptionReport, subscriptionReport };
 
 const periods = {'1':'Сегодня', '7':'7 дней', '30':'30 дней', '0':'Всё время'};
-const views = {all:'История', active:'Активные', cancelled:'Без продления'};
+const views = {all:'История', active:'Активные', cancelled:'Отмены'};
 const pageSize = 6;
 const fullDate = new Intl.DateTimeFormat('ru-RU', {
   timeZone:'Europe/Kyiv', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
@@ -121,16 +121,16 @@ async function subscriptionDetail(pool, period='0', view='all', page=0) {
       (SELECT jsonb_agg(to_jsonb(p) ORDER BY CASE WHEN $2='cancelled' THEN p.cancelled_at ELSE p.activity_at END DESC,p.id DESC) FROM page_rows p) AS items
     FROM bounds b LEFT JOIN history ON true GROUP BY b.since`,[period,view,page*pageSize]);
   const items=summary.items||[], fmt=value=>fullDate.format(new Date(value));
-  const lines=[
+  const overview=[
     '💳 Подписки Routine Pack · '+periods[period],
+    'Сейчас активны: '+summary.active+' (Pro: '+summary.pro+', Ultra: '+summary.ultra+')',
+    'Первые оплаты: '+summary.paid+' · Ошибки оформления: '+summary.errors,
     'Подтвердили email: '+summary.registrations+' · Получили ссылку: '+summary.started,
-    'Подтверждённая первая оплата: '+summary.paid+' · Ошибки: '+summary.errors,
-    'Истекшие ссылки без оплаты: '+summary.expired+' · Отменили: '+summary.cancelled,
-    'Сейчас активны: '+summary.active+' (Pro: '+summary.pro+', Ultra: '+summary.ultra+') · Ждут оплаты: '+summary.pending,
-    '',
-    views[view]+(view==='active'?' · на данный момент':' · '+periods[period])+' · стр. '+(page+1)+' · время Киева'
+    'Истекли без оплаты: '+summary.expired+' · Клиентов с отменой: '+summary.cancelled,
+    'Сейчас ждут оплаты: '+summary.pending
   ];
-  if(period!=='0')lines.push('Старые оплаты без даты подтверждения видны в «Всё время».');
+  if(period!=='0')overview.push('Старые оплаты без точной даты видны в «Всё время».');
+  const lines=[...overview,'',views[view]+(view==='active'?' · на данный момент':' · '+periods[period])+' · стр. '+(page+1)+' · время Киева'];
   if(!items.length)lines.push('Записей нет.');
   for(const r of items.slice(0,pageSize)){
     lines.push('',r.email.slice(0,254)+' · '+plan(r.tier)+' · '+labels[r.state],
@@ -149,6 +149,7 @@ async function subscriptionDetail(pool, period='0', view='all', page=0) {
   if(page>0)pagination.push(button('← Назад',period,view,page-1));
   if(items.length>pageSize&&page<9999)pagination.push(button('Далее →',period,view,page+1));
   if(pagination.length)keyboard.push(pagination);
-  return {text:lines.join('\n'),reply_markup:{inline_keyboard:keyboard}};
+  return {text:lines.join('\n'),overview:overview.join('\n'),reply_markup:{inline_keyboard:keyboard}};
 }
 module.exports.subscriptionDetail=subscriptionDetail;
+module.exports.subscriptionPeriods=periods;

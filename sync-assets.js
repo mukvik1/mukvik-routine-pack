@@ -36,6 +36,13 @@ async function download(relativePath) {
   if(relativePath==='messages.json'){
     const messages=JSON.parse(bytes);
     Object.assign(messages.uk,require('./config/storefront-uk.json'),{
+      'More performances':'Більше виступів',
+      'DJ routines with video lessons and downloadable MP3s.':'DJ-рутини з відеоуроками та MP3 для завантаження.',
+      'Open free routine':'Відкрити безкоштовну рутину',
+      'Search tracks':'Пошук треків',
+      'Filter by plan':'Фільтр за тарифом',
+      'All':'Усі',
+      'No routines found.':'Рутини не знайдено.',
       'Downloads without an account':'Завантаження без акаунта',
       'Watch previews and download Free routines without an account.':'Дивіться прев’ю та завантажуйте Free-рутини без акаунта.',
       'Routine Pack is Mukvik’s library of DJ routines for practicing wordplay, tone play and transitions.':'Routine Pack — бібліотека DJ-рутин Mukvik для практики вордплею, тонплею та переходів.',
@@ -58,7 +65,7 @@ async function download(relativePath) {
     bytes=Buffer.from(JSON.stringify(messages));
   }
   if(relativePath.endsWith('.html')){
-    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=17"'));
+    bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/i18n\.js(?:\?[^"]*)?"/g,'src="/i18n.js?v=18"'));
   }
   if (relativePath === 'index.html') {
     const html = bytes.toString('utf8');
@@ -222,7 +229,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261118-legal-nav');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=44"><script defer src="/storefront-refresh.js?v=47"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=45"><script defer src="/storefront-refresh.js?v=48"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -323,10 +330,10 @@ async function updatePricePage() {
   const homepage=await fs.readFile(path.join(__dirname,'web','index.html'),'utf8');
   const filename=path.join(__dirname,'web','price','index.html');
   let html=await fs.readFile(filename,'utf8');
-  html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=44')
-    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=47')
+  html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=45')
+    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=48')
     .replace(/(video-background\.(?:js|css))\?[^"]+/g,'$1?v=20261118-legal-nav')
-    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=17')
+    .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=18')
     .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=plan-return-20261123');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');

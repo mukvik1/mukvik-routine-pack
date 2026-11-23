@@ -21,7 +21,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
   const statusLabel=value=>statusLabels[value]||'неизвестен';
   const eventLabel=value=>eventLabels[value]||'другое событие';
   const money=(cents,currency)=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:currency||'USD'}).format(cents/100);
-  const date=value=>new Date(value).toLocaleString('ru-RU',{timeZone:'UTC'})+' UTC';
+  const date=value=>new Date(value).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv'})+' (Киев)';
   async function installWebhook() {
     if(settings.TELEGRAM_BOT_USERNAME) {
       const identity=await call('getMe',{});
@@ -36,7 +36,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
         {command:'orders',description:'Последние заказы'},
         {command:'pending',description:'Заказы на проверке'},
         {command:'order',description:'Информация о заказе'},
-        {command:'stats',description:'💰 Посещения, заказы и загрузки'},
+        {command:'stats',description:'Подписки, посещаемость и заказы'},
         {command:'visits',description:'📊 Посещаемость сайта'},
         {command:'status',description:'Состояние подключений'},
         {command:'events',description:'Последние события'}
@@ -69,7 +69,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
       for(const a of alerts.rows){
         try{
           const reason=a.error_code==='MONOBANK_HTTP_401'||a.error_code==='MONOBANK_HTTP_403'?'Monobank отклонил авторизацию: проверьте ключ эквайринга.':a.stage==='exchange_rate'?'Не удалось получить актуальный курс USD/UAH.':a.error_code==='PAYMENT_DECLINED'?'Банк отклонил оплату.':a.error_code==='INVOICE_EXPIRED'?'Истёк срок платёжной ссылки.':'Ошибка платёжного сервиса. Проверьте журнал сервера по коду.';
-          await send(['🚨 Ошибка оплаты','Покупатель: '+a.email,'Заказ: '+a.order_id,'Товары: '+(a.products||'—'),'Сумма: '+money(a.total_cents,a.currency),'Этап: '+a.stage,'Код: '+a.error_code,'Причина: '+reason,'Время: '+new Date(a.created_at).toISOString()].join('\n'),{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+a.order_id}]]}});
+          await send(['🚨 Ошибка оплаты','Покупатель: '+a.email,'Заказ: '+a.order_id,'Товары: '+(a.products||'—'),'Сумма: '+money(a.total_cents,a.currency),'Этап: '+a.stage,'Код: '+a.error_code,'Причина: '+reason,'Время: '+date(a.created_at)].join('\n'),{reply_markup:{inline_keyboard:[[{text:'Посмотреть заказ',callback_data:'view:'+a.order_id}]]}});
           await db.query('UPDATE payment_alerts SET sent_at=now(),attempts=attempts+1 WHERE id=$1',[a.id]);
         }catch{await db.query('UPDATE payment_alerts SET attempts=attempts+1 WHERE id=$1',[a.id]);}
       }
@@ -83,7 +83,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
             lines.splice(0,lines.length,'💳 Новая подписка Routine Pack','✅ Оплата подтверждена','',
               'Тариф: '+(tier==='pro'?'Ultra':tier==='standard'?'Pro':'Прежний тариф'),
               'Покупатель: '+a.email,'Сумма: '+money(amount_kop,'UAH'),
-              'Доступ до: '+new Date(paid_until).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv'})+' (Киев)');
+              'Доступ до: '+date(paid_until));
           }
           else {
             for(const item of a.payload.added||[])lines.push('Добавлено: '+item.name);
@@ -122,19 +122,19 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
       const days=['0','1','7','30'].includes(arg)?Number(arg):0;
       return send(await require('./analytics').report(pool,days),{reply_markup:{inline_keyboard:[[{text:'Сегодня',callback_data:'visits:1'},{text:'7 дней',callback_data:'visits:7'},{text:'30 дней',callback_data:'visits:30'}],[{text:'За всё время',callback_data:'visits:0'}]]}});
     }
-    if(name==='/start'||name==='/help')return send('🎛 Панель владельца Routine Pack\n\n💳 /subscriptions — оплаты и попытки оформить Pro / Ultra\n📊 /visits — посещаемость сайта\n🛍 /orders — последние заказы\n⏳ /pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n💰 /stats — посещения сайта, заказы и загрузки\n🟢 /status — состояние подключений\n🧾 /events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
+    if(name==='/start'||name==='/help')return send('🎛 Панель владельца Routine Pack\n\n💳 /subscriptions — оплаты и попытки оформить Pro / Ultra\n📊 /visits — посещаемость сайта\n🛍 /orders — последние заказы\n⏳ /pending — заказы, ожидающие оплаты\n/order UUID — подробности заказа\n💰 /stats — общая сводка по подпискам и сайту\n🟢 /status — состояние подключений\n🧾 /events — история событий\nПри оплате Monobank доступ открывается автоматически после подтверждения банка. Чек оформляйте вручную.');
     if(name==='/status') {
-      const emailReady=settings.MAIL_PROVIDER==='resend'?Boolean(settings.RESEND_API_KEY&&settings.SMTP_FROM):settings.MAIL_PROVIDER==='gmail_api'
-        ? ['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'].every(key=>Boolean(settings[key]))
-        : settings.MAIL_PROVIDER==='smtp'&&['SMTP_HOST','SMTP_USER','SMTP_PASSWORD'].every(key=>Boolean(settings[key]));
+      const mailProvider=settings.MAIL_PROVIDER||'smtp';
+      const mailKeys={resend:['RESEND_API_KEY'],gmail_api:['GMAIL_OAUTH_CLIENT_ID','GMAIL_OAUTH_CLIENT_SECRET','GMAIL_OAUTH_REFRESH_TOKEN'],smtp:['SMTP_HOST','SMTP_USER','SMTP_PASSWORD']}[mailProvider];
+      const emailReady=Boolean(mailKeys&&settings.SMTP_FROM&&mailKeys.every(key=>Boolean(settings[key])));
       const filesReady=Boolean(settings.GOOGLE_SERVICE_ACCOUNT_JSON&&settings.COMMERCE_FILES_JSON);
       return send([
         'Состояние Routine Pack',
         'Бот: на связи',
         'Кабинет: '+(settings.COMMERCE_ENABLED==='true'?'включён':'выключен'),
         'Оформление подписок: '+({public:'доступно клиентам',pilot:'только владельцу',disabled:'недоступно'})[subscriptions],
-        'Почта: '+(emailReady?'учётные данные указаны, нужна проверка отправки':'нет серверных учётных данных'),
-        'Защищённая выдача: '+(filesReady?'учётные данные указаны, нужна проверка доступа':'нет доступа сервера к закрытым файлам'),
+        'Почта: '+(emailReady?'настройки указаны · доставка писем не проверялась':'не хватает настроек отправки'),
+        'Защищённая выдача: '+(filesReady?'настройки указаны · скачивание ZIP не проверялось':'не хватает настроек доступа к файлам'),
         'Monobank (старые разовые заказы): '+(settings.MONOBANK_ENABLED==='true'?'включён':'выключен')
       ].join('\n'));
     }
@@ -143,19 +143,29 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
       return send(r.rows.length?r.rows.map(e=>date(e.created_at)+' · '+eventLabel(e.event_type)+' · '+(e.email||'')+(e.order_id?' · '+e.order_id:'')).join('\n').slice(0,4000):'Событий пока нет.');
     }
     if(name==='/stats') {
-      const r=await pool.query("SELECT (SELECT count(*)::int FROM orders) AS orders,(SELECT count(*)::int FROM orders WHERE status='awaiting_manual_review') AS pending,(SELECT count(*)::int FROM orders WHERE status='approved') AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads");
-      const x=r.rows[0];
-      let traffic='Посещения сайта: статистика временно недоступна.';
-      try{
-        const v=await require('./analytics').summary(pool);
-        traffic='📊 Посещения сайта (по Киеву, приблизительно)\n'+
-          'Сегодня: уникальных посетителей — '+v.today_people+', просмотров — '+v.today_views+'\n'+
-          'Вчера: уникальных посетителей — '+v.yesterday_people+', просмотров — '+v.yesterday_views+'\n'+
-          'За 7 дней: уникальных посетителей — '+v.week_people+', просмотров — '+v.week_views+'\n'+
-          'За 30 дней: уникальных посетителей — '+(v.month_people||0)+', просмотров — '+(v.month_views||0)+'\n'+
-          'За всё время: уникальных посетителей — '+(v.all_people||0)+', просмотров — '+(v.all_views||0);
-      }catch(error){console.error('Traffic report unavailable:',error.code||error.name||'error');}
-      return send(traffic+'\n\nПодписки и попытки оплаты: /subscriptions\n\nИстория разовых покупок\nЗаказов: '+x.orders+'\nЖдут проверки: '+x.pending+'\nПодтверждено: '+x.approved+'\nНачато загрузок: '+x.downloads,{reply_markup:{inline_keyboard:[[{text:'💳 Подписки',callback_data:'subs:0:all:0'}]]}});
+      const period=['0','1','7','30'].includes(arg)?arg:'7';
+      const {subscriptionDetail,subscriptionPeriods}=require('./subscription-report');
+      const results=await Promise.allSettled([
+        subscriptionDetail(pool,period),
+        require('./analytics').report(pool,Number(period)),
+        pool.query("SELECT count(*)::int AS orders,count(*) FILTER (WHERE status='awaiting_manual_review')::int AS pending,count(*) FILTER (WHERE status='approved')::int AS approved,(SELECT count(*)::int FROM order_events WHERE event_type='download_started') AS downloads FROM orders")
+      ]);
+      for(const result of results){
+        if(result.status==='rejected')console.error('Telegram statistics section unavailable:',result.reason?.code||result.reason?.name||'error');
+      }
+      const [subscriptions,traffic,orders]=results.map(result=>result.status==='fulfilled'?result.value:null);
+      const x=orders?.rows[0];
+      const text=[
+        subscriptions?.overview||'💳 Сводка по подпискам временно недоступна.',
+        traffic||'📊 Посещаемость временно недоступна.',
+        x?'🛍 Разовые покупки · за всё время\nЗаказов: '+x.orders+' · Ждут проверки: '+x.pending+
+          '\nПодтверждено: '+x.approved+' · Начато загрузок: '+x.downloads:'🛍 История разовых покупок временно недоступна.'
+      ].join('\n\n');
+      const periodButtons=['1','7','30','0'].map(value=>({
+        text:(value===period?'✓ ':'')+subscriptionPeriods[value],
+        callback_data:'stats:'+value
+      }));
+      return send(text,{reply_markup:{inline_keyboard:[periodButtons,[{text:'💳 Подписки',callback_data:'subs:'+period+':all:0'}]]}});
     }
     if(name==='/pending'||name==='/orders') {
       const r=await pool.query("SELECT o.id,o.status,o.total_cents,o.currency,c.email FROM orders o JOIN customers c ON c.id=o.customer_id WHERE ($1::boolean=false OR o.status='awaiting_manual_review') ORDER BY o.created_at DESC LIMIT 20",[name==='/pending']);
@@ -190,7 +200,7 @@ function createTelegramBot(settings, {pool, approveOrder, subscriptions = 'disab
         const [action,id]=data.split(':');
         const subs=/^subs:(0|1|7|30):(all|active|cancelled):([0-9]{1,4})$/.exec(data);
         if(subs)await showSubscriptions(subs[1],subs[2],Number(subs[3]));
-        if(action==='visits'&&['0','1','7','30'].includes(id))await command('/visits '+id);
+        if((action==='visits'||action==='stats')&&['0','1','7','30'].includes(id))await command('/'+action+' '+id);
         if(orderIdPattern.test(id||'')&&action==='view')await showOrder(id);
         if(orderIdPattern.test(id||'')&&action==='confirm') {
           await send('Вы лично проверили оплату заказа '+id+'? После подтверждения покупатель получит доступ.',{reply_markup:{inline_keyboard:[[{text:'Да · открыть доступ',callback_data:'approve:'+id},{text:'Отмена',callback_data:'cancel:'+id}]]}});

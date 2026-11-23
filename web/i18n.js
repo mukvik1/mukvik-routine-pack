@@ -39,7 +39,7 @@
    language=event.newValue;apply();
   }
  });
- const ready=fetch('/messages.json?v=16').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{messages=data;}).catch(()=>{}).then(()=>apply());
+ const ready=fetch('/messages.json?v=17').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{messages=data;}).catch(()=>{}).then(()=>apply());
  window.RP_I18N={t,set,ready,apply:()=>apply(false),get language(){return language;}};
  for(const select of document.querySelectorAll('[data-language-select]')){
   for(const [locale,label] of [['ko','🇰🇷 한국어'],['vi','🇻🇳 Tiếng Việt'],['zh-CN','🇨🇳 简体中文'],['ja','🇯🇵 日本語'],['nl','🇳🇱 Nederlands'],['pl','🇵🇱 Polski']]){
