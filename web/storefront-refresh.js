@@ -128,15 +128,16 @@
       preview.before(performances);
       performances.append(preview);
       const featuredMedia='/assets/free-videos/work-it-x-candy-shop';
-      hero.insertAdjacentHTML('afterend', `<section class="rp-featured-routine" aria-labelledby="rp-featured-title">
+      hero.classList.add('rp-hero-featured');
+      hero.insertAdjacentHTML('beforeend', `<section class="rp-featured-routine" aria-labelledby="rp-featured-title">
         <div class="rp-featured-copy">
           <h2 id="rp-featured-title">Work It × Candy Shop</h2>
-          <p data-i18n="DJ routines with video lessons and downloadable MP3s.">DJ routines with video lessons and downloadable MP3s.</p>
           <a href="/free/work-it-x-candy-shop/" data-i18n="Open free routine">Open free routine</a>
         </div>
         <video controls playsinline preload="none" poster="${featuredMedia}.jpg" src="${featuredMedia}.mp4" aria-labelledby="rp-featured-title"></video>
       </section>`);
     }
+    if(actions&&preview)actions.insertAdjacentHTML('beforebegin','<p class="rp-featured-lead" data-i18n="DJ routines with video lessons and downloadable MP3s.">DJ routines with video lessons and downloadable MP3s.</p>');
     if(actions) actions.innerHTML='<a class="rp-get-started" href="/price/">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],

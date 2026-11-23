@@ -84,8 +84,7 @@ async function subscriptionDetail(pool, period='0', view='all', page=0) {
   const {rows:[summary]} = await pool.query(`
     WITH bounds AS (
       SELECT CASE $1::int WHEN 0 THEN '-infinity'::timestamptz
-        WHEN 1 THEN date_trunc('day',now() AT TIME ZONE 'Europe/Kyiv') AT TIME ZONE 'Europe/Kyiv'
-        ELSE now()-make_interval(days=>$1::int) END AS since
+        ELSE (date_trunc('day',now() AT TIME ZONE 'Europe/Kyiv')-make_interval(days=>($1::int-1))) AT TIME ZONE 'Europe/Kyiv' END AS since
     ), history AS (
       SELECT s.id::text AS id,c.email,s.tier,s.created_at,s.first_paid_at,s.paid_until,s.cancelled_at,
         NULL::text AS error_code,
