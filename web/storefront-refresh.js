@@ -162,6 +162,7 @@
   const routineMedia = /* routine-media:start */[]/* routine-media:end */;
   const newRoutines = routineMedia.filter(routine => routine.title);
   const mediaSlugs = new Set(routineMedia.map(routine => routine.slug));
+  const coverPath = slug => '/assets/routine-covers/' + slug + '.jpg';
   const previewPath = slug => '/assets/routine-previews-v2/' + slug;
   const freePackSlugs = new Set(['routine-04','routine-06']);
   const ultraRoutines = new Set(['routine-03','routine-05','call-me-maybe-poker-face', ...newRoutines.filter(routine => routine.tier === 'pro').map(routine => routine.slug)]);
@@ -297,15 +298,14 @@
 
   function addPackRoutines(grid) {
     const fragment = document.createDocumentFragment();
-    for (const [i,[title,slug,path]] of packRoutines.entries()) {
-      const number = i + 1;
+    for (const [title,slug,path] of packRoutines) {
       const card = document.createElement('article');
       card.id = slug;
       card.className = 'standalone-routine available-routine';
       card.dataset.standardPackCard = slug;
       const isFree=freePackSlugs.has(slug);
       card.classList.add('rp-tiered-routine');
-      const image=isFree?'/assets/free-videos/'+path+'.jpg':'/assets/lesson-previews/pack-'+number+'-blurred.jpg';
+      const image=isFree?'/assets/free-videos/'+path+'.jpg':coverPath(path);
       card.innerHTML = badgeFor(tierFor(slug))+'<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" alt="" src="'+image+'"><div><h2></h2><a class="routine-detail-link" href="/routines/' + path + '/">Open Routine</a></div></div>';
       if(!isFree)card.querySelector('img').dataset.fullPosterSlug=slug;
       card.querySelector('h2').textContent = title;
@@ -406,7 +406,7 @@
           const replacement=document.createElement('article');
           replacement.className='standalone-routine available-routine';
           replacement.innerHTML='<div class="individual-card-layout"><img class="individual-performance-video" loading="lazy" decoding="async" alt=""><div><h2></h2><a class="routine-detail-link">Open Routine</a></div></div>';
-          replacement.querySelector('img').src=previewPath(slug)+'.jpg';
+          replacement.querySelector('img').src=coverPath(slug);
           replacement.querySelector('img').dataset.fullPosterSlug=slug;
           replacement.querySelector('h2').textContent=title;
           replacement.querySelector('a').href=paidPath(slug);

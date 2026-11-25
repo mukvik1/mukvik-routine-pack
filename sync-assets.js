@@ -230,7 +230,7 @@ document.querySelectorAll('[data-cookie-settings]')`);
     }
     html=html.replace(/(video-background\.(?:js|css))\?[^"]*/g,'$1?v=20261118-legal-nav');
     if(relativePath==='packs/index.html')html=html.replace('<strong>$49</strong>','<del data-pack-list-price hidden>$49</del><strong data-pack-current-price>$49</strong>');
-    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=50"><script defer src="/storefront-refresh.js?v=50"></script></head>');
+    html=html.replace('</head>','<link rel="stylesheet" href="/storefront-refresh.css?v=50"><script defer src="/storefront-refresh.js?v=51"></script></head>');
     bytes=Buffer.from(html);
   }
 
@@ -345,7 +345,7 @@ async function updatePricePage() {
   const filename=path.join(__dirname,'web','price','index.html');
   let html=await fs.readFile(filename,'utf8');
   html=html.replace(/storefront-refresh\.css\?v=\d+/, 'storefront-refresh.css?v=50')
-    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=50')
+    .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=51')
     .replace(/(video-background\.(?:js|css))\?[^"]+/g,'$1?v=20261118-legal-nav')
     .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=18')
     .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=plan-return-20261123');

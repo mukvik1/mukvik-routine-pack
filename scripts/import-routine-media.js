@@ -19,7 +19,8 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
   if (!token) throw Error('Routine media: missing Drive access token.');
   const destination = path.join(root, 'assets', 'routine-previews-v2');
   const privateVideos = path.join(root, '..', 'private-routine-videos');
-  await Promise.all([destination, privateVideos].map(directory => fs.mkdir(directory, { recursive: true })));
+  const coverRoot = path.join(root, 'assets', 'routine-covers');
+  await Promise.all([destination, privateVideos, coverRoot].map(directory => fs.mkdir(directory, { recursive: true })));
   const endpoint = id => 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true';
   const headers = { Authorization: 'Bearer ' + token };
   let next = 0;
@@ -61,9 +62,11 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           '-vf', "scale=w='min(iw,960)':h='min(ih,960)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v', 'libx264', '-threads', '2', '-preset', 'fast', '-crf', '23',
           '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fullVideo], 180000);
+        const privatePoster = path.join(privateVideos, slug + '.jpg');
         await ffmpeg(['-ss', '1', '-i', source, '-frames:v', '1',
           '-vf', "scale=w='min(iw,1280)':h='min(ih,1280)':force_original_aspect_ratio=decrease:force_divisible_by=2", '-q:v', '2',
-          '-update', '1', path.join(privateVideos, slug + '.jpg')], 30000);
+          '-update', '1', privatePoster], 30000);
+        await fs.copyFile(privatePoster, path.join(coverRoot, slug + '.jpg'));
         // Encode the mask into the public preview itself, keeping the original audio.
         // The separate full video is never placed under the web root.
         await ffmpeg(['-i', fullVideo, '-t', '20', '-filter_complex_threads', '2',

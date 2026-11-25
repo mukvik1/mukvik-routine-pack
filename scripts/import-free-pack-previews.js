@@ -16,7 +16,8 @@ async function importFreePackPreviews(settings, { root = path.join(__dirname, '.
  const auth = new GoogleAuth({ credentials: JSON.parse(settings.GOOGLE_SERVICE_ACCOUNT_JSON), scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
  const token = await auth.getAccessToken();
  const destination = path.join(root, 'assets', 'free-videos');
- await fs.mkdir(destination, { recursive: true });
+ const coverRoot = path.join(root, 'assets', 'routine-covers');
+ await Promise.all([destination, coverRoot].map(directory => fs.mkdir(directory, { recursive: true })));
  const privateRoot=path.join(root,'..','private-routine-videos');
  await fs.mkdir(privateRoot,{recursive:true});
  for (const { id, slug } of require('../config/routine-paths.json')) {
@@ -36,6 +37,7 @@ async function importFreePackPreviews(settings, { root = path.join(__dirname, '.
     await exec('ffmpeg', ['-v','error','-y','-ss','1','-i',source,'-frames:v','1',
      '-vf',"scale=w='min(iw,1280)':h='min(ih,1280)':force_original_aspect_ratio=decrease:force_divisible_by=2",
      '-q:v','2','-update','1',privatePoster], { timeout: 30000 });
+    await fs.copyFile(privatePoster, path.join(coverRoot, slug + '.jpg'));
     continue;
    }
    const output = path.join(destination, slug + '.mp4');
