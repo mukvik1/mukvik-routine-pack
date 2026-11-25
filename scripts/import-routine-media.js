@@ -61,7 +61,8 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           '-vf', "scale=w='min(iw,960)':h='min(ih,960)':force_original_aspect_ratio=decrease:force_divisible_by=2",
           '-c:v', 'libx264', '-threads', '2', '-preset', 'fast', '-crf', '23',
           '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fullVideo], 180000);
-        await ffmpeg(['-i', fullVideo, '-frames:v', '1', '-vf', 'scale=360:-2',
+        await ffmpeg(['-ss', '1', '-i', source, '-frames:v', '1',
+          '-vf', "scale=w='min(iw,1280)':h='min(ih,1280)':force_original_aspect_ratio=decrease:force_divisible_by=2", '-q:v', '2',
           '-update', '1', path.join(privateVideos, slug + '.jpg')], 30000);
         // Encode the mask into the public preview itself, keeping the original audio.
         // The separate full video is never placed under the web root.
@@ -69,7 +70,7 @@ async function importRoutineMedia(settings, root = path.join(__dirname, '..', 'w
           '-filter_complex', "[0:v]split[base][top];[top]crop=iw:trunc(ih/4)*2:0:0,boxblur=luma_radius='min(w,h)/9':luma_power=5:chroma_radius='min(cw,ch)/9':chroma_power=5[mask];[base][mask]overlay=0:0[preview]",
           '-map', '[preview]', '-map', '0:a:0?', '-c:v', 'libx264', '-threads', '2', '-preset', 'fast',
           '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', video], 120000);
-        await ffmpeg(['-i', video, '-frames:v', '1', '-update', '1', path.join(destination, slug + '.jpg')], 30000);
+        await ffmpeg(['-ss', '1', '-i', video, '-frames:v', '1', '-q:v', '2', '-update', '1', path.join(destination, slug + '.jpg')], 30000);
         console.log('Imported routine preview: ' + slug);
       } catch (error) {
         throw Error('Routine media ' + slug + ': ' + error.message);

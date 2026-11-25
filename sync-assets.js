@@ -1,5 +1,6 @@
 const fs = require('fs/promises');
 const path = require('path');
+const exec = require('node:util').promisify(require('node:child_process').execFile);
 const { importHomePerformance, name: homePerformance } = require('./scripts/import-home-performance');
 
 const origin = 'https://mukvik-routine-pack.mukvik.chatgpt.site';
@@ -326,6 +327,19 @@ body[data-page="routines"] .individual-grid .bundle-offer{margin-top:auto;justif
   console.log(`Downloaded ${relativePath}`);
 }
 
+async function refreshPromotionalPosters() {
+  const directory = path.join(__dirname, 'web', 'assets', 'free-videos');
+  const frames = [
+    ['work-it-x-candy-shop', '3'],
+    ['get-right-x-just-a-lil-bit', '1'],
+    ['rihanna-routine', '3']
+  ];
+  for (const [slug, seconds] of frames) {
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', seconds, '-i', path.join(directory, slug + '.mp4'),
+      '-frames:v', '1', '-q:v', '2', '-update', '1', path.join(directory, slug + '.jpg')], { timeout: 30000 });
+  }
+}
+
 async function updatePricePage() {
   const homepage=await fs.readFile(path.join(__dirname,'web','index.html'),'utf8');
   const filename=path.join(__dirname,'web','price','index.html');
@@ -340,7 +354,7 @@ async function updatePricePage() {
   await fs.writeFile(filename,html);
 }
 
-(async()=>{let next=0;await Promise.all([importHomePerformance(path.join(__dirname,"web","assets","videos")), ...Array.from({length:6},async()=>{while(next<files.length){const file=files[next++];await download(file);}})]);await updatePricePage();await require('./scripts/download-drive-preview').downloadDrivePreview(process.env,{save:async(name,bytes)=>{const destination=path.join(__dirname,'web','assets','videos',name);await fs.mkdir(path.dirname(destination),{recursive:true});await fs.writeFile(destination,bytes);console.log('Downloaded public preview asset: '+name);}});await require('./scripts/import-free-routines').importFreeRoutines(process.env);await require('./scripts/import-call-me-maybe').importCallMeMaybe(process.env);await require('./scripts/import-free-pack-previews').importFreePackPreviews(process.env);await require('./scripts/sanitize-routine-archives').sanitizeRoutineArchives();await require('./scripts/import-routine-media').importRoutineMedia(process.env);await require('./scripts/remove-legacy-storefront').cleanStorefrontPages(path.join(__dirname,'web'));})().catch((error) => {
+(async()=>{let next=0;await Promise.all([importHomePerformance(path.join(__dirname,"web","assets","videos")), ...Array.from({length:6},async()=>{while(next<files.length){const file=files[next++];await download(file);}})]);await refreshPromotionalPosters();await updatePricePage();await require('./scripts/download-drive-preview').downloadDrivePreview(process.env,{save:async(name,bytes)=>{const destination=path.join(__dirname,'web','assets','videos',name);await fs.mkdir(path.dirname(destination),{recursive:true});await fs.writeFile(destination,bytes);console.log('Downloaded public preview asset: '+name);}});await require('./scripts/import-free-routines').importFreeRoutines(process.env);await require('./scripts/import-call-me-maybe').importCallMeMaybe(process.env);await require('./scripts/import-free-pack-previews').importFreePackPreviews(process.env);await require('./scripts/sanitize-routine-archives').sanitizeRoutineArchives();await require('./scripts/import-routine-media').importRoutineMedia(process.env);await require('./scripts/remove-legacy-storefront').cleanStorefrontPages(path.join(__dirname,'web'));})().catch((error) => {
   console.error(error.message);
   process.exit(1);
 });
