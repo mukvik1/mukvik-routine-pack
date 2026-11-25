@@ -137,7 +137,6 @@
         <video controls playsinline preload="none" poster="${featuredMedia}.jpg" src="${featuredMedia}.mp4" aria-labelledby="rp-featured-title"></video>
       </section>`);
     }
-    if(actions&&preview)actions.insertAdjacentHTML('beforebegin','<p class="rp-featured-lead" data-i18n="DJ routines with video lessons and downloadable MP3s.">DJ routines with video lessons and downloadable MP3s.</p>');
     if(actions) actions.innerHTML='<a class="rp-get-started" href="/price/">Get Started</a>';
     const brands = [
       ['rekordbox', 'rekordbox.svg'], ['Serato', 'serato.svg'],
