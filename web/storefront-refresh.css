@@ -354,7 +354,7 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
   object-fit:contain;background:#0b0e14;border-radius:8px;
 }
 .rp-featured-copy {display:grid;gap:10px;justify-items:start;text-align:start}
-.rp-featured-copy h2 {font-size:clamp(16px,1.7vw,24px);line-height:1.18;letter-spacing:-.025em;margin:0}
+.rp-featured-copy h2 {justify-self:center;text-align:center;font-size:clamp(16px,1.7vw,24px);line-height:1.18;letter-spacing:-.025em;margin:0}
 .rp-featured-copy a {display:inline-flex;align-items:center;min-height:44px;padding-inline:12px;border-radius:7px;background:#2459ca;color:#fff;text-decoration:none;font-size:14px;font-weight:650}
 .rp-featured-copy a:hover {background:#3567d4}
 .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy {container-type:inline-size;min-width:0}
