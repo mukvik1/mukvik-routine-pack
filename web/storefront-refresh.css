@@ -353,10 +353,14 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
   grid-row:1;display:block;width:100%;aspect-ratio:9/16;max-height:min(47vh,430px);
   object-fit:contain;background:#0b0e14;border-radius:8px;
 }
-.rp-featured-copy {display:flex;flex-wrap:wrap;gap:10px 14px;justify-content:space-between;align-items:center;text-align:start}
+.rp-featured-copy {display:grid;gap:10px;justify-items:start;text-align:start}
 .rp-featured-copy h2 {font-size:clamp(16px,1.7vw,24px);line-height:1.18;letter-spacing:-.025em;margin:0}
 .rp-featured-copy a {display:inline-flex;align-items:center;min-height:44px;padding-inline:12px;border-radius:7px;background:#2459ca;color:#fff;text-decoration:none;font-size:14px;font-weight:650}
 .rp-featured-copy a:hover {background:#3567d4}
+.rp-home .rp-hero.rp-hero-featured > .rp-hero-copy {container-type:inline-size;min-width:0}
+.rp-home .rp-hero.rp-hero-featured > .rp-hero-copy h1 {
+  width:100%;max-width:100%;overflow-wrap:anywhere;
+}
 .rp-hero .rp-featured-lead {max-width:32ch;margin:16px auto 20px;color:#e2e9f2;font-size:clamp(15px,1.5vw,19px);line-height:1.5;text-wrap:balance}
 @media (min-width:1000px) {
   body .rp-home .rp-hero.rp-hero-featured {
@@ -377,15 +381,14 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
     max-height:none;border-radius:0;
   }
   .rp-hero-featured .rp-featured-copy {
-    display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;
     padding:12px;border-top:1px solid #354052;
     background:linear-gradient(135deg,#202b3e,#151b26 72%);
   }
   .rp-hero-featured .rp-featured-copy h2 {
-    font-size:clamp(14px,1.1vw,18px);overflow-wrap:anywhere;text-wrap:balance;
+    font-size:clamp(14px,1.1vw,18px);text-wrap:balance;
   }
   .rp-hero-featured .rp-featured-copy a {
-    justify-content:center;padding-inline:10px;text-align:center;font-size:12px;
+    justify-self:stretch;justify-content:center;padding-inline:10px;text-align:center;font-size:12px;
   }
   .rp-home .rp-hero.rp-hero-featured > .rp-software {grid-area:1 / 1}
   .rp-home .rp-hero.rp-hero-featured .rp-logo-group img {max-width:100%;height:clamp(18px,2.6vw,36px)}
@@ -399,6 +402,9 @@ body[data-page="routines"] .individual-grid .routine-includes{display:none}
   }
   .rp-home .rp-hero.rp-hero-featured .rp-featured-lead {margin-block:6px 8px}
   .rp-home .rp-hero.rp-hero-featured .rp-actions {margin-block:12px 20px}
+}
+:lang(uk) .rp-home .rp-hero.rp-hero-featured > .rp-hero-copy h1 {
+  font-size:min(56px,11.5cqi)!important;
 }
 .rp-more-performances {width:min(1200px,100%);margin:0 auto 36px}
 .rp-more-performances summary {width:fit-content;padding-block:12px;cursor:pointer;color:#d2daea}
