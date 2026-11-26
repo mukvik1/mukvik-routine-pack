@@ -104,7 +104,7 @@ async function download(relativePath) {
     ));
   }
   if (relativePath.endsWith('.html')) {
-    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=ultra-upgrade-20261126"'));
+    bytes = Buffer.from(bytes.toString('utf8').replace(/src="\/store-account\.js(?:\?[^"]*)?"/g,'src="/store-account.js?v=ultra-upgrade-usd"'));
   }
   if(relativePath.endsWith('.html')){
     bytes=Buffer.from(bytes.toString('utf8').replace(/src="\/video-background\.js(?:\?[^"]*)?"/g,'src="/video-background.js?v=20261024-routine-cards"'));
@@ -348,7 +348,7 @@ async function updatePricePage() {
     .replace(/storefront-refresh\.js\?v=\d+/, 'storefront-refresh.js?v=52')
     .replace(/(video-background\.(?:js|css))\?[^"]+/g,'$1?v=20261118-legal-nav')
     .replace(/i18n\.js\?v=\d+/, 'i18n.js?v=18')
-    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=ultra-upgrade-20261126');
+    .replace(/store-account\.js\?v=[^"]+/, 'store-account.js?v=ultra-upgrade-usd');
   const consent=['cookie-consent','privacy'].map(id=>homepage.match(new RegExp('<(aside|dialog)\\b[^>]*id="'+id+'"[^>]*>[\\s\\S]*?</(?:aside|dialog)>'))?.[0]||'').join('');
   if(!html.includes('id="cookie-consent"'))html=html.replace('<script defer src="/i18n.js',consent+'<script defer src="/i18n.js');
   await fs.writeFile(filename,html);

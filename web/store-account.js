@@ -173,7 +173,7 @@ function renderUpgradeOptions(section){
  const date=value=>new Date(value).toLocaleDateString(document.documentElement.lang,{timeZone:'Europe/Kyiv'});
  const planName=tier=>tier==='pro'?'Ultra':'Pro';
  if(upgrade){
-  const amount=new Intl.NumberFormat(document.documentElement.lang,{style:'currency',currency:'UAH'}).format(upgrade.amountKop/100);
+  const amount=money(upgrade.amountCents);
   const pay=button(T('Upgrade to Ultra')+' · '+amount,async()=>{
    pay.disabled=true;
    try{
