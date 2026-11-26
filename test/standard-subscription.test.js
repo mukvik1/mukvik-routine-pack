@@ -26,7 +26,7 @@ function setup(adminEmail, manifest=packManifest, upgrades=false){
   }
   if(sql.startsWith('INSERT INTO customer_activity')){(state.notices??=[]).push(JSON.parse(p[1]));return {rowCount:1};}
   if(sql.startsWith('UPDATE standard_subscriptions SET paid_until')){
-   Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date(),period_start:p[4]});
+   Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date()});
    return {rows:[state.row]};
   }
   if(sql.startsWith('UPDATE standard_subscriptions SET cancelled_at')){
@@ -252,7 +252,7 @@ test('a paid top-up grants Ultra only through the existing Pro period and next-p
  const before={};
  await subscription.status(before,user);
  assert.equal(before.data.tier,'standard');
- assert(before.data.upgrade.amountCents>0&&before.data.upgrade.amountCents<1000);
+ assert.equal(before.data.upgrade.amountCents,1000);
  assert.equal(before.data.upgrade.amountKop,before.data.upgrade.amountCents*47);
  const end=before.data.paidUntil;
  const tooLow={};

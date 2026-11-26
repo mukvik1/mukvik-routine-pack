@@ -102,9 +102,7 @@ function interpretStatus(row, data, now = Date.now()) {
   const paidUntil = Number.isFinite(started) && started >= +new Date(row.created_at) - 60000 && started <= now + 60000
     ? paidThrough(data.startDate, data.summary.totalPaid) : null;
   if (data.summary.totalPaid > 0 && !paidUntil) return null;
-  const periodStart = paidUntil && (data.summary.totalPaid === 1
-    ? new Date(started) : paidThrough(data.startDate, data.summary.totalPaid - 1));
-  return { paidUntil, periodStart, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
+  return { paidUntil, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
 }
 
 function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, invoiceFetch = fetch, driveFetch = fetch, reply, packManifest, adminEmail, archiveRoot = path.join(__dirname,'web','downloads'), privateVideoRoot = path.join(__dirname,'private-routine-videos') }) {
@@ -159,8 +157,8 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const firstPurchase = parsed.paidUntil && !row.first_paid_at && !row.paid_until;
     const r = await db.query(`UPDATE standard_subscriptions SET paid_until=$2,provider_status=$3,checked_at=now(),
       first_paid_at=CASE WHEN $2::timestamptz IS NOT NULL THEN COALESCE(first_paid_at,now()) ELSE first_paid_at END,
-      cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END, period_start=$5 WHERE id=$1 RETURNING *`,
-      [row.id, parsed.paidUntil, parsed.status, parsed.cancelled, parsed.periodStart]);
+      cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END WHERE id=$1 RETURNING *`,
+      [row.id, parsed.paidUntil, parsed.status, parsed.cancelled]);
     if (firstPurchase) {
       await db.query(`INSERT INTO customer_activity(customer_id,kind,payload)
         VALUES ($1,'subscription_paid',$2::jsonb) ON CONFLICT DO NOTHING`, [
@@ -173,11 +171,9 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   }
   function upgradeQuote(row, now = Date.now()) {
     const end = +new Date(row?.paid_until);
-    const start = +new Date(row?.period_start);
-    if (!upgradeEnabled || row?.tier !== 'standard' || !row.period_start ||
-        +new Date(row.ultra_until) > now || end - now < 120000 || end <= start) return null;
-    const differenceCents = PLAN_CENTS.pro - PLAN_CENTS.standard;
-    const amountCents = Math.ceil(differenceCents * Math.min(1, (end - now) / (end - start)));
+    if (!upgradeEnabled || row?.tier !== 'standard' ||
+        +new Date(row.ultra_until) > now || end - now < 120000) return null;
+    const amountCents = PLAN_CENTS.pro - PLAN_CENTS.standard;
     return { amountCents, amountKop: uahKopiykas(amountCents, USD_UAH_RATE), until: row.paid_until };
   }
   async function reconcileUpgrade(db, invoice) {
@@ -262,10 +258,10 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   }
   async function status(res, user, refresh = false, cached = false) {
     let row = await latest(pool, user.id);
-    if (!cached && row && ((upgradeEnabled && row.paid_until && !row.period_start) || !row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
+    if (!cached && row && (!row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
       row = await locked(user.id, async db => {
         const current = await latest(db, user.id);
-        if ((!upgradeEnabled || !current.paid_until || current.period_start) && current.checked_at && Date.now() - +new Date(current.checked_at) < (refresh ? 5000 : 60000)) return current;
+        if (current.checked_at && Date.now() - +new Date(current.checked_at) < (refresh ? 5000 : 60000)) return current;
         return reconcile(db, current);
       }).catch(e => { console.error('Standard status unavailable:', e.code || e.name); return row; });
     }
