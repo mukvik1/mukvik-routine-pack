@@ -176,8 +176,9 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const start = +new Date(row?.period_start);
     if (!upgradeEnabled || row?.tier !== 'standard' || !row.period_start ||
         +new Date(row.ultra_until) > now || end - now < 120000 || end <= start) return null;
-    const difference = uahKopiykas(PLAN_CENTS.pro - PLAN_CENTS.standard, USD_UAH_RATE);
-    return { amountKop: Math.ceil(difference * Math.min(1, (end - now) / (end - start))), until: row.paid_until };
+    const differenceCents = PLAN_CENTS.pro - PLAN_CENTS.standard;
+    const amountCents = Math.ceil(differenceCents * Math.min(1, (end - now) / (end - start)));
+    return { amountCents, amountKop: uahKopiykas(amountCents, USD_UAH_RATE), until: row.paid_until };
   }
   async function reconcileUpgrade(db, invoice) {
     const bank = await invoiceApi('status', invoice.invoice_id);
@@ -281,7 +282,10 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     if (quote) {
       const {rows:[pending]} = await pool.query(`SELECT amount_kop FROM standard_upgrade_invoices
         WHERE subscription_id=$1 AND period_end=$2 AND status='created'`,[row.id,row.paid_until]);
-      if (pending) quote.amountKop = pending.amount_kop;
+      if (pending) {
+        quote.amountKop = pending.amount_kop;
+        quote.amountCents = Math.round(pending.amount_kop / USD_UAH_RATE);
+      }
     }
     return reply(res, 200, {
       active: Boolean(row?.paid_until && +new Date(row.paid_until) > Date.now()),

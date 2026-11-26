@@ -252,7 +252,8 @@ test('a paid top-up grants Ultra only through the existing Pro period and next-p
  const before={};
  await subscription.status(before,user);
  assert.equal(before.data.tier,'standard');
- assert(before.data.upgrade.amountKop>0&&before.data.upgrade.amountKop<47000);
+ assert(before.data.upgrade.amountCents>0&&before.data.upgrade.amountCents<1000);
+ assert.equal(before.data.upgrade.amountKop,before.data.upgrade.amountCents*47);
  const end=before.data.paidUntil;
  const tooLow={};
  await subscription.upgrade(tooLow,user,1);
