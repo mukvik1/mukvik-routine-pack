@@ -102,15 +102,30 @@ function interpretStatus(row, data, now = Date.now()) {
   const paidUntil = Number.isFinite(started) && started >= +new Date(row.created_at) - 60000 && started <= now + 60000
     ? paidThrough(data.startDate, data.summary.totalPaid) : null;
   if (data.summary.totalPaid > 0 && !paidUntil) return null;
-  return { paidUntil, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
+  const periodStart = paidUntil && (data.summary.totalPaid === 1
+    ? new Date(started) : paidThrough(data.startDate, data.summary.totalPaid - 1));
+  return { paidUntil, periodStart, status: data.status.slice(0, 40), cancelled: /^(cancelled|canceled|expired|invalidated)$/i.test(data.status) };
 }
 
-function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, driveFetch = fetch, reply, packManifest, adminEmail, archiveRoot = path.join(__dirname,'web','downloads'), privateVideoRoot = path.join(__dirname,'private-routine-videos') }) {
+function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetch, invoiceFetch = fetch, driveFetch = fetch, reply, packManifest, adminEmail, archiveRoot = path.join(__dirname,'web','downloads'), privateVideoRoot = path.join(__dirname,'private-routine-videos') }) {
   if (settings.STANDARD_SUBSCRIPTIONS_ENABLED === 'false' || !settings.MONOBANK_SUBSCRIPTION_TOKEN) return null;
   const entries = catalogFiles(files, packManifest);
   const publicOrigin = new URL(settings.PUBLIC_ORIGIN);
   const webOrigin = new URL(settings.WEB_ORIGIN);
   if (publicOrigin.protocol !== 'https:' || webOrigin.protocol !== 'https:') throw Error('Subscription checkout requires HTTPS');
+  const upgradeEnabled = Boolean(settings.MONOBANK_TOKEN);
+  async function invoiceApi(operation, payload) {
+    const endpoint = new URL('https://api.monobank.ua/api/merchant/invoice/' + operation);
+    if (operation === 'status') endpoint.searchParams.set('invoiceId', payload);
+    const response = await invoiceFetch(endpoint, {
+      method: operation === 'create' ? 'POST' : 'GET',
+      headers: { 'X-Token': settings.MONOBANK_TOKEN, 'Content-Type': 'application/json' },
+      body: operation === 'create' ? JSON.stringify(payload) : undefined,
+      signal: AbortSignal.timeout(12000), redirect: 'error'
+    });
+    if (!response.ok) throw Error('Monobank upgrade payment is temporarily unavailable.');
+    return response.json();
+  }
   async function api(operation, args, method = 'GET') {
     const endpoint = new URL('https://api.monobank.ua/api/merchant/subscription/' + operation);
     if (method === 'GET') endpoint.search = new URLSearchParams(args);
@@ -144,8 +159,8 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const firstPurchase = parsed.paidUntil && !row.first_paid_at && !row.paid_until;
     const r = await db.query(`UPDATE standard_subscriptions SET paid_until=$2,provider_status=$3,checked_at=now(),
       first_paid_at=CASE WHEN $2::timestamptz IS NOT NULL THEN COALESCE(first_paid_at,now()) ELSE first_paid_at END,
-      cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END WHERE id=$1 RETURNING *`,
-      [row.id, parsed.paidUntil, parsed.status, parsed.cancelled]);
+      cancelled_at=CASE WHEN $4 THEN COALESCE(cancelled_at,now()) ELSE cancelled_at END, period_start=$5 WHERE id=$1 RETURNING *`,
+      [row.id, parsed.paidUntil, parsed.status, parsed.cancelled, parsed.periodStart]);
     if (firstPurchase) {
       await db.query(`INSERT INTO customer_activity(customer_id,kind,payload)
         VALUES ($1,'subscription_paid',$2::jsonb) ON CONFLICT DO NOTHING`, [
@@ -156,19 +171,126 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     }
     return r.rows[0];
   }
+  function upgradeQuote(row, now = Date.now()) {
+    const end = +new Date(row?.paid_until);
+    const start = +new Date(row?.period_start);
+    if (!upgradeEnabled || row?.tier !== 'standard' || !row.period_start ||
+        +new Date(row.ultra_until) > now || end - now < 120000 || end <= start) return null;
+    const difference = uahKopiykas(PLAN_CENTS.pro - PLAN_CENTS.standard, USD_UAH_RATE);
+    return { amountKop: Math.ceil(difference * Math.min(1, (end - now) / (end - start))), until: row.paid_until };
+  }
+  async function reconcileUpgrade(db, invoice) {
+    const bank = await invoiceApi('status', invoice.invoice_id);
+    if (bank.invoiceId !== invoice.invoice_id || bank.amount !== invoice.amount_kop || bank.ccy !== 980) {
+      throw Error('Unexpected Monobank upgrade payment details.');
+    }
+    if (!['success','failure','expired','reversed'].includes(bank.status)) return;
+    if (bank.status === 'success' && bank.finalAmount !== undefined && bank.finalAmount !== invoice.amount_kop) {
+      throw Error('Unexpected Monobank upgrade payment amount.');
+    }
+    await db.query('UPDATE standard_upgrade_invoices SET status=$2 WHERE id=$1', [invoice.id, bank.status]);
+    if (bank.status === 'success') {
+      await db.query('UPDATE standard_subscriptions SET ultra_until=$2 WHERE id=$1 AND (ultra_until IS NULL OR ultra_until<$2)',
+        [invoice.subscription_id, invoice.period_end]);
+    }
+    if (bank.status === 'reversed') {
+      await db.query('UPDATE standard_subscriptions SET ultra_until=NULL WHERE id=$1 AND ultra_until=$2',
+        [invoice.subscription_id, invoice.period_end]);
+    }
+  }
+  async function upgrade(res, user, maxAmountKop) {
+    if (!upgradeEnabled || !user.email_verified_at) return reply(res, 403, { error: 'Upgrade is unavailable.' });
+    if (!Number.isSafeInteger(maxAmountKop) || maxAmountKop < 1) return reply(res,400,{error:'Confirm the upgrade amount.'});
+    const result = await locked(user.id, async db => {
+      let row = await latest(db,user.id);
+      if (!row || row.tier !== 'standard') return {status:409, data:{error:'An active Pro subscription is required.'}};
+      row = await reconcile(db,row);
+      const {rows:[pending]} = await db.query(`SELECT * FROM standard_upgrade_invoices
+        WHERE subscription_id=$1 AND period_end=$2 AND status='created'`, [row.id,row.paid_until]);
+      if (pending) {
+        await reconcileUpgrade(db,pending);
+        const {rows:[updated]} = await db.query('SELECT status FROM standard_upgrade_invoices WHERE id=$1',[pending.id]);
+        if (updated.status === 'created' && pending.amount_kop <= maxAmountKop) return {status:200,data:{checkoutUrl:pending.checkout_url}};
+        if (updated.status === 'created') return {status:409,data:{error:'Refresh to confirm the existing upgrade amount.'}};
+        if (updated.status === 'success') return {status:200,data:{active:true}};
+      }
+      const quote = upgradeQuote(row);
+      if (!quote) return {status:409,data:{error:'This paid period cannot be upgraded.'}};
+      if (quote.amountKop > maxAmountKop) return {status:409,data:{error:'Refresh to confirm the current upgrade amount.'}};
+      const id = crypto.randomUUID();
+      const created = await invoiceApi('create', {
+        amount:quote.amountKop, ccy:980, paymentType:'debit',
+        validity:Math.min(1800,Math.floor((+new Date(quote.until)-Date.now())/1000)),
+        redirectUrl:webOrigin.origin+'/?account=1&upgrade=return',
+        webHookUrl:publicOrigin.origin+'/api/v2/standard/upgrade-callback/'+id,
+        merchantPaymInfo:{reference:id,destination:'MUKVIK Routine Pack — Ultra upgrade',customerEmails:[user.email]}
+      });
+      if (!/^[\w-]{5,128}$/.test(created?.invoiceId || '') || !isTrustedCheckoutUrl(created.pageUrl)) {
+        throw Error('Unexpected Monobank upgrade checkout link.');
+      }
+      await db.query(`INSERT INTO standard_upgrade_invoices(id,subscription_id,period_end,amount_kop,invoice_id,checkout_url)
+        VALUES($1,$2,$3,$4,$5,$6)`, [id,row.id,quote.until,quote.amountKop,created.invoiceId,created.pageUrl]);
+      return {status:201,data:{checkoutUrl:created.pageUrl}};
+    });
+    return reply(res,result.status,result.data);
+  }
+  async function upgradeCallback(res,id) {
+    if (!upgradeEnabled) return reply(res,404,{error:'Not found.'});
+    const {rows:[owner]} = await pool.query(`SELECT s.customer_id FROM standard_upgrade_invoices i
+      JOIN standard_subscriptions s ON s.id=i.subscription_id WHERE i.id=$1`,[id]);
+    if (!owner) return reply(res,404,{error:'Not found.'});
+    await locked(owner.customer_id,async db=>{
+      const {rows:[invoice]} = await db.query("SELECT * FROM standard_upgrade_invoices WHERE id=$1 AND status IN ('created','success')",[id]);
+      if (invoice) await reconcileUpgrade(db,invoice);
+    });
+    return reply(res,200,{ok:true});
+  }
+  async function chooseNext(res,user,tier) {
+    if (!Object.hasOwn(PLAN_CENTS,tier) || !user.email_verified_at) return reply(res,400,{error:'Choose Pro or Ultra.'});
+    const saved = await locked(user.id,async db=>{
+      let row = await latest(db,user.id);
+      if (!row?.paid_until || +new Date(row.paid_until)<=Date.now()) return false;
+      if (!row.cancelled_at) {
+        await api('edit',{subscriptionId:row.provider_id,action:'cancel'},'POST');
+      }
+      await db.query('UPDATE standard_subscriptions SET next_tier=$2,cancelled_at=COALESCE(cancelled_at,now()) WHERE id=$1',[row.id,tier]);
+      return true;
+    });
+    if (!saved) return reply(res,409,{error:'Your paid period has ended. Choose your next plan on the pricing page.'});
+    return status(res,user);
+  }
   async function status(res, user, refresh = false, cached = false) {
     let row = await latest(pool, user.id);
-    if (!cached && row && (!row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
+    if (!cached && row && ((upgradeEnabled && row.paid_until && !row.period_start) || !row.checked_at || Date.now() - +new Date(row.checked_at) > (refresh ? 5000 : 60000))) {
       row = await locked(user.id, async db => {
         const current = await latest(db, user.id);
-        if (current.checked_at && Date.now() - +new Date(current.checked_at) < (refresh ? 5000 : 60000)) return current;
+        if ((!upgradeEnabled || !current.paid_until || current.period_start) && current.checked_at && Date.now() - +new Date(current.checked_at) < (refresh ? 5000 : 60000)) return current;
         return reconcile(db, current);
       }).catch(e => { console.error('Standard status unavailable:', e.code || e.name); return row; });
+    }
+    if (refresh && upgradeEnabled && row?.paid_until) {
+      row = await locked(user.id,async db=>{
+        const current = await latest(db,user.id);
+        const {rows:[invoice]} = await db.query(`SELECT * FROM standard_upgrade_invoices
+          WHERE subscription_id=$1 AND period_end=$2 AND status='created'`,[current.id,current.paid_until]);
+        if (invoice) await reconcileUpgrade(db,invoice);
+        return latest(db,user.id);
+      }).catch(()=>row);
+    }
+    const quote = upgradeQuote(row);
+    if (quote) {
+      const {rows:[pending]} = await pool.query(`SELECT amount_kop FROM standard_upgrade_invoices
+        WHERE subscription_id=$1 AND period_end=$2 AND status='created'`,[row.id,row.paid_until]);
+      if (pending) quote.amountKop = pending.amount_kop;
     }
     return reply(res, 200, {
       active: Boolean(row?.paid_until && +new Date(row.paid_until) > Date.now()),
       paidUntil: row?.paid_until || null,
-      tier: row?.tier || null,
+      tier: +new Date(row?.ultra_until) > Date.now() ? 'pro' : row?.tier || null,
+      baseTier: row?.tier || null,
+      nextTier: row?.next_tier || null,
+      upgrade: quote,
+      ultraUntil: row?.ultra_until || null,
       cancellable: Boolean(row && !row.cancelled_at),
       pending: Boolean(row && !row.cancelled_at && !row.paid_until),
       cancelled: Boolean(row?.cancelled_at)
@@ -240,7 +362,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const secret = random();
     const r = await pool.query(`INSERT INTO standard_download_tickets(token_hash,customer_id,routine_slug,expires_at)
       SELECT $1,$2,$3,now()+($6::integer*interval '1 second')
-      WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND tier=ANY($4::text[]))) RETURNING token_hash`,
+      WHERE ($5::boolean OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=$2 AND paid_until>now() AND (tier=ANY($4::text[]) OR (ultra_until>now() AND 'pro'=ANY($4::text[]))))) RETURNING token_hash`,
     [sha(secret), user.id, media?'video:'+slug:slug, media?['legacy','standard','pro']:allowedTiers(slug), Boolean(user.email_verified_at && (FREE_PACK_SLUGS.includes(slug) || (adminEmail && user.email===adminEmail))), media?1800:60]);
     if (!r.rowCount) return reply(res, 403, { error: 'An active subscription is required.' });
     return reply(res, 200, { url: '/api/v2/standard/'+(media?'video/':'download/')+secret });
@@ -260,7 +382,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
     const r = await pool.query(`DELETE FROM standard_download_tickets AS t WHERE token_hash=$1 AND expires_at>now() AND t.routine_slug NOT LIKE 'video:%'
       AND (EXISTS (SELECT 1 FROM customers c WHERE c.id=t.customer_id AND (c.email=$3 OR t.routine_slug=ANY($4::text[])) AND c.email_verified_at IS NOT NULL)
         OR EXISTS (SELECT 1 FROM standard_subscriptions WHERE customer_id=t.customer_id AND paid_until>now()
-        AND (tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
+        AND (ultra_until>now() OR tier IN ('legacy','pro') OR (tier='standard' AND NOT (t.routine_slug=ANY($2::text[]))))))
       RETURNING routine_slug`, [sha(secret),PRO_SLUGS,adminEmail||null,FREE_PACK_SLUGS]);
     if (!r.rowCount) return reply(res, 410, { error: 'Download link expired or already used.' });
     return streamRoutine(res, r.rows[0].routine_slug);
@@ -377,7 +499,7 @@ function createStandard(settings, { pool, files, getDriveToken, fetchImpl = fetc
   function cleanup() {
     return pool.query('DELETE FROM standard_download_tickets WHERE expires_at <= now()');
   }
-  return { status, checkout, cancel, callback, ticket, libraryTicket, download, downloadFreePack, video, cleanup, catalog: {
+  return { status, checkout, cancel, callback, upgrade, upgradeCallback, chooseNext, ticket, libraryTicket, download, downloadFreePack, video, cleanup, catalog: {
     slugs: [...entries.keys(), ...localArchives.keys()],
     freeSlugs: FREE_PACK_SLUGS.filter(slug=>entries.has(slug)),
     videoSlugs: [...entries.keys()].filter(slug => fullVideo(slug)),

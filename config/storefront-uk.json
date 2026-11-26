@@ -51,5 +51,19 @@
   "Perform.": "Виступайте.",
   "{count} Pro routines": "Рутини Pro: {count}",
   "All Pro routines plus {count} Ultra routines": "Усі рутини Pro та ще {count} рутин Ultra",
-  "{count} free routines": "Безкоштовні рутини: {count}"
+  "{count} free routines": "Безкоштовні рутини: {count}",
+  "Upgrade to Ultra": "Перейти на Ultra",
+  "One-time upgrade until": "Разова доплата за Ultra до",
+  "Ultra upgrade active until": "Доступ до Ultra до",
+  "Next month’s plan": "Тариф на наступний місяць",
+  "Save next plan": "Зберегти тариф",
+  "Saving a plan turns off current auto-renewal. Confirm the next subscription in Monobank after your paid period ends.": "Збереження тарифу вимкне поточне автопродовження. Після завершення оплаченого періоду підтвердьте нову підписку в Monobank.",
+  "Selected for next month:": "На наступний місяць вибрано:",
+  "Confirm payment after your paid period ends.": "Підтвердьте оплату після завершення оплаченого періоду.",
+  "I agree to automatic renewal at": "Погоджуюся на автоматичне продовження за",
+  "month": "місяць",
+  "Continue with": "Продовжити з",
+  "Ultra upgrade confirmed.": "Перехід на Ultra підтверджено.",
+  "Checking your upgrade payment…": "Перевіряємо доплату за Ultra…",
+  "Your upgrade will appear here after Monobank confirms the payment.": "Доступ до Ultra з’явиться тут після підтвердження оплати Monobank."
 }

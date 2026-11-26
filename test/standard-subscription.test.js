@@ -13,8 +13,8 @@ const files = { pack, ...Object.fromEntries([3,5,7,8,9,10,11,12].map(n=>['routin
 const reply = (res,status,data) => Object.assign(res,{status,data});
 const bank = row => ({subscriptionId:row.provider_id,status:'active',amount:row.amount_kop,ccy:980,interval:'1m',startDate:new Date().toISOString(),summary:{totalPaid:0,totalFailed:0}});
 
-function setup(adminEmail, manifest=packManifest){
- const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null };
+function setup(adminEmail, manifest=packManifest, upgrades=false){
+ const state = { row:null, tickets:new Map(), events:[], requests:[], bankData:null, invoices:[], invoiceStatus:"created" };
  const db = { release(){}, async query(sql,p=[]){
   if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'||sql.startsWith('SELECT id FROM customers'))return {rows:[]};
   if(sql.startsWith('SELECT * FROM standard_subscriptions'))return {rows:state.row?[state.row]:[]};
@@ -26,31 +26,62 @@ function setup(adminEmail, manifest=packManifest){
   }
   if(sql.startsWith('INSERT INTO customer_activity')){(state.notices??=[]).push(JSON.parse(p[1]));return {rowCount:1};}
   if(sql.startsWith('UPDATE standard_subscriptions SET paid_until')){
-   Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date()});
+   Object.assign(state.row,{paid_until:p[1],provider_status:p[2],checked_at:new Date(),period_start:p[4]});
    return {rows:[state.row]};
   }
   if(sql.startsWith('UPDATE standard_subscriptions SET cancelled_at')){
    state.row.cancelled_at=new Date();return {rows:[]};
+  }
+  if(sql.startsWith('SELECT s.customer_id'))return {rows:state.invoices.some(i=>i.id===p[0])?[state.row]:[]};
+  if(sql.includes('FROM standard_upgrade_invoices')){
+   const matches=state.invoices.filter(i=>sql.includes('period_end=$2')
+    ? i.subscription_id===p[0] && +new Date(i.period_end)===+new Date(p[1]) && i.status==='created'
+    : i.id===p[0] && (!sql.includes('status IN')||['created','success'].includes(i.status)));
+   return {rows:matches};
+  }
+  if(sql.startsWith('INSERT INTO standard_upgrade_invoices')){
+   const [id,subscription_id,period_end,amount_kop,invoice_id,checkout_url]=p;
+   state.invoices.push({id,subscription_id,period_end,amount_kop,invoice_id,checkout_url,status:'created'});
+   return {rows:[]};
+  }
+  if(sql.startsWith('UPDATE standard_upgrade_invoices')){
+   state.invoices.find(i=>i.id===p[0]).status=p[1];return {rows:[]};
+  }
+  if(sql.startsWith('UPDATE standard_subscriptions SET ultra_until')){
+   state.row.ultra_until=sql.includes('=NULL')?null:p[1];return {rows:[]};
+  }
+  if(sql.startsWith('UPDATE standard_subscriptions SET next_tier')){
+   state.row.next_tier=p[1];state.row.cancelled_at=new Date();return {rows:[]};
   }
   if(sql.startsWith('INSERT INTO standard_download_tickets')){
    if(sql.includes("'video:library'")){
     if(!p[2]&&!(state.row?.customer_id===p[1]&&state.row.paid_until>new Date()))return {rows:[]};
     return {rows:[{expires_at:new Date(Date.now()+60000)}]};
    }
-   if(!p[4]&&!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.tier)))return {rowCount:0};
+   if(!p[4]&&!(state.row?.customer_id===p[1] && state.row?.paid_until > new Date() && p[3].includes(state.row.ultra_until>new Date()?'pro':state.row.tier)))return {rowCount:0};
    state.tickets.set(p[0],{slug:p[2],admin:p[4]});return {rowCount:1};
   }
   if(sql.startsWith('DELETE FROM standard_download_tickets AS t')){
    const saved=state.tickets.get(p[0]),slug=saved?.slug;
-   if(!saved?.admin&&state.row?.tier==='standard'&&p[1].includes(slug))return {rowCount:0};
+   if(!saved?.admin&&state.row?.tier==='standard'&&!(state.row.ultra_until>new Date())&&p[1].includes(slug))return {rowCount:0};
    if(!slug||!(saved.admin&&(p[2]===adminEmail||p[3]?.includes(slug)))&&!(state.row?.paid_until>new Date()))return {rowCount:0};
    state.tickets.delete(p[0]);return {rowCount:1,rows:[{routine_slug:slug}]};
   }
   throw Error('Unexpected SQL '+sql);
  }};
- const subscription = createStandard(settings,{
+ const subscription = createStandard({...settings,...(upgrades?{MONOBANK_ENABLED:"true",MONOBANK_TOKEN:"invoice-token"}:{})},{
   pool:{query:db.query,connect:async()=>db},files,packManifest:manifest,adminEmail,reply,getDriveToken:async()=> 'fake-drive',
   driveFetch:async url=>{state.events.push(url);return new Response(url.includes('video')?'video-test':'audio-test');},
+  invoiceFetch:async(url,req)=>{
+   assert.equal(req.headers['X-Token'],'invoice-token');
+   if(req.method==='POST'){
+    state.invoiceRequest=JSON.parse(req.body);
+    return Response.json({invoiceId:'invoice_'+state.invoices.length,pageUrl:'https://pay.mbnk.biz/upgrade'});
+   }
+   const id=new URL(url).searchParams.get('invoiceId');
+   const invoice=state.invoices.find(i=>i.invoice_id===id);
+   return Response.json({invoiceId:id,amount:invoice.amount_kop+(state.wrongAmount?1:0),ccy:980,status:state.invoiceStatus});
+  },
   fetchImpl:async (url,req)=>{
    assert.equal(req.headers['X-Token'],'fake-only');
    const path=new URL(url).pathname.split('/').at(-1), payload=req.body&&JSON.parse(req.body);
@@ -207,4 +238,71 @@ test('library grants require an active subscription or a verified administrator'
  assert.match((await request(user)).data.url,/^\/api\/v2\/standard\/video\/[\w-]{43}$/);
  state.row.paid_until=new Date(Date.now()-1000);
  assert.equal((await request(user)).status,403);
+});
+
+
+test('a paid top-up grants Ultra only through the existing Pro period and next-plan choice cancels renewal',async()=>{
+ const {state,subscription}=setup(undefined,packManifest,true);
+ await subscription.checkout({},user,true);
+ const started=new Date(Date.now()-14*86400000);
+ state.row.created_at=started;
+ state.bankData={...bank(state.row),startDate:started.toISOString(),summary:{totalPaid:1}};
+ await subscription.callback({},state.requests[0].payload.webHookUrls.chargeUrl.split('/').at(-1));
+
+ const before={};
+ await subscription.status(before,user);
+ assert.equal(before.data.tier,'standard');
+ assert(before.data.upgrade.amountKop>0&&before.data.upgrade.amountKop<47000);
+ const end=before.data.paidUntil;
+ const tooLow={};
+ await subscription.upgrade(tooLow,user,1);
+ assert.equal(tooLow.status,409);
+ const startedUpgrade={};
+ await subscription.upgrade(startedUpgrade,user,before.data.upgrade.amountKop);
+ assert.equal(startedUpgrade.status,201);
+ const retry={};
+ await subscription.upgrade(retry,user,before.data.upgrade.amountKop);
+ assert.equal(retry.data.checkoutUrl,startedUpgrade.data.checkoutUrl);
+ assert.equal(state.invoices.length,1);
+ assert.equal(state.invoiceRequest.amount,state.invoices[0].amount_kop);
+
+ const callbackId=state.invoices[0].id;
+ await subscription.upgradeCallback({},callbackId);
+ assert.equal(state.row.ultra_until,undefined);
+ state.invoiceStatus='success';
+ state.wrongAmount=true;
+ await assert.rejects(subscription.upgradeCallback({},callbackId),/Unexpected Monobank upgrade payment/);
+ assert.equal(state.row.ultra_until,undefined);
+ state.wrongAmount=false;
+ await subscription.upgradeCallback({},callbackId);
+ await subscription.upgradeCallback({},callbackId);
+ const after={};
+ await subscription.status(after,user);
+ assert.equal(after.data.tier,'pro');
+ assert.equal(after.data.baseTier,'standard');
+ assert.equal(+after.data.paidUntil,+end);
+ assert.equal(+after.data.ultraUntil,+end);
+ const ultraTicket={};
+ await subscription.ticket(ultraTicket,user,'y-que-fue-low');
+ assert.equal(ultraTicket.status,200);
+ assert.equal(state.requests.filter(r=>r.path==='edit').length,0);
+
+ const renewal={};
+ await subscription.chooseNext(renewal,user,'pro');
+ assert.equal(renewal.data.nextTier,'pro');
+ assert.equal(renewal.data.cancelled,true);
+ assert.equal(+renewal.data.paidUntil,+end);
+ const earlyCheckout={};
+ await subscription.checkout(earlyCheckout,user,true,'pro');
+ assert.equal(earlyCheckout.status,409);
+ await subscription.chooseNext({},user,'standard');
+ assert.equal(state.row.next_tier,'standard');
+ assert.equal(state.requests.filter(r=>r.path==='edit').length,1);
+
+ state.invoiceStatus='reversed';
+ await subscription.upgradeCallback({},callbackId);
+ const refunded={};
+ await subscription.status(refunded,user);
+ assert.equal(refunded.data.tier,'standard');
+ assert.equal(+refunded.data.paidUntil,+end);
 });

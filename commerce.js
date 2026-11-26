@@ -86,7 +86,7 @@ function createCommerce(settings=process.env,overrides={}){
  const auth=new GoogleAuth({credentials,scopes:['https://www.googleapis.com/auth/drive.readonly']});
  let standard=null;
  try{standard=require('./standard-subscription').createStandard(settings,{
-  pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
+  pool,files,fetchImpl:overrides.subscriptionFetch||overrides.fetch||fetch,invoiceFetch:overrides.monobankFetch||overrides.fetch||fetch,driveFetch:overrides.fetch||fetch,
   adminEmail,getDriveToken:overrides.driveToken||auth.getAccessToken.bind(auth),reply:response
  });}catch(error){console.error('Standard integration unavailable:',error.code||error.name,error.routine||'');}
  const standardPublic=Boolean(standard&&settings.STANDARD_SUBSCRIPTIONS_ENABLED!=='pilot');
@@ -474,6 +474,8 @@ function createCommerce(settings=process.env,overrides={}){
    if(standard){
     const callback=/^\/api\/v2\/standard\/callback\/([\w-]{43})$/.exec(url.pathname);
     if(req.method==='POST'&&callback){req.resume();await standard.callback(res,callback[1]);return true;}
+    const upgradeCallback=/^\/api\/v2\/standard\/upgrade-callback\/([a-f0-9-]{36})$/.exec(url.pathname);
+    if(req.method==='POST'&&upgradeCallback){req.resume();await standard.upgradeCallback(res,upgradeCallback[1]);return true;}
     const download=/^\/api\/v2\/standard\/download\/([\w-]{43})$/.exec(url.pathname);
     if(req.method==='GET'&&download){await standard.download(res,download[1]);return true;}
     const media=/^\/api\/v2\/standard\/video\/([\w-]{43})$/.exec(url.pathname);
@@ -527,6 +529,13 @@ function createCommerce(settings=process.env,overrides={}){
       }
       throw error;
      }
+     return true;
+    }
+    if(req.method==='POST'&&['/api/v2/standard/upgrade','/api/v2/standard/next-plan'].includes(url.pathname)){
+     if(user.email===adminEmail){response(res,403,{error:'Subscription checkout is not available for administrator accounts.'});return true;}
+     const request=await body(req);
+     if(url.pathname.endsWith('/upgrade'))await standard.upgrade(res,user,request?.maxAmountKop);
+     else await standard.chooseNext(res,user,request?.tier);
      return true;
     }
     if(req.method==='POST'&&url.pathname==='/api/v2/standard/cancel'){await standard.cancel(res,user);return true;}

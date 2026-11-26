@@ -92,7 +92,7 @@ function renderHeader(){
   box.removeAttribute('aria-busy');
   box.replaceChildren();
   if(!user){box.append(button('SIGN IN',()=>openAuth()),button('SIGN UP',()=>openAuth('register'),'store-button primary'));}
-  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',()=>{menu.open=false;renderAccount();show(account);}),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
+  else{const menu=el('details',undefined,'store-user-menu'),summary=el('summary');summary.title=user.email;summary.append(el('span',user.nickname||user.email,'rp-member-name'),el('span',memberLevel(),'rp-member-tier'));const entries=el('div',undefined,'store-user-entries');entries.append(button('Your account',async()=>{menu.open=false;await refreshStandard();renderAccount();show(account);}),button('Sign out',async()=>{try{await api('/auth/logout','POST',{});token=null;user=null;standardPlan=publicStandardPlan;standardAccess=null;standardGeneration++;write('mukvik_store_session',null);window.RPAccountHeader?.clear();renderHeader();account.close();}catch(e){accountStatus.textContent=e.message;renderAccount();show(account);}}));menu.append(summary,entries);box.append(menu);}
  });
 }
 let newsPrompt=null,newsSaving=false;
@@ -139,6 +139,17 @@ async function openRequestedAccount(){
  if(!user){openAuth('login');return;}
  accountRequested=false;
  renderAccount();show(account);
+ if(accountQuery.get('upgrade')==='return'){
+  for(let attempt=0;attempt<6&&user;attempt++){
+   await refreshStandard(true);
+   renderHeader();renderAccount();
+   if(standardAccess?.tier==='pro'){accountStatus.textContent=T('Ultra upgrade confirmed.');return;}
+   accountStatus.textContent=T('Checking your upgrade payment…');
+   await new Promise(resolve=>setTimeout(resolve,3000));
+  }
+  accountStatus.textContent=T('Your upgrade will appear here after Monobank confirms the payment.');
+  return;
+ }
  const order=user.orders.find(o=>o.id===returnedOrder);
  if(order?.status!=='awaiting_manual_review')return;
  accountStatus.textContent=T('Checking your payment…');
@@ -151,11 +162,71 @@ async function openRequestedAccount(){
   accountStatus.textContent=T('Payment status is temporarily unavailable. Please use Refresh to check again.');
  }
 }
+function goToMonobank(checkoutUrl){
+ const url=new URL(checkoutUrl);
+ if(url.protocol!=='https:'||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(url.hostname)||url.username||url.password)throw Error('Unexpected checkout link.');
+ window.top.location.assign(url.href);
+}
+function renderUpgradeOptions(section){
+ if(!standardAccess||user.admin)return;
+ const {upgrade,active,baseTier,nextTier,ultraUntil}=standardAccess;
+ const date=value=>new Date(value).toLocaleDateString(document.documentElement.lang,{timeZone:'Europe/Kyiv'});
+ const planName=tier=>tier==='pro'?'Ultra':'Pro';
+ if(upgrade){
+  const amount=new Intl.NumberFormat(document.documentElement.lang,{style:'currency',currency:'UAH'}).format(upgrade.amountKop/100);
+  const pay=button(T('Upgrade to Ultra')+' · '+amount,async()=>{
+   pay.disabled=true;
+   try{
+    const result=await api('/standard/upgrade','POST',{maxAmountKop:upgrade.amountKop});
+    if(result.checkoutUrl){goToMonobank(result.checkoutUrl);return;}
+    await refreshStandard(true);renderHeader();renderAccount();
+   }catch(e){accountStatus.textContent=e.message;pay.disabled=false;}
+  },'store-button primary');
+  section.append(el('p',T('One-time upgrade until')+' '+date(upgrade.until)),pay);
+ }else if(active&&baseTier==='standard'&&ultraUntil&&+new Date(ultraUntil)>Date.now()){
+  section.append(el('p',T('Ultra upgrade active until')+' '+date(ultraUntil)));
+ }
+ if(active&&(baseTier==='standard'||nextTier)){
+  const select=el('select');
+  select.setAttribute('aria-label',T('Next month’s plan'));
+  for(const tier of ['standard','pro']){
+   const option=el('option',planName(tier));option.value=tier;select.append(option);
+  }
+  select.value=nextTier||'standard';
+  const save=button(T('Save next plan'),async()=>{
+   if(!confirm(T('Saving a plan turns off current auto-renewal. Confirm the next subscription in Monobank after your paid period ends.')))return;
+   save.disabled=true;
+   try{
+    standardAccess=await api('/standard/next-plan','POST',{tier:select.value});
+    renderHeader();renderAccount();
+   }catch(e){accountStatus.textContent=e.message;save.disabled=false;}
+  });
+  section.append(el('p',T('Next month’s plan')),select,save);
+  if(nextTier)section.append(el('p',T('Selected for next month:')+' '+planName(nextTier)+'. '+T('Confirm payment after your paid period ends.')));
+ }
+ const renewalTier=nextTier||(standardAccess.pending&&baseTier);
+ if(!active&&renewalTier){
+  const plan=standardPlan?.plans?.[renewalTier];
+  if(!plan)return;
+  const consent=el('input');consent.type='checkbox';
+  const label=el('label');
+  const terms=el('a',T('subscription terms'));terms.href='/standard-terms.html';
+  label.append(consent,document.createTextNode(' '+T('I agree to automatic renewal at')+' $'+plan.priceCents/100+' / '+T('month')+' · '),terms);
+  const start=button(T('Continue with')+' '+planName(renewalTier),async()=>{
+   if(!consent.checked){accountStatus.textContent=T('Confirm the monthly payment before continuing.');return;}
+   start.disabled=true;
+   try{goToMonobank((await api('/standard/checkout','POST',{consent:true,tier:renewalTier})).checkoutUrl);}
+   catch(e){accountStatus.textContent=e.message;start.disabled=false;}
+  },'store-button primary');
+  section.append(label,start);
+ }
+}
 function renderAccount(){account.querySelector('h2').textContent=T('Your account');accountBody.replaceChildren();if(!user)return;accountBody.append(el('p',user.email,'store-muted'));
  {
   const section=el('section',undefined,'store-order');
   const level=memberLevel();
   section.append(el('h3',level==='Admin'?'Admin access':level+' membership'),el('p',level==='Admin'?'You have administrative access.':level==='Free'?(standardAccess?.pending?'Payment pending. Your Free membership is active.':'Your Free membership is active.'):('Paid videos and downloads available until '+new Date(standardAccess.paidUntil).toLocaleString()),'store-muted'));
+  renderUpgradeOptions(section);
   if(standardAccess?.cancelled)section.append(el('p','Auto-renewal is off.'));
   if(standardAccess?.cancellable){
    const cancel=button('Cancel auto-renewal',async()=>{
@@ -177,7 +248,7 @@ function renderAccount(){account.querySelector('h2').textContent=T('Your account
    block.append(remove);
   }accountBody.append(block);
  }
- accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
+ accountBody.append(button('Refresh',async()=>{try{for(const o of user.orders.filter(x=>x.status==='awaiting_manual_review'))await api('/orders/'+o.id+'/monobank/status');user=await api('/me');await refreshStandard(true);renderHeader();renderAccount();}catch(e){accountStatus.textContent=e.message;}}));
  if(!user.admin&&user.newsOptIn!==undefined){
   const news=el('section',undefined,'store-order');newsControls(news,false);accountBody.append(news);
  }
@@ -321,7 +392,7 @@ function renderStandard(){
   }
   if(standardPlan.pilot)panel.append(el('p','Admin pilot. Monobank will charge the displayed amount if you confirm payment.'));
   if(standardAccess?.active){
-   panel.append(el('p',standardAccess.cancelled?'You can switch to Ultra after your current paid period ends.':'You can switch to Ultra after your current paid period ends. Turn off Pro auto-renewal in your account to make the switch.'),button('Manage Pro',()=>{renderAccount();show(account);}));
+   panel.append(button('Manage subscription',async()=>{await refreshStandard();renderAccount();show(account);}));
   }
   else {
    const consent=el('input');consent.type='checkbox';
@@ -334,9 +405,7 @@ function renderStandard(){
     start.disabled=true;
     try{
      const result=await api('/standard/checkout','POST',{consent:true,tier});
-     const url=new URL(result.checkoutUrl);
-     if(url.protocol!=='https:'||!['pay.mbnk.biz','pay.monobank.ua','pay.monobank.com.ua'].includes(url.hostname)||url.username||url.password)throw Error('Unexpected checkout link.');
-     window.top.location.assign(url.href);
+     goToMonobank(result.checkoutUrl);
     }catch(e){feedback.textContent=e.message;start.disabled=false;}
    },'store-button primary');
    panel.append(label,start,feedback);
@@ -353,7 +422,7 @@ function renderStandard(){
  }
  clearTimeout(videoExpiryTimer);
  if(paidActive)videoExpiryTimer=setTimeout(()=>{
-  if(+new Date(standardAccess?.paidUntil)<=Date.now()){renderHeader();refreshStandard().then(renderHeader);}
+  if(+new Date(standardAccess?.paidUntil)<=Date.now()){renderHeader();refreshStandard().then(()=>{renderHeader();if(account.open)renderAccount();});}
   else renderStandard();
  },Math.min(paidUntil-Date.now()+25,2147483647));
  const ticketUrl=async slug=>{
@@ -464,7 +533,7 @@ async function retryCatalog(){
  renderHeader();
 }
 try{
- const returning=accountQuery.get('subscription')==='return';
+ const returning=accountQuery.get('subscription')==='return'||accountQuery.get('upgrade')==='return';
  const [, , access]=await Promise.all([
   loadCatalog(),
   token?api('/me').then(value=>{user=value;}).catch(()=>{}):null,
